@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import os
 from pathlib import Path
 import re
@@ -36,6 +37,23 @@ def _put(root: Path,name: str,content: bytes,mode: int=0o644):
     path=root/name; path.parent.mkdir(parents=True,exist_ok=True); path.write_bytes(content); path.chmod(mode)
 
 
+def _script_without_bytecode(raw: bytes) -> bytes:
+    """Direct engine invocations must not add cache files to an immutable release."""
+    source=raw.decode('utf-8')
+    tree=ast.parse(source)
+    # Keep the shebang, inline dependency metadata, module docstring and future
+    # imports in place. Disable writes before any runtime imports execute.
+    for node in tree.body:
+        if isinstance(node,ast.Expr) and isinstance(node.value,ast.Constant) and isinstance(node.value.value,str):
+            continue
+        if isinstance(node,ast.ImportFrom) and node.module=='__future__':
+            continue
+        lines=source.splitlines(keepends=True)
+        lines.insert(node.lineno-1,'if __name__ == "__main__":\n    import sys\n    sys.dont_write_bytecode = True\n\n')
+        return ''.join(lines).encode('utf-8')
+    return raw
+
+
 def build(plugin: Path,output: Path) -> dict:
     if output.exists(): raise FlowError('package output must be a new directory')
     definition=policy.load_definition(plugin); names=definition['identity']; name=names['distribution']
@@ -51,6 +69,7 @@ def build(plugin: Path,output: Path) -> dict:
                 if any(part in {'tests','__pycache__','.pytest_cache','.git'} for part in Path(relative).parts) or path.suffix=='.pyc': continue
                 data=managed.read_file(plugin,path.relative_to(plugin).as_posix())
                 if data is None: raise FlowError('source changed during package build')
+                if directory=='scripts' and path.suffix=='.py': data=_script_without_bytecode(data)
                 _put(engine,directory+'/'+relative,data,0o755 if path.stat().st_mode & 0o111 else 0o644)
         _put(engine,'plugin.json',managed.read_file(plugin,'plugin.json') or b'{}')
         license_=managed.read_file(plugin.parent,'LICENSE')

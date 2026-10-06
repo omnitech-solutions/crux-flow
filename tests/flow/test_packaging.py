@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import os
 import json
 from pathlib import Path
 import shutil
@@ -55,6 +56,34 @@ def test_tampered_payload_cannot_validate(tmp_path):
     with pytest.raises(ValueError): api().inspect(Path(out['root']))
 
 
+def test_running_packaged_engine_script_preserves_release_manifest(tmp_path):
+    out=api().build(PLUGIN,tmp_path/'out')
+    root=Path(out['root'])
+    before=api().inspect(root)['digest']
+    env=dict(os.environ)
+    env.pop('PYTHONDONTWRITEBYTECODE',None)
+    env.pop('PYTHONPYCACHEPREFIX',None)
+    done=subprocess.run([sys.executable,str(Path(out['payload'])/'engine/scripts/bionic-config.py'),
+                         '--repo-root',str(tmp_path)],env=env,capture_output=True,text=True)
+    assert done.returncode==0,done.stderr
+    assert json.loads(done.stdout)['docs_dir']=='bionic'
+    assert api().inspect(root)['digest']==before
+    assert not list(root.rglob('*.pyc'))
+
+
+def test_unlisted_release_content_is_still_refused(tmp_path):
+    out=api().build(PLUGIN,tmp_path/'out')
+    root=Path(out['root'])
+    extra=Path(out['payload'])/'engine/scripts/__pycache__/foreign.pyc'
+    extra.parent.mkdir()
+    extra.write_bytes(b'unlisted content')
+    with pytest.raises(ValueError,match='release content set differs from manifest'):
+        api().inspect(root)
+    extra.unlink()
+    assert not extra.exists()
+    assert api().inspect(root)['statically_valid']
+
+
 def test_zip_escape_and_symlink_are_refused(tmp_path):
     archive=tmp_path/'bad.zip'
     with zipfile.ZipFile(archive,'w') as z: z.writestr('../escape','x')
@@ -65,7 +94,8 @@ def test_zip_escape_and_symlink_are_refused(tmp_path):
     assert not (tmp_path/'escape').exists()
 
 
-def test_source_provenance_does_not_invent_git_history(tmp_path):
+def test_source_provenance_does_not_invent_git_history(tmp_path,monkeypatch):
+    monkeypatch.setattr(api().provenance,'git_head',lambda repo: None)
     out=api().build(PLUGIN,tmp_path/'out')
     meta=api().inspect(Path(out['root']))['release']
     assert meta['source_commit'] is None
