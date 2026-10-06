@@ -129,7 +129,7 @@ the actual client, not inferred from CLI installation.
 ## Publish a release
 
 ```sh
-pnpm run release -- --to git@github.com:omnitech-solutions/crux-flow-marketplace.git
+pnpm run release --to git@github.com:omnitech-solutions/crux-flow-marketplace.git
 ```
 
 One command builds the release, inspects it, stages it into a clone of the distribution

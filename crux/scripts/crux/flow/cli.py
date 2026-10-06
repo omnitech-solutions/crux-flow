@@ -167,6 +167,8 @@ def _run(args,plugin,runner,executables):
 
 
 def main(argv: list[str] | None=None,*,plugin: Path=PLUGIN,runner=execute,executables: dict[str,str] | None=None,confirm=None,fetch=None) -> int:
+    argv=list(sys.argv[1:] if argv is None else argv)
+    if '--' in argv: argv.remove('--')   # package managers forward their own separator
     args=parser().parse_args(argv); args.repo=args.repo.resolve(); args.home=args.home.resolve()
     code=0
     try:

@@ -135,3 +135,10 @@ def test_cli_publishes_with_one_command(remote, capsys):
     out = json.loads(capsys.readouterr().out)
     assert out['status'] == 'published' and git(remote, 'tag', '--list') == 'v0.2.0'
     assert main(['publish', '--yes']) == 2 and 'publish needs --to' in capsys.readouterr().err
+
+
+def test_a_forwarded_double_dash_separator_is_ignored(remote, capsys):
+    """`pnpm run release -- --to X` forwards the separator literally."""
+    from crux.flow.cli import main
+    assert main(['publish', '--', '--to', str(remote), '--allow-dirty', '--no-github-release', '--yes']) == 0
+    assert json.loads(capsys.readouterr().out)['status'] == 'published'
