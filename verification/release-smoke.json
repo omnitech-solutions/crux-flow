@@ -1,0 +1,148 @@
+{
+  "status": "passed",
+  "archive_sha256": "8a33dcdbdceb881db5c27da27880e6ea29aca0746dda227f9809f3fb8887e644",
+  "reproducible_bytes": true,
+  "checks": [
+    {
+      "surface": "package",
+      "args": [
+        "mode",
+        "list"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "0cdabf573a3f6a3d2f362fe3a78bdd5d6a4f5daaa0433e6f9961ce7fe13688bc"
+    },
+    {
+      "surface": "package",
+      "args": [
+        "guide"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "93a267e5a80503e50fd3b98ebd18194b1019e6790c0318a126235ceb5d24797a"
+    },
+    {
+      "surface": "package",
+      "args": [
+        "mode",
+        "show",
+        "--resolved",
+        "--host",
+        "claude",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "576c2528c7ae71212d7b5c3beb6bc8fd00646957e33690ed66e9064b6d2eb677"
+    },
+    {
+      "surface": "package",
+      "args": [
+        "mode",
+        "show",
+        "--resolved",
+        "--host",
+        "codex",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "4e1024a489cfc87e50bf86b07a5eaa9c67a3435ecab11d0dbb2163ffd3d84d9b"
+    },
+    {
+      "surface": "package",
+      "args": [
+        "mode",
+        "show",
+        "--resolved",
+        "--host",
+        "opencode",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "483ee6541dad5a380d1417fb5677b56ca0602e1dd3d605d8b568ed976c25a71e"
+    },
+    {
+      "surface": "package",
+      "args": [
+        "mode",
+        "show",
+        "--resolved",
+        "--host",
+        "omp",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "3fdfb61e8e8bb89a4ff3e9f7fba5d513a490a3ebb5e222d9fcffacee99fd882a"
+    },
+    {
+      "surface": "source",
+      "args": [
+        "mode",
+        "list"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "0cdabf573a3f6a3d2f362fe3a78bdd5d6a4f5daaa0433e6f9961ce7fe13688bc"
+    },
+    {
+      "surface": "source",
+      "args": [
+        "guide"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "ac8617ed1e5299b25d8127b9db1c3146dbd740eee04d1e77516681b7d95c16c3"
+    },
+    {
+      "surface": "source",
+      "args": [
+        "mode",
+        "show",
+        "--resolved",
+        "--host",
+        "claude",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "576c2528c7ae71212d7b5c3beb6bc8fd00646957e33690ed66e9064b6d2eb677"
+    },
+    {
+      "surface": "source",
+      "args": [
+        "mode",
+        "show",
+        "--resolved",
+        "--host",
+        "codex",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "4e1024a489cfc87e50bf86b07a5eaa9c67a3435ecab11d0dbb2163ffd3d84d9b"
+    },
+    {
+      "surface": "source",
+      "args": [
+        "mode",
+        "show",
+        "--resolved",
+        "--host",
+        "opencode",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "483ee6541dad5a380d1417fb5677b56ca0602e1dd3d605d8b568ed976c25a71e"
+    },
+    {
+      "surface": "source",
+      "args": [
+        "mode",
+        "show",
+        "--resolved",
+        "--host",
+        "omp",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "3fdfb61e8e8bb89a4ff3e9f7fba5d513a490a3ebb5e222d9fcffacee99fd882a"
+    }
+  ],
+  "archive_files": 378,
+  "standalone_source_rebuild_matches": true,
+  "retained_package_unchanged_after_execution": true
+}

@@ -1,0 +1,57 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		LIB_PRJ = {
+			isa = PBXProject;
+			mainGroup = LIB_MG;
+			targets = (
+				LIB_TGT,
+			);
+		};
+		LIB_MG = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				LIB_GRP,
+			);
+		};
+		LIB_GRP = {
+			isa = PBXGroup;
+			path = "Lib";
+			sourceTree = "<group>";
+			children = (
+				LIB_FR_ENGINE,
+			);
+		};
+		LIB_FR_ENGINE = {
+			isa = PBXFileReference;
+			path = "Engine.swift";
+			sourceTree = "<group>";
+		};
+		LIB_BF_ENGINE = {
+			isa = PBXBuildFile;
+			fileRef = LIB_FR_ENGINE;
+		};
+		LIB_PH_SOURCES = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				LIB_BF_ENGINE,
+			);
+		};
+		LIB_TGT = {
+			isa = PBXNativeTarget;
+			name = "Lib";
+			productType = "com.apple.product-type.framework";
+			buildPhases = (
+				LIB_PH_SOURCES,
+			);
+			dependencies = (
+			);
+		};
+	};
+	rootObject = LIB_PRJ;
+}

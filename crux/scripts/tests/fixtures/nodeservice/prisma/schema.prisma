@@ -1,0 +1,38 @@
+// Prisma schema — the committed data-model projection (ADR-0068 point 2).
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  role      Role     @default(USER)
+  tags      String[]
+  posts     Post[]
+  createdAt DateTime @default(now())
+}
+
+model Post {
+  id       Int    @id @default(autoincrement())
+  title    String
+  author   User   @relation(fields: [authorId], references: [id])
+  authorId Int
+}
+
+model Session {
+  id    Int    @id @default(autoincrement())
+  token String @unique
+
+  @@map("sessions")
+}

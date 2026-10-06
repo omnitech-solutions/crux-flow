@@ -1,0 +1,14 @@
+# ADR-0130 clause 17 hostile-boundary CONTROL: a `project.pbxproj` nested to
+# exactly the admitted depth (probed against the real grammar at fixture-
+# authoring time: 61 custom dict levels inside one field, one below
+# the too-deep refusal). Reads cleanly -- no `project-unreadable` residual.
+exit_code: 0
+
+rows:
+  data-model:
+    - "| `Model` | struct | public |"
+
+absent:
+  module-graph:
+    - "project-unreadable"
+    - "too-deep"

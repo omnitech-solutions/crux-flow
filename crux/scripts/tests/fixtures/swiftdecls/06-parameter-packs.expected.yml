@@ -1,0 +1,14 @@
+# Parameter packs (`each`, `repeat`). Schema: 01-actor.expected.yml.
+types:
+  - {name: Tuple, kind: struct, access: public, at: [1, 1], conditional: false}
+stored_properties:
+  - {owner: Tuple, name: elements, type: "(repeat each Element)", access: public, at: [2, 2]}
+relationships: []
+interfaces:
+  - {name: Tuple, kind: struct, access: public, at: [1, 1], attributes: [], conditional: false}
+  - {name: Tuple.elements, kind: let, access: public, at: [2, 2], attributes: [], conditional: false}
+  - {name: "Tuple.init(_:)", kind: init, access: public, at: [4, 4], attributes: [], conditional: false}
+  - {name: "count(_:)", kind: func, access: public, at: [9, 9], attributes: [], conditional: false}
+requirements: []
+mains: []
+residuals: []

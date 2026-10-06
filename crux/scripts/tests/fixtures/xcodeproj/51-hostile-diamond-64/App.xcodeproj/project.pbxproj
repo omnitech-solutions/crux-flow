@@ -1,0 +1,1958 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+				TGT_A,
+			);
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				GRP_A1,
+				GRP_B1,
+			);
+		};
+		GRP_A1 = {
+			isa = PBXGroup;
+			path = "A1";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED1,
+			);
+		};
+		GRP_B1 = {
+			isa = PBXGroup;
+			path = "B1";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED1,
+			);
+		};
+		GRP_SHARED1 = {
+			isa = PBXGroup;
+			path = "Shared1";
+			sourceTree = "<group>";
+			children = (
+				GRP_A2,
+				GRP_B2,
+			);
+		};
+		GRP_A2 = {
+			isa = PBXGroup;
+			path = "A2";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED2,
+			);
+		};
+		GRP_B2 = {
+			isa = PBXGroup;
+			path = "B2";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED2,
+			);
+		};
+		GRP_SHARED2 = {
+			isa = PBXGroup;
+			path = "Shared2";
+			sourceTree = "<group>";
+			children = (
+				GRP_A3,
+				GRP_B3,
+			);
+		};
+		GRP_A3 = {
+			isa = PBXGroup;
+			path = "A3";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED3,
+			);
+		};
+		GRP_B3 = {
+			isa = PBXGroup;
+			path = "B3";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED3,
+			);
+		};
+		GRP_SHARED3 = {
+			isa = PBXGroup;
+			path = "Shared3";
+			sourceTree = "<group>";
+			children = (
+				GRP_A4,
+				GRP_B4,
+			);
+		};
+		GRP_A4 = {
+			isa = PBXGroup;
+			path = "A4";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED4,
+			);
+		};
+		GRP_B4 = {
+			isa = PBXGroup;
+			path = "B4";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED4,
+			);
+		};
+		GRP_SHARED4 = {
+			isa = PBXGroup;
+			path = "Shared4";
+			sourceTree = "<group>";
+			children = (
+				GRP_A5,
+				GRP_B5,
+			);
+		};
+		GRP_A5 = {
+			isa = PBXGroup;
+			path = "A5";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED5,
+			);
+		};
+		GRP_B5 = {
+			isa = PBXGroup;
+			path = "B5";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED5,
+			);
+		};
+		GRP_SHARED5 = {
+			isa = PBXGroup;
+			path = "Shared5";
+			sourceTree = "<group>";
+			children = (
+				GRP_A6,
+				GRP_B6,
+			);
+		};
+		GRP_A6 = {
+			isa = PBXGroup;
+			path = "A6";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED6,
+			);
+		};
+		GRP_B6 = {
+			isa = PBXGroup;
+			path = "B6";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED6,
+			);
+		};
+		GRP_SHARED6 = {
+			isa = PBXGroup;
+			path = "Shared6";
+			sourceTree = "<group>";
+			children = (
+				GRP_A7,
+				GRP_B7,
+			);
+		};
+		GRP_A7 = {
+			isa = PBXGroup;
+			path = "A7";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED7,
+			);
+		};
+		GRP_B7 = {
+			isa = PBXGroup;
+			path = "B7";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED7,
+			);
+		};
+		GRP_SHARED7 = {
+			isa = PBXGroup;
+			path = "Shared7";
+			sourceTree = "<group>";
+			children = (
+				GRP_A8,
+				GRP_B8,
+			);
+		};
+		GRP_A8 = {
+			isa = PBXGroup;
+			path = "A8";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED8,
+			);
+		};
+		GRP_B8 = {
+			isa = PBXGroup;
+			path = "B8";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED8,
+			);
+		};
+		GRP_SHARED8 = {
+			isa = PBXGroup;
+			path = "Shared8";
+			sourceTree = "<group>";
+			children = (
+				GRP_A9,
+				GRP_B9,
+			);
+		};
+		GRP_A9 = {
+			isa = PBXGroup;
+			path = "A9";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED9,
+			);
+		};
+		GRP_B9 = {
+			isa = PBXGroup;
+			path = "B9";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED9,
+			);
+		};
+		GRP_SHARED9 = {
+			isa = PBXGroup;
+			path = "Shared9";
+			sourceTree = "<group>";
+			children = (
+				GRP_A10,
+				GRP_B10,
+			);
+		};
+		GRP_A10 = {
+			isa = PBXGroup;
+			path = "A10";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED10,
+			);
+		};
+		GRP_B10 = {
+			isa = PBXGroup;
+			path = "B10";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED10,
+			);
+		};
+		GRP_SHARED10 = {
+			isa = PBXGroup;
+			path = "Shared10";
+			sourceTree = "<group>";
+			children = (
+				GRP_A11,
+				GRP_B11,
+			);
+		};
+		GRP_A11 = {
+			isa = PBXGroup;
+			path = "A11";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED11,
+			);
+		};
+		GRP_B11 = {
+			isa = PBXGroup;
+			path = "B11";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED11,
+			);
+		};
+		GRP_SHARED11 = {
+			isa = PBXGroup;
+			path = "Shared11";
+			sourceTree = "<group>";
+			children = (
+				GRP_A12,
+				GRP_B12,
+			);
+		};
+		GRP_A12 = {
+			isa = PBXGroup;
+			path = "A12";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED12,
+			);
+		};
+		GRP_B12 = {
+			isa = PBXGroup;
+			path = "B12";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED12,
+			);
+		};
+		GRP_SHARED12 = {
+			isa = PBXGroup;
+			path = "Shared12";
+			sourceTree = "<group>";
+			children = (
+				GRP_A13,
+				GRP_B13,
+			);
+		};
+		GRP_A13 = {
+			isa = PBXGroup;
+			path = "A13";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED13,
+			);
+		};
+		GRP_B13 = {
+			isa = PBXGroup;
+			path = "B13";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED13,
+			);
+		};
+		GRP_SHARED13 = {
+			isa = PBXGroup;
+			path = "Shared13";
+			sourceTree = "<group>";
+			children = (
+				GRP_A14,
+				GRP_B14,
+			);
+		};
+		GRP_A14 = {
+			isa = PBXGroup;
+			path = "A14";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED14,
+			);
+		};
+		GRP_B14 = {
+			isa = PBXGroup;
+			path = "B14";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED14,
+			);
+		};
+		GRP_SHARED14 = {
+			isa = PBXGroup;
+			path = "Shared14";
+			sourceTree = "<group>";
+			children = (
+				GRP_A15,
+				GRP_B15,
+			);
+		};
+		GRP_A15 = {
+			isa = PBXGroup;
+			path = "A15";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED15,
+			);
+		};
+		GRP_B15 = {
+			isa = PBXGroup;
+			path = "B15";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED15,
+			);
+		};
+		GRP_SHARED15 = {
+			isa = PBXGroup;
+			path = "Shared15";
+			sourceTree = "<group>";
+			children = (
+				GRP_A16,
+				GRP_B16,
+			);
+		};
+		GRP_A16 = {
+			isa = PBXGroup;
+			path = "A16";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED16,
+			);
+		};
+		GRP_B16 = {
+			isa = PBXGroup;
+			path = "B16";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED16,
+			);
+		};
+		GRP_SHARED16 = {
+			isa = PBXGroup;
+			path = "Shared16";
+			sourceTree = "<group>";
+			children = (
+				GRP_A17,
+				GRP_B17,
+			);
+		};
+		GRP_A17 = {
+			isa = PBXGroup;
+			path = "A17";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED17,
+			);
+		};
+		GRP_B17 = {
+			isa = PBXGroup;
+			path = "B17";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED17,
+			);
+		};
+		GRP_SHARED17 = {
+			isa = PBXGroup;
+			path = "Shared17";
+			sourceTree = "<group>";
+			children = (
+				GRP_A18,
+				GRP_B18,
+			);
+		};
+		GRP_A18 = {
+			isa = PBXGroup;
+			path = "A18";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED18,
+			);
+		};
+		GRP_B18 = {
+			isa = PBXGroup;
+			path = "B18";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED18,
+			);
+		};
+		GRP_SHARED18 = {
+			isa = PBXGroup;
+			path = "Shared18";
+			sourceTree = "<group>";
+			children = (
+				GRP_A19,
+				GRP_B19,
+			);
+		};
+		GRP_A19 = {
+			isa = PBXGroup;
+			path = "A19";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED19,
+			);
+		};
+		GRP_B19 = {
+			isa = PBXGroup;
+			path = "B19";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED19,
+			);
+		};
+		GRP_SHARED19 = {
+			isa = PBXGroup;
+			path = "Shared19";
+			sourceTree = "<group>";
+			children = (
+				GRP_A20,
+				GRP_B20,
+			);
+		};
+		GRP_A20 = {
+			isa = PBXGroup;
+			path = "A20";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED20,
+			);
+		};
+		GRP_B20 = {
+			isa = PBXGroup;
+			path = "B20";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED20,
+			);
+		};
+		GRP_SHARED20 = {
+			isa = PBXGroup;
+			path = "Shared20";
+			sourceTree = "<group>";
+			children = (
+				GRP_A21,
+				GRP_B21,
+			);
+		};
+		GRP_A21 = {
+			isa = PBXGroup;
+			path = "A21";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED21,
+			);
+		};
+		GRP_B21 = {
+			isa = PBXGroup;
+			path = "B21";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED21,
+			);
+		};
+		GRP_SHARED21 = {
+			isa = PBXGroup;
+			path = "Shared21";
+			sourceTree = "<group>";
+			children = (
+				GRP_A22,
+				GRP_B22,
+			);
+		};
+		GRP_A22 = {
+			isa = PBXGroup;
+			path = "A22";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED22,
+			);
+		};
+		GRP_B22 = {
+			isa = PBXGroup;
+			path = "B22";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED22,
+			);
+		};
+		GRP_SHARED22 = {
+			isa = PBXGroup;
+			path = "Shared22";
+			sourceTree = "<group>";
+			children = (
+				GRP_A23,
+				GRP_B23,
+			);
+		};
+		GRP_A23 = {
+			isa = PBXGroup;
+			path = "A23";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED23,
+			);
+		};
+		GRP_B23 = {
+			isa = PBXGroup;
+			path = "B23";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED23,
+			);
+		};
+		GRP_SHARED23 = {
+			isa = PBXGroup;
+			path = "Shared23";
+			sourceTree = "<group>";
+			children = (
+				GRP_A24,
+				GRP_B24,
+			);
+		};
+		GRP_A24 = {
+			isa = PBXGroup;
+			path = "A24";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED24,
+			);
+		};
+		GRP_B24 = {
+			isa = PBXGroup;
+			path = "B24";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED24,
+			);
+		};
+		GRP_SHARED24 = {
+			isa = PBXGroup;
+			path = "Shared24";
+			sourceTree = "<group>";
+			children = (
+				GRP_A25,
+				GRP_B25,
+			);
+		};
+		GRP_A25 = {
+			isa = PBXGroup;
+			path = "A25";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED25,
+			);
+		};
+		GRP_B25 = {
+			isa = PBXGroup;
+			path = "B25";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED25,
+			);
+		};
+		GRP_SHARED25 = {
+			isa = PBXGroup;
+			path = "Shared25";
+			sourceTree = "<group>";
+			children = (
+				GRP_A26,
+				GRP_B26,
+			);
+		};
+		GRP_A26 = {
+			isa = PBXGroup;
+			path = "A26";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED26,
+			);
+		};
+		GRP_B26 = {
+			isa = PBXGroup;
+			path = "B26";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED26,
+			);
+		};
+		GRP_SHARED26 = {
+			isa = PBXGroup;
+			path = "Shared26";
+			sourceTree = "<group>";
+			children = (
+				GRP_A27,
+				GRP_B27,
+			);
+		};
+		GRP_A27 = {
+			isa = PBXGroup;
+			path = "A27";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED27,
+			);
+		};
+		GRP_B27 = {
+			isa = PBXGroup;
+			path = "B27";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED27,
+			);
+		};
+		GRP_SHARED27 = {
+			isa = PBXGroup;
+			path = "Shared27";
+			sourceTree = "<group>";
+			children = (
+				GRP_A28,
+				GRP_B28,
+			);
+		};
+		GRP_A28 = {
+			isa = PBXGroup;
+			path = "A28";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED28,
+			);
+		};
+		GRP_B28 = {
+			isa = PBXGroup;
+			path = "B28";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED28,
+			);
+		};
+		GRP_SHARED28 = {
+			isa = PBXGroup;
+			path = "Shared28";
+			sourceTree = "<group>";
+			children = (
+				GRP_A29,
+				GRP_B29,
+			);
+		};
+		GRP_A29 = {
+			isa = PBXGroup;
+			path = "A29";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED29,
+			);
+		};
+		GRP_B29 = {
+			isa = PBXGroup;
+			path = "B29";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED29,
+			);
+		};
+		GRP_SHARED29 = {
+			isa = PBXGroup;
+			path = "Shared29";
+			sourceTree = "<group>";
+			children = (
+				GRP_A30,
+				GRP_B30,
+			);
+		};
+		GRP_A30 = {
+			isa = PBXGroup;
+			path = "A30";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED30,
+			);
+		};
+		GRP_B30 = {
+			isa = PBXGroup;
+			path = "B30";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED30,
+			);
+		};
+		GRP_SHARED30 = {
+			isa = PBXGroup;
+			path = "Shared30";
+			sourceTree = "<group>";
+			children = (
+				GRP_A31,
+				GRP_B31,
+			);
+		};
+		GRP_A31 = {
+			isa = PBXGroup;
+			path = "A31";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED31,
+			);
+		};
+		GRP_B31 = {
+			isa = PBXGroup;
+			path = "B31";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED31,
+			);
+		};
+		GRP_SHARED31 = {
+			isa = PBXGroup;
+			path = "Shared31";
+			sourceTree = "<group>";
+			children = (
+				GRP_A32,
+				GRP_B32,
+			);
+		};
+		GRP_A32 = {
+			isa = PBXGroup;
+			path = "A32";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED32,
+			);
+		};
+		GRP_B32 = {
+			isa = PBXGroup;
+			path = "B32";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED32,
+			);
+		};
+		GRP_SHARED32 = {
+			isa = PBXGroup;
+			path = "Shared32";
+			sourceTree = "<group>";
+			children = (
+				GRP_A33,
+				GRP_B33,
+			);
+		};
+		GRP_A33 = {
+			isa = PBXGroup;
+			path = "A33";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED33,
+			);
+		};
+		GRP_B33 = {
+			isa = PBXGroup;
+			path = "B33";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED33,
+			);
+		};
+		GRP_SHARED33 = {
+			isa = PBXGroup;
+			path = "Shared33";
+			sourceTree = "<group>";
+			children = (
+				GRP_A34,
+				GRP_B34,
+			);
+		};
+		GRP_A34 = {
+			isa = PBXGroup;
+			path = "A34";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED34,
+			);
+		};
+		GRP_B34 = {
+			isa = PBXGroup;
+			path = "B34";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED34,
+			);
+		};
+		GRP_SHARED34 = {
+			isa = PBXGroup;
+			path = "Shared34";
+			sourceTree = "<group>";
+			children = (
+				GRP_A35,
+				GRP_B35,
+			);
+		};
+		GRP_A35 = {
+			isa = PBXGroup;
+			path = "A35";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED35,
+			);
+		};
+		GRP_B35 = {
+			isa = PBXGroup;
+			path = "B35";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED35,
+			);
+		};
+		GRP_SHARED35 = {
+			isa = PBXGroup;
+			path = "Shared35";
+			sourceTree = "<group>";
+			children = (
+				GRP_A36,
+				GRP_B36,
+			);
+		};
+		GRP_A36 = {
+			isa = PBXGroup;
+			path = "A36";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED36,
+			);
+		};
+		GRP_B36 = {
+			isa = PBXGroup;
+			path = "B36";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED36,
+			);
+		};
+		GRP_SHARED36 = {
+			isa = PBXGroup;
+			path = "Shared36";
+			sourceTree = "<group>";
+			children = (
+				GRP_A37,
+				GRP_B37,
+			);
+		};
+		GRP_A37 = {
+			isa = PBXGroup;
+			path = "A37";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED37,
+			);
+		};
+		GRP_B37 = {
+			isa = PBXGroup;
+			path = "B37";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED37,
+			);
+		};
+		GRP_SHARED37 = {
+			isa = PBXGroup;
+			path = "Shared37";
+			sourceTree = "<group>";
+			children = (
+				GRP_A38,
+				GRP_B38,
+			);
+		};
+		GRP_A38 = {
+			isa = PBXGroup;
+			path = "A38";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED38,
+			);
+		};
+		GRP_B38 = {
+			isa = PBXGroup;
+			path = "B38";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED38,
+			);
+		};
+		GRP_SHARED38 = {
+			isa = PBXGroup;
+			path = "Shared38";
+			sourceTree = "<group>";
+			children = (
+				GRP_A39,
+				GRP_B39,
+			);
+		};
+		GRP_A39 = {
+			isa = PBXGroup;
+			path = "A39";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED39,
+			);
+		};
+		GRP_B39 = {
+			isa = PBXGroup;
+			path = "B39";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED39,
+			);
+		};
+		GRP_SHARED39 = {
+			isa = PBXGroup;
+			path = "Shared39";
+			sourceTree = "<group>";
+			children = (
+				GRP_A40,
+				GRP_B40,
+			);
+		};
+		GRP_A40 = {
+			isa = PBXGroup;
+			path = "A40";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED40,
+			);
+		};
+		GRP_B40 = {
+			isa = PBXGroup;
+			path = "B40";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED40,
+			);
+		};
+		GRP_SHARED40 = {
+			isa = PBXGroup;
+			path = "Shared40";
+			sourceTree = "<group>";
+			children = (
+				GRP_A41,
+				GRP_B41,
+			);
+		};
+		GRP_A41 = {
+			isa = PBXGroup;
+			path = "A41";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED41,
+			);
+		};
+		GRP_B41 = {
+			isa = PBXGroup;
+			path = "B41";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED41,
+			);
+		};
+		GRP_SHARED41 = {
+			isa = PBXGroup;
+			path = "Shared41";
+			sourceTree = "<group>";
+			children = (
+				GRP_A42,
+				GRP_B42,
+			);
+		};
+		GRP_A42 = {
+			isa = PBXGroup;
+			path = "A42";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED42,
+			);
+		};
+		GRP_B42 = {
+			isa = PBXGroup;
+			path = "B42";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED42,
+			);
+		};
+		GRP_SHARED42 = {
+			isa = PBXGroup;
+			path = "Shared42";
+			sourceTree = "<group>";
+			children = (
+				GRP_A43,
+				GRP_B43,
+			);
+		};
+		GRP_A43 = {
+			isa = PBXGroup;
+			path = "A43";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED43,
+			);
+		};
+		GRP_B43 = {
+			isa = PBXGroup;
+			path = "B43";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED43,
+			);
+		};
+		GRP_SHARED43 = {
+			isa = PBXGroup;
+			path = "Shared43";
+			sourceTree = "<group>";
+			children = (
+				GRP_A44,
+				GRP_B44,
+			);
+		};
+		GRP_A44 = {
+			isa = PBXGroup;
+			path = "A44";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED44,
+			);
+		};
+		GRP_B44 = {
+			isa = PBXGroup;
+			path = "B44";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED44,
+			);
+		};
+		GRP_SHARED44 = {
+			isa = PBXGroup;
+			path = "Shared44";
+			sourceTree = "<group>";
+			children = (
+				GRP_A45,
+				GRP_B45,
+			);
+		};
+		GRP_A45 = {
+			isa = PBXGroup;
+			path = "A45";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED45,
+			);
+		};
+		GRP_B45 = {
+			isa = PBXGroup;
+			path = "B45";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED45,
+			);
+		};
+		GRP_SHARED45 = {
+			isa = PBXGroup;
+			path = "Shared45";
+			sourceTree = "<group>";
+			children = (
+				GRP_A46,
+				GRP_B46,
+			);
+		};
+		GRP_A46 = {
+			isa = PBXGroup;
+			path = "A46";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED46,
+			);
+		};
+		GRP_B46 = {
+			isa = PBXGroup;
+			path = "B46";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED46,
+			);
+		};
+		GRP_SHARED46 = {
+			isa = PBXGroup;
+			path = "Shared46";
+			sourceTree = "<group>";
+			children = (
+				GRP_A47,
+				GRP_B47,
+			);
+		};
+		GRP_A47 = {
+			isa = PBXGroup;
+			path = "A47";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED47,
+			);
+		};
+		GRP_B47 = {
+			isa = PBXGroup;
+			path = "B47";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED47,
+			);
+		};
+		GRP_SHARED47 = {
+			isa = PBXGroup;
+			path = "Shared47";
+			sourceTree = "<group>";
+			children = (
+				GRP_A48,
+				GRP_B48,
+			);
+		};
+		GRP_A48 = {
+			isa = PBXGroup;
+			path = "A48";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED48,
+			);
+		};
+		GRP_B48 = {
+			isa = PBXGroup;
+			path = "B48";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED48,
+			);
+		};
+		GRP_SHARED48 = {
+			isa = PBXGroup;
+			path = "Shared48";
+			sourceTree = "<group>";
+			children = (
+				GRP_A49,
+				GRP_B49,
+			);
+		};
+		GRP_A49 = {
+			isa = PBXGroup;
+			path = "A49";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED49,
+			);
+		};
+		GRP_B49 = {
+			isa = PBXGroup;
+			path = "B49";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED49,
+			);
+		};
+		GRP_SHARED49 = {
+			isa = PBXGroup;
+			path = "Shared49";
+			sourceTree = "<group>";
+			children = (
+				GRP_A50,
+				GRP_B50,
+			);
+		};
+		GRP_A50 = {
+			isa = PBXGroup;
+			path = "A50";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED50,
+			);
+		};
+		GRP_B50 = {
+			isa = PBXGroup;
+			path = "B50";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED50,
+			);
+		};
+		GRP_SHARED50 = {
+			isa = PBXGroup;
+			path = "Shared50";
+			sourceTree = "<group>";
+			children = (
+				GRP_A51,
+				GRP_B51,
+			);
+		};
+		GRP_A51 = {
+			isa = PBXGroup;
+			path = "A51";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED51,
+			);
+		};
+		GRP_B51 = {
+			isa = PBXGroup;
+			path = "B51";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED51,
+			);
+		};
+		GRP_SHARED51 = {
+			isa = PBXGroup;
+			path = "Shared51";
+			sourceTree = "<group>";
+			children = (
+				GRP_A52,
+				GRP_B52,
+			);
+		};
+		GRP_A52 = {
+			isa = PBXGroup;
+			path = "A52";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED52,
+			);
+		};
+		GRP_B52 = {
+			isa = PBXGroup;
+			path = "B52";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED52,
+			);
+		};
+		GRP_SHARED52 = {
+			isa = PBXGroup;
+			path = "Shared52";
+			sourceTree = "<group>";
+			children = (
+				GRP_A53,
+				GRP_B53,
+			);
+		};
+		GRP_A53 = {
+			isa = PBXGroup;
+			path = "A53";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED53,
+			);
+		};
+		GRP_B53 = {
+			isa = PBXGroup;
+			path = "B53";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED53,
+			);
+		};
+		GRP_SHARED53 = {
+			isa = PBXGroup;
+			path = "Shared53";
+			sourceTree = "<group>";
+			children = (
+				GRP_A54,
+				GRP_B54,
+			);
+		};
+		GRP_A54 = {
+			isa = PBXGroup;
+			path = "A54";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED54,
+			);
+		};
+		GRP_B54 = {
+			isa = PBXGroup;
+			path = "B54";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED54,
+			);
+		};
+		GRP_SHARED54 = {
+			isa = PBXGroup;
+			path = "Shared54";
+			sourceTree = "<group>";
+			children = (
+				GRP_A55,
+				GRP_B55,
+			);
+		};
+		GRP_A55 = {
+			isa = PBXGroup;
+			path = "A55";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED55,
+			);
+		};
+		GRP_B55 = {
+			isa = PBXGroup;
+			path = "B55";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED55,
+			);
+		};
+		GRP_SHARED55 = {
+			isa = PBXGroup;
+			path = "Shared55";
+			sourceTree = "<group>";
+			children = (
+				GRP_A56,
+				GRP_B56,
+			);
+		};
+		GRP_A56 = {
+			isa = PBXGroup;
+			path = "A56";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED56,
+			);
+		};
+		GRP_B56 = {
+			isa = PBXGroup;
+			path = "B56";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED56,
+			);
+		};
+		GRP_SHARED56 = {
+			isa = PBXGroup;
+			path = "Shared56";
+			sourceTree = "<group>";
+			children = (
+				GRP_A57,
+				GRP_B57,
+			);
+		};
+		GRP_A57 = {
+			isa = PBXGroup;
+			path = "A57";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED57,
+			);
+		};
+		GRP_B57 = {
+			isa = PBXGroup;
+			path = "B57";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED57,
+			);
+		};
+		GRP_SHARED57 = {
+			isa = PBXGroup;
+			path = "Shared57";
+			sourceTree = "<group>";
+			children = (
+				GRP_A58,
+				GRP_B58,
+			);
+		};
+		GRP_A58 = {
+			isa = PBXGroup;
+			path = "A58";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED58,
+			);
+		};
+		GRP_B58 = {
+			isa = PBXGroup;
+			path = "B58";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED58,
+			);
+		};
+		GRP_SHARED58 = {
+			isa = PBXGroup;
+			path = "Shared58";
+			sourceTree = "<group>";
+			children = (
+				GRP_A59,
+				GRP_B59,
+			);
+		};
+		GRP_A59 = {
+			isa = PBXGroup;
+			path = "A59";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED59,
+			);
+		};
+		GRP_B59 = {
+			isa = PBXGroup;
+			path = "B59";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED59,
+			);
+		};
+		GRP_SHARED59 = {
+			isa = PBXGroup;
+			path = "Shared59";
+			sourceTree = "<group>";
+			children = (
+				GRP_A60,
+				GRP_B60,
+			);
+		};
+		GRP_A60 = {
+			isa = PBXGroup;
+			path = "A60";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED60,
+			);
+		};
+		GRP_B60 = {
+			isa = PBXGroup;
+			path = "B60";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED60,
+			);
+		};
+		GRP_SHARED60 = {
+			isa = PBXGroup;
+			path = "Shared60";
+			sourceTree = "<group>";
+			children = (
+				GRP_A61,
+				GRP_B61,
+			);
+		};
+		GRP_A61 = {
+			isa = PBXGroup;
+			path = "A61";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED61,
+			);
+		};
+		GRP_B61 = {
+			isa = PBXGroup;
+			path = "B61";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED61,
+			);
+		};
+		GRP_SHARED61 = {
+			isa = PBXGroup;
+			path = "Shared61";
+			sourceTree = "<group>";
+			children = (
+				GRP_A62,
+				GRP_B62,
+			);
+		};
+		GRP_A62 = {
+			isa = PBXGroup;
+			path = "A62";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED62,
+			);
+		};
+		GRP_B62 = {
+			isa = PBXGroup;
+			path = "B62";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED62,
+			);
+		};
+		GRP_SHARED62 = {
+			isa = PBXGroup;
+			path = "Shared62";
+			sourceTree = "<group>";
+			children = (
+				GRP_A63,
+				GRP_B63,
+			);
+		};
+		GRP_A63 = {
+			isa = PBXGroup;
+			path = "A63";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED63,
+			);
+		};
+		GRP_B63 = {
+			isa = PBXGroup;
+			path = "B63";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED63,
+			);
+		};
+		GRP_SHARED63 = {
+			isa = PBXGroup;
+			path = "Shared63";
+			sourceTree = "<group>";
+			children = (
+				GRP_A64,
+				GRP_B64,
+			);
+		};
+		GRP_A64 = {
+			isa = PBXGroup;
+			path = "A64";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED64,
+			);
+		};
+		GRP_B64 = {
+			isa = PBXGroup;
+			path = "B64";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED64,
+			);
+		};
+		GRP_SHARED64 = {
+			isa = PBXGroup;
+			path = "Shared64";
+			sourceTree = "<group>";
+			children = (
+			);
+		};
+		TGT_A = {
+			isa = PBXNativeTarget;
+			name = "TargetA";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+				PHASE_SOURCES,
+			);
+			dependencies = (
+			);
+		};
+		PHASE_SOURCES = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				BF_SHARED1,
+				BF_SHARED2,
+				BF_SHARED3,
+				BF_SHARED4,
+				BF_SHARED5,
+				BF_SHARED6,
+				BF_SHARED7,
+				BF_SHARED8,
+				BF_SHARED9,
+				BF_SHARED10,
+				BF_SHARED11,
+				BF_SHARED12,
+				BF_SHARED13,
+				BF_SHARED14,
+				BF_SHARED15,
+				BF_SHARED16,
+				BF_SHARED17,
+				BF_SHARED18,
+				BF_SHARED19,
+				BF_SHARED20,
+				BF_SHARED21,
+				BF_SHARED22,
+				BF_SHARED23,
+				BF_SHARED24,
+				BF_SHARED25,
+				BF_SHARED26,
+				BF_SHARED27,
+				BF_SHARED28,
+				BF_SHARED29,
+				BF_SHARED30,
+				BF_SHARED31,
+				BF_SHARED32,
+				BF_SHARED33,
+				BF_SHARED34,
+				BF_SHARED35,
+				BF_SHARED36,
+				BF_SHARED37,
+				BF_SHARED38,
+				BF_SHARED39,
+				BF_SHARED40,
+				BF_SHARED41,
+				BF_SHARED42,
+				BF_SHARED43,
+				BF_SHARED44,
+				BF_SHARED45,
+				BF_SHARED46,
+				BF_SHARED47,
+				BF_SHARED48,
+				BF_SHARED49,
+				BF_SHARED50,
+				BF_SHARED51,
+				BF_SHARED52,
+				BF_SHARED53,
+				BF_SHARED54,
+				BF_SHARED55,
+				BF_SHARED56,
+				BF_SHARED57,
+				BF_SHARED58,
+				BF_SHARED59,
+				BF_SHARED60,
+				BF_SHARED61,
+				BF_SHARED62,
+				BF_SHARED63,
+				BF_SHARED64,
+			);
+		};
+		BF_SHARED1 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED1;
+		};
+		BF_SHARED2 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED2;
+		};
+		BF_SHARED3 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED3;
+		};
+		BF_SHARED4 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED4;
+		};
+		BF_SHARED5 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED5;
+		};
+		BF_SHARED6 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED6;
+		};
+		BF_SHARED7 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED7;
+		};
+		BF_SHARED8 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED8;
+		};
+		BF_SHARED9 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED9;
+		};
+		BF_SHARED10 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED10;
+		};
+		BF_SHARED11 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED11;
+		};
+		BF_SHARED12 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED12;
+		};
+		BF_SHARED13 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED13;
+		};
+		BF_SHARED14 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED14;
+		};
+		BF_SHARED15 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED15;
+		};
+		BF_SHARED16 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED16;
+		};
+		BF_SHARED17 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED17;
+		};
+		BF_SHARED18 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED18;
+		};
+		BF_SHARED19 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED19;
+		};
+		BF_SHARED20 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED20;
+		};
+		BF_SHARED21 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED21;
+		};
+		BF_SHARED22 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED22;
+		};
+		BF_SHARED23 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED23;
+		};
+		BF_SHARED24 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED24;
+		};
+		BF_SHARED25 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED25;
+		};
+		BF_SHARED26 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED26;
+		};
+		BF_SHARED27 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED27;
+		};
+		BF_SHARED28 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED28;
+		};
+		BF_SHARED29 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED29;
+		};
+		BF_SHARED30 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED30;
+		};
+		BF_SHARED31 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED31;
+		};
+		BF_SHARED32 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED32;
+		};
+		BF_SHARED33 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED33;
+		};
+		BF_SHARED34 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED34;
+		};
+		BF_SHARED35 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED35;
+		};
+		BF_SHARED36 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED36;
+		};
+		BF_SHARED37 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED37;
+		};
+		BF_SHARED38 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED38;
+		};
+		BF_SHARED39 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED39;
+		};
+		BF_SHARED40 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED40;
+		};
+		BF_SHARED41 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED41;
+		};
+		BF_SHARED42 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED42;
+		};
+		BF_SHARED43 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED43;
+		};
+		BF_SHARED44 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED44;
+		};
+		BF_SHARED45 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED45;
+		};
+		BF_SHARED46 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED46;
+		};
+		BF_SHARED47 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED47;
+		};
+		BF_SHARED48 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED48;
+		};
+		BF_SHARED49 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED49;
+		};
+		BF_SHARED50 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED50;
+		};
+		BF_SHARED51 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED51;
+		};
+		BF_SHARED52 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED52;
+		};
+		BF_SHARED53 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED53;
+		};
+		BF_SHARED54 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED54;
+		};
+		BF_SHARED55 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED55;
+		};
+		BF_SHARED56 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED56;
+		};
+		BF_SHARED57 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED57;
+		};
+		BF_SHARED58 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED58;
+		};
+		BF_SHARED59 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED59;
+		};
+		BF_SHARED60 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED60;
+		};
+		BF_SHARED61 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED61;
+		};
+		BF_SHARED62 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED62;
+		};
+		BF_SHARED63 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED63;
+		};
+		BF_SHARED64 = {
+			isa = PBXBuildFile;
+			fileRef = GRP_SHARED64;
+		};
+	};
+	rootObject = PRJ;
+}

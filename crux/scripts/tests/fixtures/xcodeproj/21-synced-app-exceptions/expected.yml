@@ -1,0 +1,18 @@
+# ADR-0130 clause 17 form: synced app with an exception set that EXCLUDES an
+# owner's file (Excluded.swift) and a /Localized/<dir>/<name> entry (owner
+# exclusion route), a bundle-suffix directory (.xcassets) hiding a .swift
+# file, and an explicitFolders entry hiding another .swift file -- neither
+# hidden file gets a membership row.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `AppSrc/Owned.swift` | `App` | folder-synced root AppSrc | — |"
+    - "| `AppSrc/Excluded.swift` | `App` | excluded by an exception set | — |"
+    - "| `AppSrc/Resources/en.lproj/Localized.swift` | `App` | excluded by an exception set | — |"
+
+absent:
+  module-graph:
+    - "| `AppSrc/Assets.xcassets/Hidden.swift`"
+    - "| `AppSrc/Explicit/Hidden2.swift`"
+    - "unresolved-reference"

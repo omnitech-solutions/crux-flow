@@ -1,0 +1,4 @@
+# A product and a target whose names hold a pipe, a CR, an LF, three backticks
+# and `-->`, written as Swift escapes. Its counts must equal plain-names/'s
+# (ADR-0129 clause 5). Schema: literal-subset/expected.yml.
+counts: {api-surface: 1, module-graph: 1}

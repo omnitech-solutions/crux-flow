@@ -1,0 +1,18 @@
+# ADR-0130 clause 3, the control: `$(`, `${` and bare `$NAME` are
+# build-setting references only in an Xcode-reader position. SwiftPM expands
+# nothing in `.package(path:)`, so a `$(X)` segment there is literal text:
+# it is normalised lexically like any other segment, the following `..`
+# cancels it, and the contained reference renders its dependency row at
+# `Local/Core` and draws its edge. Neither `unresolved-reference` nor
+# `path-escape` renders.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `.` | `$(X)/../Local/Core` | path dependency | `Local/Core` | — | `Package.swift:5-5` |"
+    - "Package_swift__AppCore[\"AppCore (Package.swift)\"] --> Local_Core_Package_swift__CoreKit[\"CoreKit (Local/Core/Package.swift)\"]"
+
+absent:
+  module-graph:
+    - "unresolved-reference"
+    - "path-escape"

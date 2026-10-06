@@ -1,0 +1,21 @@
+# ADR-0130 clause 17 hostile form: a `..`-traversal relative path, an
+# `<absolute>` sourceTree reference, and an absolute `projectDirPath` on
+# PBXProject itself -- each resolves to the group-descent "escape" outcome
+# and renders a `path-escape` residual (range covers the reference, detail
+# never the path as written). Swift entities still render.
+exit_code: 0
+
+rows:
+  data-model:
+    - "| `Model` | struct | public |"
+
+residuals:
+  - class: path-escape
+    path: App.xcodeproj/project.pbxproj
+    kind: null
+    first_line: null
+    last_line: null
+
+absent:
+  module-graph:
+    - "project-unreadable"

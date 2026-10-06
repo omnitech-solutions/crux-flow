@@ -1,0 +1,29 @@
+# Expected extraction for 13-dropped-declaration-conditional.swift, the
+# conditional twin of 13-dropped-declaration.swift. Schema: 01-actor.expected.yml.
+#
+# The same actor sits inside a top-level `#if os(macOS)` block. The top-level
+# ERROR that drops the actor also swallows the `#endif`. Grammar-only recovery
+# still brings back the actor, its stored property, its initializer and
+# `isEmpty()`, and every recovered row carries the enclosing `#if` state:
+# ADR-0129 clause 7, "An entity under `#if` renders marked conditional."
+# Every declaration line sits one below its place in 13-dropped-declaration.swift,
+# the unmarked control. The error span ends two lines below its place there,
+# because the error also swallows the `#endif`.
+types:
+  - {name: ShelfCatalog, kind: actor, access: public, at: [5, 5], conditional: true}
+stored_properties:
+  - {owner: ShelfCatalog, name: shelfCount, type: Int, access: public, at: [7, 7]}
+relationships: []
+interfaces:
+  - {name: ShelfCatalog, kind: actor, access: public, at: [5, 5], attributes: [], conditional: true}
+  - {name: ShelfCatalog.shelfCount, kind: let, access: public, at: [7, 7], attributes: [], conditional: true}
+  - {name: "ShelfCatalog.init(shelves:)", kind: init, access: public, at: [9, 9], attributes: [], conditional: true}
+  - {name: "ShelfCatalog.isEmpty()", kind: func, access: public, at: [13, 13], attributes: [], conditional: true}
+requirements: []
+mains: []
+imports:
+  - {module: Foundation, kind: plain, line: 1}
+  - {module: Shelving, kind: plain, line: 2}
+residuals:
+  - {concern: data-model, class: declaration-recovered, lines: "5-27", detail: "location top level; actor ShelfCatalog dropped by a top-level error, recovered from lines 5-15"}
+  - {concern: api-surface, class: declaration-recovered, lines: "5-27", detail: "location top level; actor ShelfCatalog dropped by a top-level error, recovered from lines 5-15"}

@@ -1,0 +1,109 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		"PRJ" = {
+			"isa" = "PBXProject";
+			"mainGroup" = "MG";
+			"targets" = (
+				"APP",
+			);
+		};
+		"MG" = {
+			"isa" = "PBXGroup";
+			"sourceTree" = "<group>";
+			"children" = (
+				"F",
+				"FIN",
+				"FLEAK",
+				"FLEAKIN",
+				"SR",
+			);
+		};
+		"F" = {
+			"isa" = "PBXFileReference";
+			"path" = "Out/X.swift";
+			"sourceTree" = "<group>";
+		};
+		"FIN" = {
+			"isa" = "PBXFileReference";
+			"path" = "In/X.swift";
+			"sourceTree" = "<group>";
+		};
+		"FLEAK" = {
+			"isa" = "PBXFileReference";
+			"path" = "Leak.swift";
+			"sourceTree" = "<group>";
+		};
+		"FLEAKIN" = {
+			"isa" = "PBXFileReference";
+			"path" = "LeakIn.swift";
+			"sourceTree" = "<group>";
+		};
+		"BF1" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "F";
+		};
+		"BF2" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "F";
+		};
+		"BF3" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "FIN";
+		};
+		"BF4" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "FLEAK";
+		};
+		"BF5" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "FLEAKIN";
+		};
+		"SRC" = {
+			"isa" = "PBXSourcesBuildPhase";
+			"files" = (
+				"BF1",
+				"BF2",
+				"BF3",
+				"BF4",
+				"BF5",
+			);
+		};
+		"SR" = {
+			"isa" = "PBXFileSystemSynchronizedRootGroup";
+			"sourceTree" = "<group>";
+			"path" = "Synced";
+			"exceptions" = (
+				"EX",
+			);
+		};
+		"EX" = {
+			"isa" = "PBXFileSystemSynchronizedBuildFileExceptionSet";
+			"target" = "APP";
+			"membershipExceptions" = (
+				"Out/Y.swift",
+				"Out/Sub",
+				"/Localized/Out/Foo.swift",
+				"In/Y.swift",
+				"In/Sub",
+				"/Localized/In/Foo.swift",
+			);
+		};
+		"APP" = {
+			"isa" = "PBXNativeTarget";
+			"name" = "App";
+			"productType" = "com.apple.product-type.application";
+			"buildPhases" = (
+				"SRC",
+			);
+			"fileSystemSynchronizedGroups" = (
+				"SR",
+			);
+		};
+	};
+	rootObject = "PRJ";
+}

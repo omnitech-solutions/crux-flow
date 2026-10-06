@@ -1,0 +1,2 @@
+// An xcconfig within the 2 MB bound: read, and its conditioned key reported.
+SWIFT_VERSION[sdk=iphoneos*] = 5.9

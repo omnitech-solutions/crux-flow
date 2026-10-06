@@ -1,0 +1,17 @@
+{
+  "why": "build_plan refuses a ratify row whose evidence path does not resolve to a file inside the repository root, so a hermetic test driving this fixture materializes each of these paths as a stub under its temp root first. Without it every one of the 40 rows refuses and the test measures the refusal, not the publish.",
+  "paths": [
+    "Gemfile",
+    "app/controllers/api/base_controller.rb",
+    "app/controllers/application_controller.rb",
+    "app/models/api_key.rb",
+    "app/models/version.rb",
+    "config/initializers/clearance.rb",
+    "config/initializers/content_security_policy.rb",
+    "config/initializers/flipper.rb",
+    "config/initializers/good_job.rb",
+    "config/initializers/rack_attack.rb",
+    "config/initializers/session_store.rb",
+    "config/routes.rb"
+  ]
+}

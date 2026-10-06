@@ -1,0 +1,28 @@
+# `#if os()` / `#elseif` / `#else`: every branch renders, marked conditional, and
+# the name declared in three branches gets one conditional-declaration line in
+# each concern where it renders. Schema: 01-actor.expected.yml.
+types:
+  - {name: PlatformFlag, kind: struct, access: public, at: [2, 2], conditional: true}
+  - {name: PlatformFlag, kind: struct, access: public, at: [6, 6], conditional: true}
+  - {name: PlatformFlag, kind: struct, access: public, at: [10, 10], conditional: true}
+  - {name: Always, kind: struct, access: public, at: [15, 15], conditional: false}
+stored_properties:
+  - {owner: PlatformFlag, name: iosOnly, type: Int, access: public, at: [3, 3]}
+  - {owner: PlatformFlag, name: macOnly, type: Int, access: public, at: [7, 7]}
+  - {owner: PlatformFlag, name: otherOnly, type: Int, access: public, at: [11, 11]}
+  - {owner: Always, name: x, type: Int, access: public, at: [16, 16]}
+relationships: []
+interfaces:
+  - {name: PlatformFlag, kind: struct, access: public, at: [2, 2], attributes: [], conditional: true}
+  - {name: PlatformFlag.iosOnly, kind: let, access: public, at: [3, 3], attributes: [], conditional: true}
+  - {name: PlatformFlag, kind: struct, access: public, at: [6, 6], attributes: [], conditional: true}
+  - {name: PlatformFlag.macOnly, kind: let, access: public, at: [7, 7], attributes: [], conditional: true}
+  - {name: PlatformFlag, kind: struct, access: public, at: [10, 10], attributes: [], conditional: true}
+  - {name: PlatformFlag.otherOnly, kind: let, access: public, at: [11, 11], attributes: [], conditional: true}
+  - {name: Always, kind: struct, access: public, at: [15, 15], attributes: [], conditional: false}
+  - {name: Always.x, kind: let, access: public, at: [16, 16], attributes: [], conditional: false}
+requirements: []
+mains: []
+residuals:
+  - {concern: data-model, class: conditional-declaration, lines: "1-13", detail: "PlatformFlag is declared in 3 `#if` branches; every branch renders and none is evaluated"}
+  - {concern: api-surface, class: conditional-declaration, lines: "1-13", detail: "PlatformFlag is declared in 3 `#if` branches; every branch renders and none is evaluated"}

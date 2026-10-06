@@ -1,0 +1,16 @@
+# ADR-0130 clause 17 hostile form: an unresolved git merge-conflict marker
+# (`<<<<<<<`) inside `objects` -- `<` opens no construct this grammar
+# recognises, so it fails as an ordinary unexpected-token error, refused as
+# `project-unreadable` / 'malformed'. Swift entities elsewhere still render.
+exit_code: 0
+
+rows:
+  data-model:
+    - "| `Model` | struct | public |"
+
+residuals:
+  - class: project-unreadable
+    path: App.xcodeproj/project.pbxproj
+    kind: "malformed"
+    first_line: null
+    last_line: null

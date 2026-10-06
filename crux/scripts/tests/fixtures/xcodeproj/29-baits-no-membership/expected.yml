@@ -1,0 +1,12 @@
+# ADR-0130 clause 17 fixture-only "baits" form: a group directory named
+# after the target, and two file references resolvable on disk but wired
+# into no Sources phase and no synced root -- neither is a membership row
+# (ADR-0130 clause 10: membership is read from a route, never guessed from
+# a name).
+exit_code: 0
+
+absent:
+  module-graph:
+    - "| `App/Decoy.swift`"
+    - "| `App/Loose.swift`"
+    - "unresolved-reference"

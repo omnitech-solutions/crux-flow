@@ -1,0 +1,14 @@
+# ADR-0130 clause 7: an undeclared product renders unresolved-reference,
+# and a plugin product renders a dependency row (never an edge).
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `App` | `Fmt` | plugin product |"
+
+residuals:
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: null
+    first_line: null
+    last_line: null

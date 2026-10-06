@@ -1,0 +1,123 @@
+# ADR-0130 clauses 2, 3, 6 and 9.
+#
+# `Phase.xcodeproj`: a build-phase membership exception set holds one entry
+# of each class the shared exception-entry classifier renders. A
+# build-setting reference (`$(X)/Lit.swift`), an absolute entry, a
+# `..`-escaping entry and a pruned `Pods/` path each render one line at the
+# entry's own item line and withhold nothing, so `Phase/$(X)/Lit.swift`
+# keeps its default row. `./Withheld.swift` withholds its lexically
+# normalised path `Phase/Withheld.swift`. A `/Localized/` entry names
+# `.lproj` content, which is never a member: it withholds and renders
+# nothing. The set's own line says the set is not interpreted and that the
+# rows it names are withheld.
+#
+# `Deps.xcodeproj`: a `targetProxy` naming no object beside a resolving
+# `target` draws no edge and does not resolve. A list `target` with no proxy,
+# and a dictionary `remoteGlobalIDString` with no `target`, each render what
+# a dangling string renders: "names a dangling target". Only `Control`
+# draws its edge. A dangling string item of `targets`, `buildPhases` and
+# `packageReferences` renders the line a non-string item renders, at its
+# item line. An `exceptions` item naming no object, and one naming a file
+# reference, each render the dangling-set line at its item line.
+#
+# `Phase/$(X)/Lit.swift` is materialized at test time, so no committed path
+# carries a `$`.
+materialize:
+  - path: Phase/$(X)/Lit.swift
+    kind: repeated
+    head: "struct S {}\n"
+    count: 1
+
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `Phase/$(X)/Lit.swift` | `PhaseApp` | folder-synced root Phase | — |"
+    - "| `Phase/Kept.swift` | `PhaseApp` | folder-synced root Phase | — |"
+    - "| `DepsSynced/Own.swift` | `DepsApp` | folder-synced root DepsSynced | — |"
+    - "  Deps_xcodeproj__Control[\"Control (Deps.xcodeproj)\"] --> Deps_xcodeproj__DepsApp[\"DepsApp (Deps.xcodeproj)\"]\n"
+    - "_2 containers, 6 targets, 1 in-tree dependency edges and every Swift import,"
+
+absent:
+  module-graph:
+    - "| `Phase/Withheld.swift`"
+    - "| `Phase/Pods/P.swift`"
+    - "DanglingProxy (Deps.xcodeproj)\"] -->"
+    - "ListTarget (Deps.xcodeproj)\"] -->"
+    - "ListRemote (Deps.xcodeproj)\"] -->"
+    - "is not applied"
+
+residuals:
+  - class: unsupported-project-form
+    path: Phase.xcodeproj/project.pbxproj
+    kind: a build-phase membership exception set on Phase is not interpreted; the rows it names are withheld
+    first_line: 30
+    last_line: 41
+  - class: unresolved-reference
+    path: Phase.xcodeproj/project.pbxproj
+    kind: an exception entry names a build-setting reference; it is never resolved and changes no membership
+    first_line: 34
+    last_line: 34
+  - class: path-escape
+    path: Phase.xcodeproj/project.pbxproj
+    kind: an exception entry on Phase escapes the checkout
+    count: 2
+  - class: path-escape
+    path: Phase.xcodeproj/project.pbxproj
+    kind: an exception entry on Phase escapes the checkout
+    first_line: 35
+    last_line: 35
+  - class: path-escape
+    path: Phase.xcodeproj/project.pbxproj
+    kind: an exception entry on Phase escapes the checkout
+    first_line: 36
+    last_line: 36
+  - class: unresolved-reference
+    path: Phase.xcodeproj/project.pbxproj
+    kind: an exception entry names a path in a directory the Swift walk skips; it is not read
+    first_line: 37
+    last_line: 37
+  - class: unresolved-reference
+    path: Deps.xcodeproj/project.pbxproj
+    kind: dependency of 'DanglingProxy' does not resolve
+    first_line: 75
+    last_line: 79
+  - class: unresolved-reference
+    path: Deps.xcodeproj/project.pbxproj
+    kind: dependency of 'ListTarget' names a dangling target
+    first_line: 88
+    last_line: 93
+  - class: unresolved-reference
+    path: Deps.xcodeproj/project.pbxproj
+    kind: dependency of 'ListRemote' names a dangling target
+    first_line: 102
+    last_line: 105
+  - class: unresolved-reference
+    path: Deps.xcodeproj/project.pbxproj
+    kind: a project's targets entry is not an object id and is not read
+    first_line: 17
+    last_line: 17
+  - class: unresolved-reference
+    path: Deps.xcodeproj/project.pbxproj
+    kind: a project's packageReferences entry is not an object id and is not read
+    first_line: 20
+    last_line: 20
+  - class: unresolved-reference
+    path: Deps.xcodeproj/project.pbxproj
+    kind: a target's buildPhases entry is not an object id and is not read
+    first_line: 61
+    last_line: 61
+  - class: unresolved-reference
+    path: Deps.xcodeproj/project.pbxproj
+    kind: a dangling exception set on DepsSynced
+    count: 2
+  - class: unresolved-reference
+    path: Deps.xcodeproj/project.pbxproj
+    kind: a dangling exception set on DepsSynced
+    first_line: 51
+    last_line: 51
+  - class: unresolved-reference
+    path: Deps.xcodeproj/project.pbxproj
+    kind: a dangling exception set on DepsSynced
+    first_line: 52
+    last_line: 52

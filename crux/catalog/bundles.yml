@@ -1,0 +1,111 @@
+# crux/catalog/bundles.yml — the bundle organization of the skill catalog.
+# Hand-authored. Validated by validate-catalog.py against the regenerated
+# skills.json. NEVER regenerated. The `.yml` extension declares that: in
+# crux/catalog/, `.json` means machine-regenerated and `.yml` means
+# hand-authored (see the repo-root AGENTS.md catalog-provenance paragraph).
+#
+# Keyed by bundle id: the mapping key IS the `id`, so it is not repeated in
+# the value. `skills:` must list every skill whose SKILL.md frontmatter names
+# this bundle, and only skills that exist — the audit checks both directions.
+crux-core:
+  name: "crux core orchestration substrate"
+  description: "Skills for the LLM caller, dissent resolution, capability-gap forge loop, retrospective harvest, nightly gardening, and news reading. The retained tracer, probe, identity, task-planning, and runbook APIs are documented in the shipped box references."
+  audiences:
+    - "agent-team-operators"
+    - "software-project-maintainers"
+  default_provision: false
+  skills:
+    - "call-llm"
+    - "forge-skill"
+    - "retrospective"
+    - "tend-garden"
+    - "read-news"
+    - "srde"
+crux-docs:
+  name: "crux documentation suite"
+  description: "Skills for project documentation across seven concerns (code, research, ADRs, briefs, journal, promptbooks, invariants) plus the derived arch spine, development cycles, and hygiene scans. Includes the council, ADR council runner, capability-gap forge, retrospective, and LLM caller used by default workflows. Default-on for any installed crux plugin."
+  audiences:
+    - "software-project-maintainers"
+  default_provision: true
+  skills:
+    - "archive-promptbook"
+    - "audit-docs"
+    - "author-promptbook"
+    - "backfill-signoff"
+    - "call-llm"
+    - "check-drift"
+    - "cleanup-campsite"
+    - "compile-doctrine"
+    - "council"
+    - "derive-arch"
+    - "dev-cycle"
+    - "escalate-arch-runtime"
+    - "extract-code-docs"
+    - "fix-directly"
+    - "flow"
+    - "forge-skill"
+    - "ingest-research"
+    - "init-docs"
+    - "install-codex-agents"
+    - "install-docs-skills"
+    - "install-opencode-agents"
+    - "iterate"
+    - "link-adr-graph"
+    - "log-work"
+    - "patch-cycle"
+    - "process-inbox"
+    - "propose-adr"
+    - "propose-brief"
+    - "propose-observation"
+    - "query-docs"
+    - "reconcile-signoff"
+    - "recover-decisions"
+    - "recover-invariants"
+    - "refresh-research-sources"
+    - "refresh-research-synthesis"
+    - "retrospective"
+    - "review-decisions"
+    - "run-adr-council"
+    - "run-promptbook"
+    - "srde"
+    - "survey-sheet"
+    - "survey-signoff"
+    - "transition-adr"
+    - "transition-brief"
+    - "transition-decision"
+    - "transition-invariant"
+    - "transition-observation"
+    - "verify-code-docs"
+    - "whiteboarding"
+crux-flow:
+  name: "Crux Flow fork policy and model maintenance"
+  description: "Fork execution modes, autonomous outcome records, and reviewed model catalog refresh."
+  audiences:
+    - "software-project-maintainers"
+    - "agent-team-operators"
+  default_provision: false
+  skills:
+    - "flow"
+    - "models-refresh"
+crux-infrastructure:
+  name: "crux infrastructure & lifecycle"
+  description: "Install the crux runtime or role agents in a target repository. The retained HTTP service for non-Python clients is documented in the shipped operator-services reference; key bootstrap remains owned by crux-env."
+  audiences:
+    - "software-project-maintainers"
+    - "agent-team-operators"
+  default_provision: false
+  skills:
+    - "install-runtime"
+    - "install-codex-agents"
+    - "install-opencode-agents"
+crux-verification:
+  name: "crux verification primitives"
+  description: "Multi-model council deliberation. The anti-hallucination floor that other crux skills compose on top of, plus a parameterized ADR council runner and a prose reviewer that returns rewrites rather than opinions."
+  audiences:
+    - "software-project-maintainers"
+    - "agent-team-operators"
+  default_provision: false
+  skills:
+    - "council"
+    - "prose-review"
+    - "run-adr-council"

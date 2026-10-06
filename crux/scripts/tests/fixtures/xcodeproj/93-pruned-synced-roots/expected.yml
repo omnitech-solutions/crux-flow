@@ -1,0 +1,38 @@
+# ADR-0129 clause 8 governs ADR-0130 clause 9's walk: a folder-synced
+# root in a directory the Swift walk skips is refused before any filesystem
+# access. The owned `DerivedData` root renders one `unresolved-reference`
+# line whose detail names no path, and none of its files. The `Pods` root no
+# target owns, with no exception set, renders nothing at all. The `App` root
+# is the control and still renders its member.
+materialize:
+  - path: DerivedData/Gen.swift
+    kind: repeated
+    head: "public struct GeneratedType {}\n"
+    count: 1
+  - path: Pods/Stuff.swift
+    kind: repeated
+    head: "public struct PodStuff {}\n"
+    count: 1
+
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `App/Main.swift` | `App` | folder-synced root App | — |"
+
+absent:
+  module-graph:
+    - "DerivedData"
+    - "Pods"
+  data-model:
+    - "GeneratedType"
+    - "PodStuff"
+  api-surface:
+    - "GeneratedType"
+    - "PodStuff"
+
+residuals:
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: a folder-synced root lies in a directory the Swift walk skips; nothing under it is read
+    count: 1

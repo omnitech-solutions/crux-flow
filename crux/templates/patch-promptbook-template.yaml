@@ -1,0 +1,290 @@
+# Canonical patch cycle (5 prompts) — full YAML book skeleton.
+#
+# A `patch` book is a cycle book with `cycle_kind: patch`: the third tier, for a
+# SMALL REVERSIBLE NON-ARCHITECTURAL change whose file footprint can be named
+# honestly before the work starts. It runs five phases in order — verify, plan,
+# implement, review, summary — ONE PROMPT EACH.
+#
+# This is a THIRD TIER, NOT A RELAXATION OF TWO. The `4N+4M+3K+2` formula and the
+# thirteen-prompt floor that `dev-cycle` (cycle_kind: adr) and `iterate`
+# (cycle_kind: verify) are held to are UNCHANGED. A floor that bends on judgment
+# is not a floor; a genuinely smaller tier with its own countable contract is.
+#
+# Invariants enforced (machine-checked by validate-promptbook.py's cycle-coverage
+# pass — a book violating any of these is refused before it ships):
+#   1. total_prompts == len(prompts) == 5. The patch formula is the CONSTANT 5,
+#      not a formula over module instances, and its floor is 5.
+#   2. Every prompt carries `phase:`, and the sequence is exactly
+#      [verify, plan, implement, review, summary], in that order.
+#   3. No prompt carries `module_tag:`, and the book carries no `modules:` block.
+#      A patch book has phases, not modules.
+#   4. `blast_radius:` is non-empty and every entry passes the declared-path
+#      grammar — `invalid_blast_radius_entry` in `scripts/validate-promptbook.py`,
+#      the one implementation the authoring validator and the archive check share.
+#      Its rejections are NOT restated here; read the function. (Restating them
+#      produced a partial copy that read as complete and omitted some of them.)
+#
+# THE TWO GATES A PATCH STILL PAYS. The council gate is a postcondition of the
+# verify phase; the review gate is a postcondition of the review phase. Both are
+# positional, guaranteed by the fixed phase sequence, so a patch book that
+# archives a completed run has passed both.
+#
+# THE BLAST RADIUS is declared BELOW, before the run starts, and is held by two
+# guards — only the second is mechanical:
+#   (a) PROPORTION, at the verify council: it refuses the patch framing when the
+#       radius is drawn wider than the work needs.
+#   (b) CONTAINMENT, at the archive precondition: `archive-promptbook` runs
+#       `check-blast-radius.py`, comparing the declaration against the paths the
+#       run actually changed, drawn from git — never from anything the run wrote
+#       about itself.
+# The declaration is FIXED once the run starts and no prompt may widen it:
+# `blast_radius` sits inside the frozen-plan subset that `book_content_hash`
+# covers, so widening it mid-run moves the hash and audit rule CHK-PB-BIND fires.
+#
+# Bookkeeping is excluded from the comparison (the run machinery's own writes:
+# everything under `<docs_dir>/promptbooks/`, `<docs_dir>/journal/`,
+# `<docs_dir>/arch/`, plus `log.md`, `index.md`, `manifest.yml`,
+# `whats_next.md`). An ADR path is deliberately NOT excluded — work that needs an
+# ADR is not a patch, and the check enforces that from the other end.
+
+format_version: "1"
+id: PB-NNNN
+title: "Patch: <small reversible non-architectural change>"
+status: active
+created_at: YYYY-MM-DD
+total_prompts: 5
+current_run: null
+current_prompt: null
+forked_from: null          # accepted vestige; always null, nothing writes it
+tags: [cycle, workflow, patch]
+cycle_kind: patch
+
+# The repository paths this change may touch, repo-relative. A directory entry
+# covers everything beneath it; a file entry covers only that file. Declare a
+# path you will CREATE as well as ones you will edit — the check sees untracked
+# files too. Draw this as tightly as the work allows: a radius that cannot fail
+# proves nothing, and the verify council exists to catch exactly that.
+blast_radius:
+  - <repo/relative/path>
+
+goal: |
+  <One paragraph: the small reversible non-architectural change this patch makes.
+  Open it with one sentence carrying all three: the Outcome — what improves for
+  the affected user; the Evidence — what would demonstrate that improvement; and
+  the Constraint — what the change must preserve. Prose in this field: no new
+  field, no form, no gate. If it needs an architectural decision recorded, it is NOT a
+  patch — the verify council routes it to `dev-cycle`. If it cannot be bounded by
+  the declared paths or finished in one implement prompt, it is NOT a patch — the
+  council routes it to `iterate`. End-state: a reviewed, tested change ready for
+  human merge.>
+
+strategy: |
+  Drive one small change through the patch tier: verify (reproduce/root-cause,
+  then council-review the diagnosis, the minimal approach, AND the declared blast
+  radius), plan (ordered work units within the radius), implement (edits +
+  tests), review (quality gates + independent review), summary (completion report
+  + archive). Five phases, one prompt each.
+
+  Out of scope by construction: any change needing an ADR, any change reaching
+  outside the declared blast radius, cutting a release tag, merging the PR.
+
+run_autonomy: |
+  Once this cycle's run is started, it runs to completion without human review.
+  Questions and decisions are resolved by the `council` skill and dispatched
+  `Agent`s. The only stops are (a) an escalation loop firing (3-round
+  non-convergence on the council or the review fix-loop), (b) the verify
+  council's escape verdict — "this needs an ADR, use `dev-cycle`" or "this is too
+  large to bound, use `iterate`" — and (c) a genuinely irreversible/outward-facing
+  action the plan did not authorize (push/merge, deploy, external send, data
+  deletion, spend). In-repo edits — including `docs/AGENTS.md`, skill files, and
+  code — are never stop points. See `docs/AGENTS.md` §11 "Run execution autonomy"
+  for the full contract.
+
+prompts:
+  - n: 1
+    phase: verify
+    title: "Verify: reproduce, root-cause, and council-review the diagnosis and the blast radius"
+    purpose: |
+      Establish that the change is real, understood, minimal, and correctly
+      bounded — before any code lands. This phase's postcondition is the council
+      gate.
+    prompt: |
+      Read the goal and the declared `blast_radius` above. Invoke `query-docs` for
+      any relevant ADRs, briefs, research, or journal entries.
+
+      Produce a `Diagnosis` block in this run snapshot's `notes`: the reproduction
+      (steps, a failing test, or concretely-cited drift — not a vague
+      description), the root cause distinguished from the symptom, the scope, and
+      the MINIMAL remediation approach. A failing test is a complete
+      reproduction; do not build a corpus of inputs to demonstrate a class, and
+      do not let a security label on the finding widen the fix.
+
+      Then invoke the `council` skill (Claude + Gemini + GPT, async) over the
+      diagnosis. Each seat owns one dimension: (1) Evidence/reproduction; (2)
+      Root-cause correctness; (3) Approach soundness and minimality; (4)
+      **Blast-radius proportion** — is the declaration drawn no wider than the
+      work needs? A radius wider than the change is the tier's main failure mode,
+      because containment then passes for free; (5) Security.
+
+      **Three escape verdicts, each a `docs/AGENTS.md` §11 premise-contradiction
+      stop:** if the work needs an architectural decision recorded, STOP and
+      recommend `dev-cycle`. If it cannot be bounded by the declaration or
+      finished in one implement prompt, STOP and recommend `iterate`. If the
+      radius is disproportionate, STOP — it cannot be widened now (the
+      declaration is frozen by `book_content_hash`), so re-author the book.
+
+      Otherwise resolve findings autonomously (`srde`, then a read-only
+      deep-review `Agent` for what srde cannot settle) and continue. After 3
+      rounds without convergence, STOP and escalate.
+    expected_output: |
+      A `Diagnosis` block in the run `notes`; an aggregated council verdict
+      covering the approach AND the blast-radius proportion; any escape verdict
+      recorded explicitly.
+    side_effects: [query-docs, council, srde]
+
+  - n: 2
+    phase: plan
+    title: "Plan: ordered work units, inside the declared radius"
+    purpose: |
+      Convert the council-approved approach into work units that stay inside the
+      declaration.
+    prompt: |
+      From the `Diagnosis` block and the council verdict, produce an
+      implementation plan in this run snapshot's `notes`: the files to create or
+      modify (paths), ordered work units, implementation-specific risks, and the
+      quality gates the review phase must run (tests, linters, static analysis,
+      security, `verify-code-docs`).
+
+      **Every path in the plan must lie inside the declared `blast_radius`.** If
+      the plan needs a path outside it, that is the overshoot the tier exists to
+      catch: no prompt may widen the declaration — it is frozen inside
+      `book_content_hash`, and editing it trips audit rule CHK-PB-BIND and hides
+      the overshoot instead of recording it. STOP, abandon the run
+      (`run-promptbook abandon`), and re-author in `iterate` or `dev-cycle`.
+
+      Keep the change minimal: the council approved a fix, not a refactor.
+    expected_output: |
+      An implementation plan in the run `notes`; every path confirmed inside the
+      declared blast radius.
+    side_effects: []
+
+  - n: 3
+    phase: implement
+    title: "Implement: make the change and its tests"
+    purpose: |
+      Land the approved change.
+    prompt: |
+      Implement the work units from the plan. Write the failing test first, watch
+      it fail, then make it pass. A test is evidence of a change only once it has
+      been seen to fail, for the reason the change addresses, against the code
+      without the change. If a test has no observed failure, disable the change,
+      watch the test fail for that reason, then restore the change and watch it
+      pass.
+
+      Stay inside the declared blast radius and inside the approved scope. Record
+      files changed, tests added or updated, and any unilateral decision with its
+      rationale in this run snapshot's `notes`.
+    expected_output: |
+      The change implemented with tests; files changed and decisions recorded in
+      the run `notes`.
+    side_effects: []
+
+  - n: 4
+    phase: review
+    title: "Review: quality gates and an independent review pass"
+    purpose: |
+      Verify the change before it ships. This phase's postcondition is the review
+      gate.
+    prompt: |
+      Run, in order, and RECORD each in the run `notes` with its exact command AND
+      a concrete result token (e.g. `unittest → 149 OK`, `validate-catalog
+      --dry-run → exit 0`) — NOT a bare "all green", which an unrecorded gate
+      makes indistinguishable from a gate never run:
+      the repo's FULL test suite (the complete run, not a hand-picked subset);
+      the linter/formatter; static analysis; security analysis;
+      `verify-code-docs`; and — if the diff touches any distributed surface
+      (`crux/skills/`, `crux/agents/`, `crux/templates/`) — the release-content
+      scan `check-public-release-content.py`. Read its exit code as a gate: exit 0
+      = clean; **exit 1 = FINDINGS** (one `<path>:<lineno>: <line>` row per hit on
+      stdout — a real gate failure to FIX by re-editing, NOT an environment
+      error); a crash / exit >= 2 / non-zero with empty or unparseable stdout = an
+      environment-capability error (surface stderr; a distinct lane).
+
+      Then dispatch an independent reviewer over the diff — correctness against
+      the diagnosed root cause, consistency with ADRs and `docs/AGENTS.md`,
+      clarity, and security (injection, secrets incl. the `~/.crux/` contract,
+      authz, supply-chain, unsafe file/shell/path ops). A `[SECURITY:Sn]` finding
+      on a reachable path is a non-downgradable MUST-FIX.
+
+      The reviewer receives the book's `goal` statements — the Outcome, the
+      Evidence, and the Constraint. It judges the change against the Outcome,
+      not against the diff alone.
+      It returns one disposition per Evidence item:
+        - verified, with the command and the result token, or the observation
+          and where it is recorded when no command produced it;
+        - contradicted, which is a finding;
+        - unobserved, with what was attempted, what limited it, and what
+          would settle it.
+      It re-derives each disposition rather than adopting the author's.
+      It states whether the Constraint held and what shows that. A result token is
+      an exit code, a pass count, or a named verdict — never raw output, an
+      environment value, or a secret.
+
+      Where you fixed a MUST-FIX yourself rather than dispatching it, that
+      fix is your own authorship: the re-review of it is commissioned by
+      your delegator, not by you, and you re-dispatch only the reviewers of
+      work you did not write. At the top of the chain the delegator is the
+      human who approved the run.
+
+      Fix every MUST-FIX, then re-run the gates. After 3 loops without
+      convergence, STOP and escalate.
+    expected_output: |
+      All gates green with a command + result token recorded per gate; review
+      findings resolved; one disposition per Evidence item.
+    side_effects: [verify-code-docs]
+
+  - n: 5
+    phase: summary
+    title: "Summary: completion report AND archive the book"
+    purpose: |
+      Hand off cleanly and close the cycle's tracked artifact inside its own final
+      prompt.
+    prompt: |
+      Write a completion summary to this run snapshot's `summary` field: a
+      one-paragraph outcome; the verified root cause; links (CHANGELOG entry if
+      one was written, journal entry, this run); stats (council rounds, gate
+      loops, files changed, tests added); and any deferred work.
+
+      THEN run `uv run "${CRUX_PLUGIN_ROOT}/scripts/advance-run.py" <run-RUN-NNN.yaml>
+      --outcome done --result "summary written; archiving next"
+      --book <active-book.yaml>`. This prompt's `result` records the
+      hand-off, NOT "book archived" — the archive has not happened yet at the
+      instant that string is written. The run reaches `status: completed`,
+      `current_prompt` is nulled on both book and run, and the book's
+      `current_run` SURVIVES.
+
+      THEN invoke `archive-promptbook PB-NNNN`.
+
+      **Archival runs the blast-radius containment check** for this book, since it
+      is `cycle_kind: patch`. Read its exit code as a three-lane gate: exit 0 =
+      clean, the book archives; **exit 1 = the check FAILED** — a document
+      verdict, not an environment error, and it must not be waved through; exit
+      >= 2 = an environment-capability error (git absent, not a git work tree,
+      the base commit unknown) — surface stderr and treat it as fail-closed,
+      because an unproven blast radius is not a passed one.
+
+      **When the check fails, the run does not archive as completed work.**
+      Abandon it (`run-promptbook abandon PB-NNNN --reason "<why>"`) and re-author
+      the work in whichever non-patch tier fits — `iterate` when the diagnosis
+      still holds, `dev-cycle` when the overshoot revealed a decision. The
+      overshoot then stays legible in the run record, and the book still closes.
+
+      Do NOT manually null `current_run`/`current_prompt` first — `archive-promptbook`
+      reads `current_run` to find the run that authorizes the archive. The
+      archive act itself is recorded in the `archive_note` and the
+      `promptbook | archived` log entry, never in a prompt `result`.
+    expected_output: |
+      Completion summary written; the blast-radius check read as a three-lane
+      gate; the book archived (or the run abandoned and re-authored in another
+      tier, with the reason recorded).
+    side_effects: [archive-promptbook]

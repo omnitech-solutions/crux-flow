@@ -1,0 +1,12 @@
+exit_code: 0
+residuals:
+  - class: missing-input
+    path: project.yml
+    kind: XcodeGen
+    first_line: null
+    last_line: null
+  - class: missing-input
+    path: App.xcodeproj
+    kind: "the Xcode project bundle 'App.xcodeproj' holds no project.pbxproj"
+    first_line: null
+    last_line: null

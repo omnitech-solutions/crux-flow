@@ -1,0 +1,11 @@
+exit_code: 0
+residuals:
+  - class: path-escape
+    path: App.xcworkspace/contents.xcworkspacedata
+    count: 3
+
+absent:
+  module-graph:
+    - "/etc/passwd"
+    - "developer:"
+    - "../../Escaped.xcodeproj"

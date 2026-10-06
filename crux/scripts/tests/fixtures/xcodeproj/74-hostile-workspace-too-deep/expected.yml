@@ -1,0 +1,7 @@
+exit_code: 0
+residuals:
+  - class: project-unreadable
+    path: App.xcworkspace/contents.xcworkspacedata
+    kind: too-deep
+    first_line: null
+    last_line: null

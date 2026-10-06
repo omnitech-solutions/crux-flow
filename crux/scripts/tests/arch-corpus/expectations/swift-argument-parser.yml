@@ -1,0 +1,544 @@
+# Pre-implementation expectations: the pinned apple/swift-argument-parser package's
+# targets, dependencies, model types and public surface. Written before the Swift
+# pack's decision record is proposed and before any implementation. After its
+# SHA-256 is recorded in the run notes, a fact changes only through an
+# `Expectation amendments` note naming the fact, the old and new value, and the
+# evidence.
+schema: 1
+name: swift-argument-parser
+repository: apple/swift-argument-parser
+url: https://github.com/apple/swift-argument-parser
+sha: cdc5f0c6e836de848699ae11f6480f2d99ac5ef1
+license: Apache-2.0
+license_check: "gh api repos/apple/swift-argument-parser --jq .license.spdx_id -> Apache-2.0 (2026-09-24)"
+recorded: 2026-09-24
+facts:
+  - concern: module-graph
+    kind: target
+    value: "ArgumentParser (library target)"
+    evidence: "Package.swift:31-34"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "ArgumentParserTestHelpers (library target, shared test helpers)"
+    evidence: "Package.swift:35-38"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "ArgumentParserToolInfo (library target)"
+    evidence: "Package.swift:39-41"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "GenerateDoccReference (command plugin target)"
+    evidence: "Package.swift:44-55"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "GenerateManual (command plugin target)"
+    evidence: "Package.swift:56-62"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "roll (executable target, example)"
+    evidence: "Package.swift:65-68"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "math (executable target, example)"
+    evidence: "Package.swift:69-72"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "repeat (executable target, example)"
+    evidence: "Package.swift:73-76"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "color (executable target, example)"
+    evidence: "Package.swift:77-80"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "default-as-flag (executable target, example)"
+    evidence: "Package.swift:81-85"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "generate-docc-reference (executable target, tool backing the plugin)"
+    evidence: "Package.swift:88-91"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "generate-manual (executable target, tool backing the plugin)"
+    evidence: "Package.swift:92-95"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "ArgumentParserEndToEndTests (test target)"
+    evidence: "Package.swift:98-101"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "ArgumentParserExampleTests (test target)"
+    evidence: "Package.swift:102-106"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "ArgumentParserGenerateDoccReferenceTests (test target)"
+    evidence: "Package.swift:107-110"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "ArgumentParserGenerateManualTests (test target)"
+    evidence: "Package.swift:111-114"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "ArgumentParserPackageManagerTests (test target)"
+    evidence: "Package.swift:115-118"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "ArgumentParserToolInfoTests (test target)"
+    evidence: "Package.swift:119-122"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "ArgumentParserUnitTests (test target)"
+    evidence: "Package.swift:123-126"
+    status: must-render
+  - concern: module-graph
+    kind: target
+    value: "count-lines (executable target, example; appended under #if os(macOS) as a literal executableTarget call, so still statically readable)"
+    evidence: "Package.swift:133-136"
+    status: limitation-expected
+  - concern: module-graph
+    kind: target
+    value: "changelog-authors (executable target, tool; appended under #if os(macOS) as a literal executableTarget call, so still statically readable)"
+    evidence: "Package.swift:139-142"
+    status: limitation-expected
+
+  - concern: module-graph
+    kind: target-dependency
+    value: "ArgumentParser -> ArgumentParserToolInfo"
+    evidence: "Package.swift:31-34"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "ArgumentParserTestHelpers -> ArgumentParser"
+    evidence: "Package.swift:35-38"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "ArgumentParserTestHelpers -> ArgumentParserToolInfo"
+    evidence: "Package.swift:35-38"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "GenerateDoccReference -> generate-docc-reference"
+    evidence: "Package.swift:44-55"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "GenerateManual -> generate-manual"
+    evidence: "Package.swift:56-62"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "roll -> ArgumentParser"
+    evidence: "Package.swift:65-68"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "math -> ArgumentParser"
+    evidence: "Package.swift:69-72"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "repeat -> ArgumentParser"
+    evidence: "Package.swift:73-76"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "color -> ArgumentParser"
+    evidence: "Package.swift:77-80"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "default-as-flag -> ArgumentParser"
+    evidence: "Package.swift:81-85"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "generate-docc-reference -> ArgumentParser"
+    evidence: "Package.swift:88-91"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "generate-docc-reference -> ArgumentParserToolInfo"
+    evidence: "Package.swift:88-91"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "generate-manual -> ArgumentParser"
+    evidence: "Package.swift:92-95"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "generate-manual -> ArgumentParserToolInfo"
+    evidence: "Package.swift:92-95"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "ArgumentParserEndToEndTests -> ArgumentParser"
+    evidence: "Package.swift:98-101"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "ArgumentParserEndToEndTests -> ArgumentParserTestHelpers"
+    evidence: "Package.swift:98-101"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "ArgumentParserExampleTests -> ArgumentParserTestHelpers"
+    evidence: "Package.swift:102-106"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "ArgumentParserGenerateDoccReferenceTests -> ArgumentParserTestHelpers"
+    evidence: "Package.swift:107-110"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "ArgumentParserGenerateManualTests -> ArgumentParserTestHelpers"
+    evidence: "Package.swift:111-114"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "ArgumentParserPackageManagerTests -> ArgumentParser"
+    evidence: "Package.swift:115-118"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "ArgumentParserPackageManagerTests -> ArgumentParserTestHelpers"
+    evidence: "Package.swift:115-118"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "ArgumentParserToolInfoTests -> ArgumentParserToolInfo"
+    evidence: "Package.swift:119-122"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "ArgumentParserUnitTests -> ArgumentParser"
+    evidence: "Package.swift:123-126"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "ArgumentParserUnitTests -> ArgumentParserTestHelpers"
+    evidence: "Package.swift:123-126"
+    status: must-render
+  - concern: module-graph
+    kind: target-dependency
+    value: "count-lines -> ArgumentParser"
+    evidence: "Package.swift:133-136"
+    status: limitation-expected
+  - concern: module-graph
+    kind: target-dependency
+    value: "changelog-authors -> ArgumentParser"
+    evidence: "Package.swift:139-142"
+    status: limitation-expected
+
+  - concern: module-graph
+    kind: import
+    value: "ArgumentParser imports ArgumentParserToolInfo (internal import)"
+    evidence: "Sources/ArgumentParser/Completions/BashCompletionsGenerator.swift:12-12"
+    status: must-render
+  - concern: module-graph
+    kind: import
+    value: "ArgumentParser imports ArgumentParserToolInfo (internal import)"
+    evidence: "Sources/ArgumentParser/Completions/FishCompletionsGenerator.swift:12-12"
+    status: must-render
+  - concern: module-graph
+    kind: import
+    value: "ArgumentParser imports ArgumentParserToolInfo (internal import)"
+    evidence: "Sources/ArgumentParser/Usage/DumpHelpGenerator.swift:12-12"
+    status: must-render
+  - concern: module-graph
+    kind: import
+    value: "ArgumentParserUnitTests imports ArgumentParser (@testable import)"
+    evidence: "Tests/ArgumentParserUnitTests/HelpGenerationTests.swift:16-16"
+    status: must-render
+  - concern: module-graph
+    kind: import
+    value: "ArgumentParserExampleTests imports ArgumentParser (@testable import)"
+    evidence: "Tests/ArgumentParserExampleTests/MathExampleTests.swift:15-15"
+    status: must-render
+
+  - concern: module-graph
+    kind: limitation
+    value: "package.targets.append(contentsOf: [...]) inside #if os(macOS) adds count-lines and changelog-authors; the two executableTarget calls in the appended array are literal and readable, but the os(macOS) guard around the whole block cannot be evaluated statically, so inclusion is platform-conditional and unconfirmed"
+    evidence: "Package.swift:130-144"
+    status: limitation-expected
+
+  - concern: module-graph
+    kind: residual
+    value: "CMakeLists.txt build description (root and per-directory CMake files); the pack does not read CMake build definitions"
+    evidence: "CMakeLists.txt:1-20"
+    status: out-of-scope
+  - concern: module-graph
+    kind: residual
+    value: "format.sh developer formatting script under Scripts/; shell tooling, not part of the Swift module graph"
+    evidence: "Scripts/format.sh:1-5"
+    status: out-of-scope
+  - concern: module-graph
+    kind: residual
+    value: "GeneratePlugin protocol's plugin-execution entry points (PackagePlugin.CommandPlugin conformance); plugin invocation and its generated output are not derived statically"
+    evidence: "Plugins/GenerateCommon/GeneratePlugin.swift:14-20"
+    status: out-of-scope
+
+  - concern: data-model
+    kind: type
+    value: "CompletionShell (struct, public)"
+    evidence: "Sources/ArgumentParser/Completions/CompletionsGenerator.swift:15-17"
+    status: must-render
+  - concern: data-model
+    kind: type
+    value: "ArgumentHelp (struct, public)"
+    evidence: "Sources/ArgumentParser/Parsable Properties/ArgumentHelp.swift:13-13"
+    status: must-render
+  - concern: data-model
+    kind: type
+    value: "ValidationError (struct, public)"
+    evidence: "Sources/ArgumentParser/Parsable Properties/Errors.swift:14-14"
+    status: must-render
+  - concern: data-model
+    kind: type
+    value: "ExitCode (struct, public)"
+    evidence: "Sources/ArgumentParser/Parsable Properties/Errors.swift:35-35"
+    status: must-render
+  - concern: data-model
+    kind: type
+    value: "CleanExit (struct, public)"
+    evidence: "Sources/ArgumentParser/Parsable Properties/Errors.swift:70-70"
+    status: must-render
+  - concern: data-model
+    kind: type
+    value: "CommandConfiguration (struct, public)"
+    evidence: "Sources/ArgumentParser/Parsable Types/CommandConfiguration.swift:13-13"
+    status: must-render
+  - concern: api-surface
+    kind: public-symbol
+    value: "EnumerableFlag (protocol, public)"
+    evidence: "Sources/ArgumentParser/Parsable Types/EnumerableFlag.swift:58-58"
+    status: must-render
+  - concern: api-surface
+    kind: public-symbol
+    value: "ParsableCommand (protocol, public)"
+    evidence: "Sources/ArgumentParser/Parsable Types/ParsableCommand.swift:13-13"
+    status: must-render
+  - concern: api-surface
+    kind: public-symbol
+    value: "ParsableArguments (protocol, public)"
+    evidence: "Sources/ArgumentParser/Parsable Types/ParsableArguments.swift:16-16"
+    status: must-render
+  - concern: api-surface
+    kind: public-symbol
+    value: "ExpressibleByArgument (protocol, public)"
+    evidence: "Sources/ArgumentParser/Parsable Types/ExpressibleByArgument.swift:13-13"
+    status: must-render
+  - concern: data-model
+    kind: type
+    value: "Tree (class, internal)"
+    evidence: "Sources/ArgumentParser/Utilities/Tree.swift:12-12"
+    status: must-render
+  - concern: data-model
+    kind: type
+    value: "ArgumentDecoder (class, internal)"
+    evidence: "Sources/ArgumentParser/Parsing/ArgumentDecoder.swift:31-31"
+    status: must-render
+  - concern: data-model
+    kind: type
+    value: "ParserError (enum, internal)"
+    evidence: "Sources/ArgumentParser/Parsing/ParserError.swift:13-13"
+    status: must-render
+  - concern: data-model
+    kind: type
+    value: "Parsed (enum, internal)"
+    evidence: "Sources/ArgumentParser/Parsing/Parsed.swift:12-12"
+    status: must-render
+  - concern: data-model
+    kind: type
+    value: "Argument (struct, public, property wrapper)"
+    evidence: "Sources/ArgumentParser/Parsable Properties/Argument.swift:45-45"
+    status: must-render
+
+  - concern: data-model
+    kind: stored-property
+    value: "CommandConfiguration.commandName: String?"
+    evidence: "Sources/ArgumentParser/Parsable Types/CommandConfiguration.swift:18-18"
+    status: must-render
+  - concern: data-model
+    kind: stored-property
+    value: "CommandConfiguration.abstract: String"
+    evidence: "Sources/ArgumentParser/Parsable Types/CommandConfiguration.swift:28-28"
+    status: must-render
+  - concern: data-model
+    kind: stored-property
+    value: "CommandConfiguration.usage: String?"
+    evidence: "Sources/ArgumentParser/Parsable Types/CommandConfiguration.swift:36-36"
+    status: must-render
+  - concern: data-model
+    kind: stored-property
+    value: "CommandConfiguration.discussion: String"
+    evidence: "Sources/ArgumentParser/Parsable Types/CommandConfiguration.swift:44-44"
+    status: must-render
+  - concern: data-model
+    kind: stored-property
+    value: "CommandConfiguration.helpBanner: String?"
+    evidence: "Sources/ArgumentParser/Parsable Types/CommandConfiguration.swift:53-53"
+    status: must-render
+  - concern: data-model
+    kind: stored-property
+    value: "ValidationError.message: String"
+    evidence: "Sources/ArgumentParser/Parsable Properties/Errors.swift:18-18"
+    status: must-render
+  - concern: data-model
+    kind: stored-property
+    value: "ExitCode.rawValue: Int32"
+    evidence: "Sources/ArgumentParser/Parsable Properties/Errors.swift:37-37"
+    status: must-render
+  - concern: data-model
+    kind: stored-property
+    value: "Tree.element: Element"
+    evidence: "Sources/ArgumentParser/Utilities/Tree.swift:13-13"
+    status: must-render
+
+  - concern: api-surface
+    kind: public-symbol
+    value: "ArgumentParser (library product)"
+    evidence: "Package.swift:18-20"
+    status: must-render
+  - concern: api-surface
+    kind: public-symbol
+    value: "GenerateDoccReference (command plugin product)"
+    evidence: "Package.swift:21-23"
+    status: must-render
+  - concern: api-surface
+    kind: public-symbol
+    value: "GenerateManual (command plugin product)"
+    evidence: "Package.swift:24-26"
+    status: must-render
+  - concern: api-surface
+    kind: public-symbol
+    value: "Argument (property-wrapper struct exposing a parsed positional value via ParsedWrapper)"
+    evidence: "Sources/ArgumentParser/Parsable Properties/Argument.swift:44-46"
+    status: must-render
+  - concern: api-surface
+    kind: public-symbol
+    value: "Flag (property-wrapper struct exposing a parsed flag value via ParsedWrapper)"
+    evidence: "Sources/ArgumentParser/Parsable Properties/Flag.swift:71-72"
+    status: must-render
+  - concern: api-surface
+    kind: public-symbol
+    value: "Option (property-wrapper struct exposing a parsed option value via ParsedWrapper)"
+    evidence: "Sources/ArgumentParser/Parsable Properties/Option.swift:51-52"
+    status: must-render
+  - concern: api-surface
+    kind: public-symbol
+    value: "OptionGroup (property-wrapper struct grouping a nested ParsableArguments value)"
+    evidence: "Sources/ArgumentParser/Parsable Properties/OptionGroup.swift:33-34"
+    status: must-render
+  - concern: api-surface
+    kind: public-symbol
+    value: "ParentCommand (property-wrapper struct referencing an ancestor command's parsed value)"
+    evidence: "Sources/ArgumentParser/Parsable Properties/ParentCommand.swift:42-43"
+    status: must-render
+  - concern: api-surface
+    kind: public-symbol
+    value: "CommandGroup.init(name:subcommands:) (public initializer for a named group of subcommands shown in help)"
+    evidence: "Sources/ArgumentParser/Parsable Types/CommandGroup.swift:21-24"
+    status: must-render
+  - concern: api-surface
+    kind: public-symbol
+    value: "ParsableCommand.main(_:) (static entry point that parses arguments and runs the resulting command)"
+    evidence: "Sources/ArgumentParser/Parsable Types/ParsableCommand.swift:148-148"
+    status: must-render
+
+  - concern: api-surface
+    kind: protocol-requirement
+    value: "ParsableCommand.configuration (static var; default falls back to CommandConfiguration())"
+    evidence: "Sources/ArgumentParser/Parsable Types/ParsableCommand.swift:16-16"
+    status: must-render
+  - concern: api-surface
+    kind: protocol-requirement
+    value: "ParsableCommand.run (mutating func; default implementation throws a help request)"
+    evidence: "Sources/ArgumentParser/Parsable Types/ParsableCommand.swift:32-32"
+    status: must-render
+  - concern: api-surface
+    kind: protocol-requirement
+    value: "ParsableArguments.validate (mutating func for post-parse validation)"
+    evidence: "Sources/ArgumentParser/Parsable Types/ParsableArguments.swift:25-25"
+    status: must-render
+
+  - concern: api-surface
+    kind: entry-declaration
+    value: "ChangelogAuthors (@main entry, AsyncParsableCommand tool)"
+    evidence: "Tools/changelog-authors/ChangelogAuthors.swift:19-21"
+    status: must-render
+  - concern: api-surface
+    kind: entry-declaration
+    value: "GenerateDoccReference (@main entry, ParsableCommand tool executable; distinct from the plugin target/product of the same name)"
+    evidence: "Tools/generate-docc-reference/GenerateDoccReference.swift:47-48"
+    status: must-render
+  - concern: api-surface
+    kind: entry-declaration
+    value: "GenerateManual (@main entry, ParsableCommand tool executable; distinct from the plugin target/product of the same name)"
+    evidence: "Tools/generate-manual/GenerateManual.swift:39-40"
+    status: must-render
+  - concern: api-surface
+    kind: entry-declaration
+    value: "GenerateManualPlugin (@main entry, GeneratePlugin/CommandPlugin conformance)"
+    evidence: "Plugins/GenerateManual/GenerateManualPlugin.swift:15-16"
+    status: must-render
+  - concern: api-surface
+    kind: entry-declaration
+    value: "GenerateDoccReferencePlugin (@main entry, GeneratePlugin/CommandPlugin conformance)"
+    evidence: "Plugins/GenerateDoccReference/GenerateDoccReference.swift:15-16"
+    status: must-render
+  - concern: api-surface
+    kind: entry-declaration
+    value: "CountLines (@main entry, AsyncParsableCommand example)"
+    evidence: "Examples/count-lines/CountLines.swift:15-17"
+    status: must-render
+  - concern: api-surface
+    kind: entry-declaration
+    value: "DefaultAsFlag (@main entry, ParsableCommand example)"
+    evidence: "Examples/default-as-flag/DefaultAsFlag.swift:14-15"
+    status: must-render
+  - concern: api-surface
+    kind: entry-declaration
+    value: "Repeat (@main entry, ParsableCommand example)"
+    evidence: "Examples/repeat/Repeat.swift:14-15"
+    status: must-render
+  - concern: api-surface
+    kind: entry-declaration
+    value: "Color (@main entry, ParsableCommand example)"
+    evidence: "Examples/color/Color.swift:14-15"
+    status: must-render
+  - concern: api-surface
+    kind: entry-declaration
+    value: "Math (@main entry, ParsableCommand example)"
+    evidence: "Examples/math/Math.swift:14-15"
+    status: must-render
+  - concern: api-surface
+    kind: limitation
+    value: "_SendableMetatype is declared twice, under #if compiler(>=6.2) and #else, with different inheritance clauses"
+    evidence: "Sources/ArgumentParser/Utilities/SwiftExtensions.swift:12-17"
+    status: limitation-expected
+  - concern: api-surface
+    kind: entry-declaration
+    value: "roll: top-level code in main.swift, not an @main declaration; not an entry declaration"
+    evidence: "Examples/roll/main.swift:35-35"
+    status: out-of-scope

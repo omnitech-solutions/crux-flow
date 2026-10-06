@@ -1,0 +1,139 @@
+format_version: "1"
+id: PB-9001
+title: Sample minimal adr-kind cycle book for validator fixtures
+status: active
+created_at: 2026-05-29
+total_prompts: 13
+current_run: RUN-001
+current_prompt: 2
+forked_from: null
+tags: [cycle, fixture, sample]
+cycle_kind: adr
+modules:
+  adrs: 1
+  dev_loops: 1
+  review_cycles: 1
+goal: |
+  Exercise the promptbook schema + the ADR-0029 cycle-coverage pass with a
+  genuine minimal 13-prompt adr-kind cycle (covers `modules`, `cycle_kind`,
+  `module_tag`, block scalars with [[wiki-links]], and the 4N+4M+3K+2 formula).
+strategy: |
+  One ADR module, one dev loop, one review cycle, plus prep + summary.
+run_autonomy: |
+  The plan is the authorization. See `docs/CLAUDE.md` §11.
+prompts:
+  - n: 1
+    title: "Propose the ADR"
+    purpose: |
+      Purpose for prompt 1.
+    prompt: |
+      Do step 1. See [[docs/CLAUDE.md]].
+    expected_output: |
+      Output for step 1.
+    module_tag: adr-1
+  - n: 2
+    title: "Council-review the ADR"
+    purpose: |
+      Purpose for prompt 2.
+    prompt: |
+      Do step 2. See [[docs/CLAUDE.md]].
+    expected_output: |
+      Output for step 2.
+    module_tag: adr-1
+  - n: 3
+    title: "Address findings"
+    purpose: |
+      Purpose for prompt 3.
+    prompt: |
+      Do step 3. See [[docs/CLAUDE.md]].
+    expected_output: |
+      Output for step 3.
+    module_tag: adr-1
+  - n: 4
+    title: "Accept the ADR"
+    purpose: |
+      Purpose for prompt 4.
+    prompt: |
+      Do step 4. See [[docs/CLAUDE.md]].
+    expected_output: |
+      Output for step 4.
+    module_tag: adr-1
+  - n: 5
+    title: "Derive implementation plan"
+    purpose: |
+      Purpose for prompt 5.
+    prompt: |
+      Do step 5. See [[docs/CLAUDE.md]].
+    expected_output: |
+      Output for step 5.
+    module_tag: dev-1
+  - n: 6
+    title: "Implement"
+    purpose: |
+      Purpose for prompt 6.
+    prompt: |
+      Do step 6. See [[docs/CLAUDE.md]].
+    expected_output: |
+      Output for step 6.
+    module_tag: dev-1
+  - n: 7
+    title: "Quality gates"
+    purpose: |
+      Purpose for prompt 7.
+    prompt: |
+      Do step 7. See [[docs/CLAUDE.md]].
+    expected_output: |
+      Output for step 7.
+    module_tag: dev-1
+  - n: 8
+    title: "Internal review"
+    purpose: |
+      Purpose for prompt 8.
+    prompt: |
+      Do step 8. See [[docs/CLAUDE.md]].
+    expected_output: |
+      Output for step 8.
+    module_tag: dev-1
+  - n: 9
+    title: "External review"
+    purpose: |
+      Purpose for prompt 9.
+    prompt: |
+      Do step 9. See [[docs/CLAUDE.md]].
+    expected_output: |
+      Output for step 9.
+    module_tag: review-1
+  - n: 10
+    title: "Tests/docs/conformance"
+    purpose: |
+      Purpose for prompt 10.
+    prompt: |
+      Do step 10. See [[docs/CLAUDE.md]].
+    expected_output: |
+      Output for step 10.
+    module_tag: review-1
+  - n: 11
+    title: "Fix-loop until clean"
+    purpose: |
+      Purpose for prompt 11.
+    prompt: |
+      Do step 11. See [[docs/CLAUDE.md]].
+    expected_output: |
+      Output for step 11.
+    module_tag: review-1
+  - n: 12
+    title: "Prep: changelog/docs/journal/PR"
+    purpose: |
+      Purpose for prompt 12.
+    prompt: |
+      Do step 12. See [[docs/CLAUDE.md]].
+    expected_output: |
+      Output for step 12.
+  - n: 13
+    title: "Summary + archive"
+    purpose: |
+      Purpose for prompt 13.
+    prompt: |
+      Do step 13. See [[docs/CLAUDE.md]].
+    expected_output: |
+      Output for step 13.

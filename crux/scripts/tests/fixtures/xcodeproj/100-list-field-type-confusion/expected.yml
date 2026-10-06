@@ -1,0 +1,189 @@
+# ADR-0130 clauses 2 and 14 hostile form: the eleven list
+# fields the Xcode reader reads -- `targets`, `packageReferences`,
+# `children`, `dependencies`, `explicitFolders`, `exceptions`,
+# `membershipExceptions`, `files`, `packageProductDependencies`,
+# `buildPhases` and `fileSystemSynchronizedGroups` -- each holding a value
+# that is not a list. The grammar parses every one, so none is `malformed`.
+# Each renders exactly one `unsupported-project-form` at the field's own
+# line with a fixed detail that echoes no value, and nothing is read from
+# it: a string's characters are never ids or paths, and a dictionary's keys
+# are never ids. So `targets = "TQ"` and `targets = { T = x; }` draw no
+# target row for the real target `T`, `packageReferences = "RX"` draws no
+# dependency row for the real reference `R`, `buildPhases = "SP"` reaches
+# no real Sources phase `S`, `packageProductDependencies = "PQ"` draws no
+# product row for the real product dependency `P`, and
+# `membershipExceptions = "x."` adds nothing to `Other` (read per
+# character, `.` named the whole root, `Explicit/Hidden2.swift` included).
+# A non-list `exceptions` or `explicitFolders` applies nothing, so the
+# root's default rows stand: `Src/D/a.swift` is a member of `Folders`.
+#
+# An item inside a list that is not a string keeps item-level handling,
+# one line per item, and the project continues: in an id list (`targets`,
+# `packageReferences`, `children`, `buildPhases`, `exceptions`, `files`) it
+# renders `unresolved-reference`; in a path list (`explicitFolders`,
+# `membershipExceptions`) it renders `unsupported-project-form`, and is not
+# applied. Each of these items raised `TypeError` or `AttributeError` and
+# collapsed the whole project to `project-unreadable`/`malformed`.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `App` | `App.xcodeproj` | app | application | — |"
+    - "| `Other` | `App.xcodeproj` | app | application | — |"
+    - "| `Phased` | `App.xcodeproj` | library | framework | — |"
+    - "| `Folders` | `App.xcodeproj` | library | framework | — |"
+    - "| `Classic/Main.swift` | `App` | classic Sources build phase | — |"
+    - "| `Item/Item.swift` | `App` | classic Sources build phase | — |"
+    - "| `AppSrc/Owned.swift` | `App` | folder-synced root AppSrc | — |"
+    - "| `AppSrc/Excluded.swift` | `App` | excluded by an exception set | — |"
+    - "| `Src/b.swift` | `Folders` | folder-synced root Src | — |"
+    - "| `Src/D/a.swift` | `Folders` | folder-synced root Src | — |"
+    - "| `project` | `https://example.com/keyed.git` | remote package | `https://example.com/keyed.git` | exactVersion 3.0.0 |"
+
+absent:
+  module-graph:
+    - "project-unreadable"
+    - "| `Listed` |"
+    - "| `Keyed` |"
+    - "listless.git"
+    - "kit.git"
+    - "| `App` | `Kit` |"
+    - "| `Classic/S.swift` | `Other` |"
+    - "| `AppSrc/Owned.swift` | `Other` |"
+    - "| `AppSrc/Excluded.swift` | `Other` |"
+    - "| `AppSrc/Explicit/Hidden2.swift`"
+    - "| `AppSrc/Owned.swift` | `App` | excluded"
+    - "added by an exception set"
+    - "dangling dependency reference"
+    - "Phased's Sources phase"
+    - "a dangling exception set on Src"
+    - "ABCDEFGH"
+    - "abcdef"
+    - "xyzw"
+
+residuals:
+  - class: unsupported-project-form
+    path: Listless.xcodeproj/project.pbxproj
+    kind: the project's targets field is not a list and is not read
+    first_line: 11
+    last_line: 11
+  - class: unsupported-project-form
+    path: Listless.xcodeproj/project.pbxproj
+    kind: the project's packageReferences field is not a list and is not read
+    first_line: 12
+    last_line: 12
+  - class: unsupported-project-form
+    path: Keyed.xcodeproj/project.pbxproj
+    kind: the project's targets field is not a list and is not read
+    first_line: 11
+    last_line: 11
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: a group's children field is not a list and is not descended
+    first_line: 45
+    last_line: 45
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: a folder-synced root's exceptions field is not a list and is not applied
+    first_line: 96
+    last_line: 96
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: a folder-synced root's explicitFolders field is not a list and is not applied
+    first_line: 97
+    last_line: 97
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: an exception set's membershipExceptions field is not a list and is not applied
+    first_line: 112
+    last_line: 112
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: a target's dependencies field is not a list and is not read
+    first_line: 136
+    last_line: 136
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: a target's packageProductDependencies field is not a list and is not read
+    first_line: 137
+    last_line: 137
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: a target's fileSystemSynchronizedGroups field is not a list and is not read
+    first_line: 143
+    last_line: 143
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: a target's buildPhases field is not a list and is not read
+    first_line: 144
+    last_line: 144
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: a build phase's files field is not a list and is not read
+    first_line: 180
+    last_line: 180
+  # Exactly one line per non-list field, never one per character.
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: a group's children field is not a list and is not descended
+    count: 1
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: a build phase's files field is not a list and is not read
+    count: 1
+  # Item-level: one line per non-string item, at the item's own line.
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: a project's targets entry is not an object id and is not read
+    first_line: 16
+    last_line: 16
+  - class: unresolved-reference
+    path: Keyed.xcodeproj/project.pbxproj
+    kind: a project's packageReferences entry is not an object id and is not read
+    first_line: 16
+    last_line: 16
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: a children entry references an object reached a second time, or not at all, by descent
+    first_line: 53
+    last_line: 53
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: a children entry references an object reached a second time, or not at all, by descent
+    count: 1
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: a dangling exception set on AppSrc
+    first_line: 81
+    last_line: 81
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: an explicitFolders entry is not a string; it is not applied
+    first_line: 87
+    last_line: 87
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: an exception entry is not a string; it is not applied
+    first_line: 104
+    last_line: 104
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: an exception entry is not a string; it is not applied
+    first_line: 118
+    last_line: 118
+  # Declared cause, ADR-0130 clause 9 (a build-phase exception set
+  # withholds the rows it names): the set-level detail denied an effect the
+  # reader applies; wording corrected; class and location unchanged.
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: a build-phase membership exception set on AppSrc is not interpreted; the rows it names are withheld
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: a target's buildPhases entry is not an object id and is not read
+    first_line: 132
+    last_line: 132
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: a dangling build file in 'App's Sources phase
+    first_line: 167
+    last_line: 167

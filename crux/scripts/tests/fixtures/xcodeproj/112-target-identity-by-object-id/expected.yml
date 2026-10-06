@@ -1,0 +1,41 @@
+# ADR-0130 clause 10 (one row per file, target and route): a target's
+# identity is its container and its object id, never its display name.
+#
+# `Ids.xcodeproj` holds four targets. `NL1` has no name and `NL2` a list
+# name, so both display `—`; `DUP|1` and `DUP`2` are both named `Dup`. Each
+# target sharing a display renders `<display> (object <id>)`, and the id is
+# cell-escaped like a name (`|` gains a backslash, a backtick becomes `ʼ`
+# in a cell and `#96;` in a Mermaid label). `NL1` is listed twice in
+# `targets` and renders one row.
+#
+# All three owners of the synced root `Shared` render their own membership
+# row for `Shared/Own.swift`; before the fix the two nameless targets merged
+# into one row. Each dependency edge is drawn between two distinct nodes and
+# counted: before the fix `—`'s edge was one node's self-loop.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `— (object NL1)` | `Ids.xcodeproj` | app | application | — |"
+    - "| `— (object NL2)` | `Ids.xcodeproj` | executable | tool | — |"
+    - "| `Dup (object DUP\\|1)` | `Ids.xcodeproj` | app | application | — |"
+    - "| `Dup (object DUPʼ2)` | `Ids.xcodeproj` | executable | tool | — |"
+    - "| `Shared/Own.swift` | `— (object NL1)` | folder-synced root Shared | — |"
+    - "| `Shared/Own.swift` | `— (object NL2)` | folder-synced root Shared | — |"
+    - "| `Shared/Own.swift` | `Dup (object DUP\\|1)` | folder-synced root Shared | — |"
+    - "[\"— (object NL2) (Ids.xcodeproj)\"] --> Ids_xcodeproj_____object_NL1_[\"— (object NL1) (Ids.xcodeproj)\"]\n"
+    - "[\"Dup (object DUP#96;2) (Ids.xcodeproj)\"] --> Ids_xcodeproj__Dup__object_DUP_1_[\"Dup (object DUP|1) (Ids.xcodeproj)\"]\n"
+    - "_1 containers, 4 targets, 2 in-tree dependency edges and every Swift import,"
+
+absent:
+  module-graph:
+    - "| `—` |"
+    - "| `Dup` |"
+    - "— (Ids.xcodeproj)"
+    - "Dup (Ids.xcodeproj)"
+
+residuals:
+  - class: unsupported-project-form
+    path: Ids.xcodeproj/project.pbxproj
+    kind: a target's name field is not a string and is not read
+    count: 1

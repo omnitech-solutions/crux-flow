@@ -1,0 +1,31 @@
+# ADR-0129:151 and :150 (fixture E-byname): a by-name product whose only
+# `.package(path:)` escaped the checkout has no local-package candidate. It
+# renders the "resolves to 0 containers" line and draws no edge.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `AppCore` | `App/Package.swift` | library"
+    - "| `CoreKit` | `Other/Package.swift` | library"
+
+absent:
+  module-graph:
+    - "-->"
+    - "path dependency"
+    - "Outside"
+    - "was refused"
+    - "Other_Package_swift__CoreKit"
+
+residuals:
+  - class: path-escape
+    path: App/Package.swift
+    kind: a `.package(path:)` reference leaves the checkout; nothing is read through it
+    first_line: 5
+    last_line: 5
+    count: 2
+  - class: unresolved-reference
+    path: App/Package.swift
+    kind: product CoreKit of target AppCore resolves to 0 containers; no edge is drawn
+    first_line: 8
+    last_line: 8
+    count: 1

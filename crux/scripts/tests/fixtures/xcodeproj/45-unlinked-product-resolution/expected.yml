@@ -1,0 +1,14 @@
+# ADR-0130 clause 7: the unique, ambiguous and unmatched unlinked-product
+# cases render one edge, one residual and one residual respectively.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "Foo (Modules/Unique/Package.swift)"
+
+residuals:
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: null
+    first_line: null
+    last_line: null

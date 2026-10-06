@@ -1,0 +1,152 @@
+# Cycle module: Verify (4 prompts) — YAML partial
+#
+# This module is a YAML fragment: a list of prompt mappings ({title, purpose, prompt,
+# expected_output, side_effects, module_tag}) that the `iterate` skill
+# concatenates into a book's `prompts:` array and then renumbers (`n: 1..total`).
+# It is NOT a standalone book — it has no top-level keys, only the prompt list.
+#
+# This is the `iterate` cycle's analogue of `cycle-module-adr.yaml`: it replaces
+# the ADR module for NON-architectural reactive work (bug fixes, drift
+# remediation, refinements to existing behavior). There is NO ADR — the council
+# reviews a VERIFIED DIAGNOSIS + remediation approach instead, and the durable
+# record is a journal entry (the diagnosis lives in the run snapshot's `notes`).
+# An `iterate` cycle MUST have at least one verify module (the council-reviewed
+# diagnosis is the cycle's load-bearing artifact, exactly as the ADR is for
+# `dev-cycle`).
+#
+# Placeholder tokens (substituted INSIDE the scalar values at assembly):
+#
+# - `{M}` — the verify iteration label (`#1`, `#2`, ...). When the cycle has
+#   exactly one verify module, the suffix is omitted. Prompt numbering is NOT a
+#   token — `iterate` assigns sequential `n:` after concatenation.
+# - `{ISSUE}` — a short phrase identifying the issue/bug/drift THIS verify module
+#   investigates. Single-verify cycles use the cycle goal verbatim.
+#
+# `module_tag: verify-{M}` — every prompt in THIS module carries the same tag,
+# where `{M}` is the 1-based occurrence of the verify module within the book
+# (first → `verify-1`, second → `verify-2`, ...). The resolved value is the BARE
+# integer (`verify-1`) — distinct from the title's `{M}` LABEL (`#1`). Substitute
+# the integer, not the label: `verify-#1` is INVALID (schema pattern
+# `^(adr|dev|review|verify)-\d+$`). The cycle-coverage pass counts `^verify-`
+# tagged elements to enforce the council-prompt invariant (ordinal 2).
+#
+# Invariant enforced by this module: the council prompt (ordinal 2) is
+# non-optional. An `iterate` cycle that contains a verify module without its
+# council prompt violates the contract (and fails validate-promptbook.py's
+# cycle-coverage pass).
+
+- title: "Verify {M}: research & reproduce {ISSUE}"
+  module_tag: verify-{M}
+  purpose: |
+    Establish that the issue is real and understood before any fix lands. This
+    is the iterate cycle's substitute for an ADR — a verified diagnosis, not an
+    architectural decision.
+  prompt: |
+    Read the cycle's Goal. Invoke `query-docs` to surface any existing ADRs,
+    briefs, research, or journal entries relevant to {ISSUE}. Then dispatch 2–3
+    research agents in parallel via the `Agent` tool. Each reads the affected
+    code/docs paths and returns: a reproduction (exact steps / a failing test /
+    the concrete drift cited by path+line — NOT a vague description), the
+    root cause (cause vs. symptom — name the actual defect), the blast radius /
+    scope, and a proposed remediation approach (the MINIMAL correct change).
+
+    A failing test is a complete reproduction of a bug. Do not build a corpus
+    of inputs to demonstrate a class: one failing input proves the instance,
+    and a class earns its own reproduction only when the Goal cites a second,
+    independent instance. A security label on the issue sets its priority, not
+    its size. If the diagnosis shows a fix that passes `fix-directly`'s sizing
+    test, say so in the Diagnosis — that is a `docs/AGENTS.md` §11
+    premise-contradiction stop, and the owner decides whether the cycle
+    continues.
+
+    Synthesize into a single **diagnosis** and write it into THIS run snapshot's
+    `notes` field under the label `Diagnosis {M}` (problem · reproduction ·
+    root cause · scope · proposed approach). Do NOT write an ADR — this is
+    non-architectural reactive work by definition; if the diagnosis reveals an
+    architectural decision is actually required, the council prompt's escape
+    verdict (next) routes it to `dev-cycle`.
+  expected_output: |
+    A `Diagnosis {M}` block in the run snapshot `notes`: reproduction/evidence,
+    root cause, scope, and the proposed minimal approach.
+  side_effects: [query-docs]
+
+- title: "Verify {M}: convene LLM council to review the diagnosis"
+  module_tag: verify-{M}
+  purpose: |
+    Gate the diagnosis + approach with multi-perspective review before any code
+    lands — the same rigor `dev-cycle` applies to an ADR, applied to a fix.
+  prompt: |
+    Invoke the `council` skill (multi-model: Claude + Gemini + GPT, async — run
+    a PEP 723 driver via `uv run` against `${CRUX_PLUGIN_ROOT}/scripts/crux/council/`,
+    per `council/SKILL.md`) — or,
+    equivalently, dispatch 5 parallel review agents via the `Agent` tool — each
+    owning one dimension over the `Diagnosis {M}` block:
+      (1) Evidence/Reproduction — is the issue actually demonstrated (repro
+          steps / failing test / concretely-cited drift), not asserted?
+      (2) Root-cause correctness — is the diagnosed cause the real cause, or a
+          symptom? Would the proposed fix actually resolve it?
+      (3) Approach soundness + **minimality** — is it the smallest correct
+          change? Any scope creep (refactors, features) that doesn't belong in
+          a fix? Regression risk?
+      (4) Consistency — does the approach fit existing behavior, ADRs, and the
+          conventions in `docs/AGENTS.md`?
+      (5) **Security** — does the fix introduce a security risk (new attack
+          surface, secret/credential handling incl. `~/.crux/`, injection/
+          authz, supply-chain/external-fetch)? `REQUEST_CHANGES` if unmitigated.
+
+    **Escape verdict (the iterate-specific stop).** If the council concludes the
+    work is ACTUALLY ARCHITECTURAL — it requires a new decision, not a fix —
+    treat this as a `docs/AGENTS.md` §11 run-autonomy **premise-contradiction
+    stop**: mark this prompt `blocked` and **escalate to the user**,
+    recommending they abandon this `iterate` run (`run-promptbook abandon
+    PB-NNNN --reason "<why>"`) and start a `dev-cycle` whose book cites this one
+    in prose. The verify journal entry + the diagnosis persist as a `learning`
+    the new `dev-cycle`'s ADR can cite. Do NOT silently convert or proceed.
+
+    Otherwise route the verdict exactly as `cycle-module-adr.yaml` does: all five
+    `APPROVE` → this module's accept prompt; minor non-safety nits → address-
+    findings; split verdict (any `REQUEST_CHANGES` or a safety-adjacent dissent)
+    → deeper review autonomously (`srde`, then a read-only deep-review `Agent`),
+    survivors → address-findings.
+  expected_output: |
+    Aggregated 5-dimension council verdict on the diagnosis; srde/deep-review
+    resolution if split; the architectural-escape stop if it fired; findings.
+  side_effects: [council, srde]
+
+- title: "Verify {M}: address council findings, re-convene the council"
+  module_tag: verify-{M}
+  purpose: |
+    Close the diagnosis loop until the council approves the fix approach.
+  prompt: |
+    For each council finding (this module's council prompt), revise the
+    `Diagnosis {M}` block in the run `notes` — sharpen the root cause, tighten
+    the approach, add evidence. Resolve findings **autonomously** (council/`srde`
+    outputs + dispatched `Agent`s); do NOT ask a human. When every finding is
+    resolved, return to this module's council prompt to re-convene. After 3 full
+    loops without convergence, STOP and escalate — a fundamental disagreement
+    (or a "this is actually architectural" conclusion) needs human adjudication.
+  expected_output: |
+    Updated `Diagnosis {M}`; control returns to this module's council prompt.
+  side_effects: []
+
+- title: "Verify {M}: commit to the approach"
+  module_tag: verify-{M}
+  purpose: |
+    Record the verified root cause + chosen approach as the durable "why"
+    (the iterate cycle's substitute for accepting an ADR — no ADR, no new
+    concern).
+  prompt: |
+    Invoke `log-work` with a reflective journal entry (category `decision` or
+    `learning`) capturing the verified diagnosis for {ISSUE}: the root cause,
+    the chosen minimal approach, why it's the right fix, and any council debate
+    that shaped it. Reference this run snapshot. Per the journal contract, name
+    at least one thing the reproduction or council surfaced that wasn't obvious
+    at first.
+
+    This commits the cycle to the approach; the dev module(s) implement it next,
+    reading the `Diagnosis {M}` block + this journal entry (the `{RULE_REFS}`
+    substitute in the reused dev module).
+  expected_output: |
+    A new `decision`/`learning` entry in `docs/journal/YYYY-MM.md` recording the
+    verified root cause + approach; the dev module is unblocked.
+  side_effects: [log-work]

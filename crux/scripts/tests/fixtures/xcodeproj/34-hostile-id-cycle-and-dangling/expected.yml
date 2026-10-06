@@ -1,0 +1,20 @@
+# ADR-0130 clause 17 hostile form: a mutual group-descent cycle (X's
+# children include Y, Y's children include X -- the descent's own visited
+# set must break it, never recurse forever or raise) alongside a dangling
+# target-dependency id. Exit 0, TWO unresolved-reference residuals: one
+# from `target_dependencies` for the dangling dependency, and one rendered
+# directly from descent at GRP_Y's own `children` list-item line -- the
+# entry that re-names GRP_X and lands the cycle in `unresolved_ids` -- with
+# NO Sources build phase involved. Swift entities elsewhere still render.
+exit_code: 0
+
+rows:
+  data-model:
+    - "| `Model` | struct | public |"
+  module-graph:
+    - "| `TargetA` | `App.xcodeproj` | app | application | \u2014 |"
+
+residuals:
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    count: 2

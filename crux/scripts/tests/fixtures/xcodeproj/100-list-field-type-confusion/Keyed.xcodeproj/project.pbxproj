@@ -1,0 +1,42 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG;
+			targets = {
+				T = x;
+			};
+			packageReferences = (
+				R,
+				(
+					R,
+				),
+			);
+		};
+		MG = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+			);
+		};
+		T = {
+			isa = PBXNativeTarget;
+			name = Keyed;
+			productType = "com.apple.product-type.application";
+		};
+		R = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://example.com/keyed.git";
+			requirement = {
+				kind = exactVersion;
+				version = 3.0.0;
+			};
+		};
+	};
+	rootObject = PRJ;
+}

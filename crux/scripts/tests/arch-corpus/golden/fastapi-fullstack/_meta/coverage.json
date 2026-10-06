@@ -1,0 +1,81 @@
+{
+  "_note": "internal, unstable schema; not a downstream compatibility surface",
+  "concerns": [
+    {
+      "concern": "data-model",
+      "extractor": "python",
+      "inputs_found": [
+        "backend/app/alembic/versions/1a31ce608336_add_cascade_delete_relationships.py",
+        "backend/app/alembic/versions/9c0a54914c78_add_max_length_for_string_varchar_.py",
+        "backend/app/alembic/versions/d98dd8ec85a3_edit_replace_id_integers_in_all_models_.py",
+        "backend/app/alembic/versions/e2412789c190_initialize_models.py",
+        "backend/app/alembic/versions/fe56fa70289e_add_created_at_to_user_and_item.py",
+        "backend/app/api/deps.py",
+        "backend/app/models.py"
+      ],
+      "n_entities": 12,
+      "n_sources": 7,
+      "verdict": "populated"
+    },
+    {
+      "concern": "api-surface",
+      "extractor": "python",
+      "inputs_found": [
+        "backend/app/api/deps.py",
+        "backend/app/api/main.py",
+        "backend/app/api/routes/items.py",
+        "backend/app/api/routes/login.py",
+        "backend/app/api/routes/private.py",
+        "backend/app/api/routes/users.py",
+        "backend/app/api/routes/utils.py",
+        "backend/app/main.py"
+      ],
+      "n_entities": 23,
+      "n_sources": 8,
+      "verdict": "populated"
+    },
+    {
+      "concern": "module-graph",
+      "extractor": "python",
+      "inputs_found": [
+        "backend/app/__init__.py",
+        "backend/app/alembic/env.py",
+        "backend/app/alembic/versions/1a31ce608336_add_cascade_delete_relationships.py",
+        "backend/app/alembic/versions/9c0a54914c78_add_max_length_for_string_varchar_.py",
+        "backend/app/alembic/versions/d98dd8ec85a3_edit_replace_id_integers_in_all_models_.py",
+        "backend/app/alembic/versions/e2412789c190_initialize_models.py",
+        "backend/app/alembic/versions/fe56fa70289e_add_created_at_to_user_and_item.py",
+        "backend/app/api/__init__.py",
+        "backend/app/api/deps.py",
+        "backend/app/api/main.py",
+        "backend/app/api/routes/__init__.py",
+        "backend/app/api/routes/items.py",
+        "backend/app/api/routes/login.py",
+        "backend/app/api/routes/private.py",
+        "backend/app/api/routes/users.py",
+        "backend/app/api/routes/utils.py",
+        "backend/app/core/__init__.py",
+        "backend/app/core/config.py",
+        "backend/app/core/db.py",
+        "backend/app/core/security.py",
+        "backend/app/crud.py",
+        "backend/app/initial_data.py",
+        "backend/app/main.py",
+        "backend/app/models.py",
+        "backend/app/utils.py"
+      ],
+      "n_entities": 36,
+      "n_sources": 25,
+      "verdict": "populated"
+    },
+    {
+      "concern": "decision-index",
+      "expected": "an ADR index at `<docs_dir>/adrs/index.md` with Accepted, non-archived entries",
+      "extractor": "stub",
+      "found": "no matching input",
+      "inputs_found": [],
+      "stub_reason": "precondition_missing",
+      "verdict": "stubbed"
+    }
+  ]
+}

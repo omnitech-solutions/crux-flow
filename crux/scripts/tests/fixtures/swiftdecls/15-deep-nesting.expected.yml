@@ -1,0 +1,16 @@
+# 1,200 nested parentheses in an initializer, deeper than the interpreter's
+# default recursion limit of 1,000, in a 2,450-byte file. Every walk in the
+# reader uses an explicit stack, so the file extracts with no residual; the
+# per-file boundary for a raised RecursionError is tested separately. Schema:
+# 01-actor.expected.yml.
+types:
+  - {name: Deep, kind: struct, access: public, at: [1, 1], conditional: false}
+stored_properties:
+  - {owner: Deep, name: value, type: Int, access: public, at: [2, 2]}
+relationships: []
+interfaces:
+  - {name: Deep, kind: struct, access: public, at: [1, 1], attributes: [], conditional: false}
+  - {name: Deep.value, kind: let, access: public, at: [2, 2], attributes: [], conditional: false}
+requirements: []
+mains: []
+residuals: []

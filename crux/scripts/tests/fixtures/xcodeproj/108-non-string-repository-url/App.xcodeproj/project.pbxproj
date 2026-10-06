@@ -1,0 +1,70 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG;
+			packageReferences = (
+				RR_LIST,
+				RR_DICT,
+			);
+			targets = (
+				TGT_APP,
+			);
+		};
+		MG = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+			);
+		};
+		RR_LIST = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = (
+				"https://u:tok@h/x.git",
+			);
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+		RR_DICT = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = {
+				a = "https://u:tok@h/x.git";
+			};
+			requirement = {
+				kind = exactVersion;
+				version = 2.0.0;
+			};
+		};
+		PD_LIST = {
+			isa = XCSwiftPackageProductDependency;
+			package = RR_LIST;
+			productName = ListKit;
+		};
+		PD_DICT = {
+			isa = XCSwiftPackageProductDependency;
+			package = RR_DICT;
+			productName = DictKit;
+		};
+		TGT_APP = {
+			isa = PBXNativeTarget;
+			name = "App";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+			);
+			dependencies = (
+			);
+			packageProductDependencies = (
+				PD_LIST,
+				PD_DICT,
+			);
+		};
+	};
+	rootObject = PRJ;
+}

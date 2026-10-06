@@ -1,0 +1,22 @@
+# ADR-0130 clause 2 hostile form: a project combining type-confused
+# shapes -- a dict `remoteGlobalIDString`, a list-valued
+# `PBXTargetDependency.target`, a dict `dependencies` item, a list-valued
+# package-product `.package`, a dict `packageProductDependencies` item,
+# and list-valued `repositoryURL`/`requirement.kind` -- still exits 0.
+# A CLEAN control project (Good.xcodeproj) alongside it still renders its
+# own target, proving the per-project boundary contains the damage rather
+# than aborting the whole scan.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `GoodTarget` | `Good.xcodeproj` | app | application | — |"
+    - "| `T1` | `App.xcodeproj` | app | application | — |"
+    - "| `T2` | `App.xcodeproj` | app | application | — |"
+
+residuals:
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: null
+    first_line: null
+    last_line: null

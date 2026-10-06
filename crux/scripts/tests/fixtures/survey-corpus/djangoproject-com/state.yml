@@ -1,0 +1,377 @@
+candidates:
+- anchor_id: 04a1919ec942c87c
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: djangoproject/middleware.py::NormalizeSlashesMiddleware
+  domain: routing
+  evidence:
+  - djangoproject/middleware.py:59-75
+  id: 04a1919ec942c87c
+  rule: A path with repeated slashes redirects permanently to its collapsed form when
+    that form resolves.
+  state: observed
+- anchor_id: 1473ffb812de5784
+  anchor_kind: api-contract
+  canonical_anchor: accounts.urls:delete_profile
+  domain: authentication
+  evidence:
+  - accounts/urls.py:18-27
+  id: 1473ffb812de5784
+  rule: A signed-in user can delete their own account through the site.
+  state: observed
+- anchor_id: 26486d68b1555def
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: djangoproject/settings/prod.py::MIDDLEWARE
+  domain: caching
+  evidence:
+  - djangoproject/settings/prod.py:47-51
+  id: 26486d68b1555def
+  rule: Production wraps the whole middleware stack in Django's per-site page cache.
+  state: observed
+- anchor_id: 29df98bbf45a1a25
+  anchor_kind: api-contract
+  canonical_anchor: djangoproject.hosts:host_patterns
+  domain: routing
+  evidence:
+  - djangoproject/hosts.py:4-8
+  id: 29df98bbf45a1a25
+  rule: The site answers on three subdomains, each with its own URL configuration.
+  state: observed
+- anchor_id: 2afac7722769f3c4
+  anchor_kind: system-of-record
+  canonical_anchor: djangoproject/settings/common.py::DATABASES
+  domain: persistence
+  evidence:
+  - djangoproject/settings/common.py:33-50
+  id: 2afac7722769f3c4
+  rule: Application data lives in PostgreSQL, across two separate databases.
+  state: observed
+- anchor_id: 2c25c26d7af77e21
+  anchor_kind: external-dependency
+  canonical_anchor: django-money
+  domain: payments
+  evidence:
+  - pyproject.toml:17-17
+  id: 2c25c26d7af77e21
+  rule: Monetary amounts are stored together with their currency by django-money.
+  state: observed
+- anchor_id: 33ba1e81fa3cdecc
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: djangoproject/settings/common.py::MIDDLEWARE
+  domain: i18n
+  evidence:
+  - djangoproject/settings/common.py:159-176
+  id: 33ba1e81fa3cdecc
+  rule: Locale middleware runs before session middleware so that responses do not
+    vary on the session cookie.
+  state: observed
+- anchor_id: 396cdb51390645a0
+  anchor_kind: external-dependency
+  canonical_anchor: django-read-only
+  domain: persistence
+  evidence:
+  - pyproject.toml:19-19
+  id: 396cdb51390645a0
+  rule: The application can be put into a read-only database mode by django-read-only.
+  state: observed
+- anchor_id: 3f15f0f546d4261e
+  anchor_kind: external-dependency
+  canonical_anchor: django-hosts
+  domain: routing
+  evidence:
+  - pyproject.toml:16-16
+  id: 3f15f0f546d4261e
+  rule: Subdomains are routed inside one deployment by django-hosts.
+  state: observed
+- anchor_id: 420838c49025395e
+  anchor_kind: external-dependency
+  canonical_anchor: django-registration-redux
+  domain: authentication
+  evidence:
+  - pyproject.toml:21-21
+  id: 420838c49025395e
+  rule: Registration and account activation are handled by django-registration-redux
+    rather than by hand-written views.
+  state: observed
+- anchor_id: 432365575e606b97
+  anchor_kind: external-dependency
+  canonical_anchor: django-recaptcha
+  domain: security
+  evidence:
+  - pyproject.toml:20-20
+  id: 432365575e606b97
+  rule: Public forms are protected from bots by reCAPTCHA.
+  state: observed
+- anchor_id: 46f7505668de4f0e
+  anchor_kind: external-dependency
+  canonical_anchor: feedparser
+  domain: syndication
+  evidence:
+  - pyproject.toml:23-23
+  id: 46f7505668de4f0e
+  rule: Community feeds are parsed by feedparser.
+  state: observed
+- anchor_id: 48446388ada92bbe
+  anchor_kind: system-of-record
+  canonical_anchor: djangoproject/settings/common.py::DATABASE_ROUTERS
+  domain: persistence
+  evidence:
+  - djangoproject/settings/common.py:52-52
+  id: 48446388ada92bbe
+  rule: Trac models are routed to the second database by a dedicated database router.
+  state: observed
+- anchor_id: 484dad2883563234
+  anchor_kind: system-of-record
+  canonical_anchor: accounts/models.py::Profile
+  domain: authentication
+  evidence:
+  - accounts/models.py:5-10
+  id: 484dad2883563234
+  rule: A user's display name lives on a profile row one-to-one with the auth user,
+    cascading on delete.
+  state: observed
+- anchor_id: 4d6f1f3b30bcf0a3
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: djangoproject/settings/common.py::SECRETS
+  domain: configuration
+  evidence:
+  - djangoproject/settings/common.py:17-24
+  id: 4d6f1f3b30bcf0a3
+  rule: Deployment secrets are read from a JSON file outside the checkout rather than
+    from the environment.
+  state: observed
+- anchor_id: 52037b6e001f45ba
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: accounts/management/commands/delete_unactivated_users.py::Command.handle
+  domain: authentication
+  evidence:
+  - accounts/management/commands/delete_unactivated_users.py:22-45
+  id: 52037b6e001f45ba
+  rule: Accounts never activated past the activation window are deleted in bulk, skipping
+    users with protected related rows.
+  state: observed
+- anchor_id: 57400a4466e3d0f6
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: djangoproject/settings/common.py::SILENCED_SYSTEM_CHECKS
+  domain: security
+  evidence:
+  - djangoproject/settings/common.py:192-195
+  id: 57400a4466e3d0f6
+  rule: The HTTPS redirect is the web server's responsibility, so Django's own check
+    for it is silenced.
+  state: observed
+- anchor_id: 5d5a50b318aa0a7e
+  anchor_kind: external-dependency
+  canonical_anchor: sorl-thumbnail
+  domain: media
+  evidence:
+  - pyproject.toml:33-33
+  id: 5d5a50b318aa0a7e
+  rule: Image thumbnails are generated on demand by sorl-thumbnail.
+  state: observed
+- anchor_id: 71dbf96e78a11325
+  anchor_kind: external-dependency
+  canonical_anchor: pykismet3
+  domain: spam
+  evidence:
+  - pyproject.toml:29-29
+  id: 71dbf96e78a11325
+  rule: Submitted text is checked for spam against Akismet.
+  state: observed
+- anchor_id: 7a38322affbf14f0
+  anchor_kind: external-dependency
+  canonical_anchor: sentry-sdk
+  domain: observability
+  evidence:
+  - pyproject.toml:53-53
+  id: 7a38322affbf14f0
+  rule: Production errors are reported to Sentry.
+  state: observed
+- anchor_id: 8297bfe976caa1d6
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: djangoproject/settings/common.py::ACCOUNT_ACTIVATION_DAYS
+  domain: authentication
+  evidence:
+  - djangoproject/settings/common.py:269-269
+  id: 8297bfe976caa1d6
+  rule: An account activation link expires three days after registration.
+  state: observed
+- anchor_id: 8408fa0862e7f421
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: djangoproject/middleware.py::CORSMiddleware
+  domain: security
+  evidence:
+  - djangoproject/middleware.py:12-24
+  id: 8408fa0862e7f421
+  rule: One middleware allows every origin, for the debug toolbar on the documentation
+    host.
+  state: observed
+- anchor_id: 889c3c173e76fcec
+  anchor_kind: module-boundary
+  canonical_anchor: djangoproject.urls.www->legacy.urls
+  domain: routing
+  evidence:
+  - djangoproject/urls/www.py:170-170
+  id: 889c3c173e76fcec
+  rule: Paths that match nothing else fall through to the legacy URL configuration.
+  state: observed
+- anchor_id: 9075c07ae023b298
+  anchor_kind: api-contract
+  canonical_anchor: djangoproject.urls.www:admin.site.urls
+  domain: administration
+  evidence:
+  - djangoproject/urls/www.py:70-70
+  id: 9075c07ae023b298
+  rule: The Django admin is mounted on the www host under a fixed prefix.
+  state: observed
+- anchor_id: 99374c809fdb8368
+  anchor_kind: external-dependency
+  canonical_anchor: django-push
+  domain: syndication
+  evidence:
+  - pyproject.toml:18-18
+  id: 99374c809fdb8368
+  rule: PubSubHubbub subscription comes from django-push pinned to a git revision
+    rather than a released version.
+  state: observed
+- anchor_id: a3bcc61714950586
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: djangoproject/settings/common.py::USE_TZ
+  domain: time
+  evidence:
+  - djangoproject/settings/common.py:233-243
+  id: a3bcc61714950586
+  rule: Datetimes are stored without a timezone, in one project-wide zone.
+  state: observed
+- anchor_id: a64ecdffef887f5e
+  anchor_kind: external-dependency
+  canonical_anchor: stripe
+  domain: payments
+  evidence:
+  - pyproject.toml:35-35
+  id: a64ecdffef887f5e
+  rule: Donations and recurring memberships are charged through Stripe.
+  state: observed
+- anchor_id: a7aff59228d6393c
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: djangoproject/settings/common.py::SECURE_PROXY_SSL_HEADER
+  domain: security
+  evidence:
+  - djangoproject/settings/common.py:186-186
+  id: a7aff59228d6393c
+  rule: TLS terminates at a reverse proxy, which reports the original scheme in a
+    request header.
+  state: observed
+- anchor_id: bc9dc9ee70851ac5
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: djangoproject/settings/prod.py::DATA_UPLOAD_MAX_MEMORY_SIZE
+  domain: uploads
+  evidence:
+  - djangoproject/settings/prod.py:103-105
+  id: bc9dc9ee70851ac5
+  rule: Release artifacts of up to 50 MB may be uploaded through the admin.
+  state: observed
+- anchor_id: c192e4a920d7d65c
+  anchor_kind: external-dependency
+  canonical_anchor: redis
+  domain: caching
+  evidence:
+  - pyproject.toml:52-52
+  id: c192e4a920d7d65c
+  rule: Redis backs the production cache.
+  state: observed
+- anchor_id: c6eeee3d05702bf2
+  anchor_kind: external-dependency
+  canonical_anchor: sphinx
+  domain: documentation
+  evidence:
+  - pyproject.toml:34-34
+  id: c6eeee3d05702bf2
+  rule: The Django documentation is built by Sphinx inside this application.
+  state: observed
+- anchor_id: c798397ca11cb787
+  anchor_kind: external-dependency
+  canonical_anchor: gunicorn
+  domain: deployment
+  evidence:
+  - pyproject.toml:50-50
+  id: c798397ca11cb787
+  rule: Production serves the WSGI application through gunicorn.
+  state: observed
+- anchor_id: d5bc6cce9a1ec9f1
+  anchor_kind: system-of-record
+  canonical_anchor: aggregator/models.py::Feed.approval_status
+  domain: syndication
+  evidence:
+  - aggregator/models.py:33-49
+  id: d5bc6cce9a1ec9f1
+  rule: A submitted community feed stays pending until a human approves or denies
+    it.
+  state: observed
+- anchor_id: d79608a49f5694ab
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: aggregator/models.py::Feed.save
+  domain: syndication
+  evidence:
+  - aggregator/models.py:60-78
+  id: d79608a49f5694ab
+  rule: Approving a feed subscribes it to the hub and denying it unsubscribes, as
+    a side effect of saving.
+  state: observed
+- anchor_id: da8806bc65ba13c6
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: djangoproject/settings/common.py::RECAPTCHA_REQUIRED_SCORE
+  domain: security
+  evidence:
+  - djangoproject/settings/common.py:261-265
+  id: da8806bc65ba13c6
+  rule: The reCAPTCHA score threshold lives in shared settings so it is identical
+    in every environment.
+  state: observed
+- anchor_id: e29a723ef2693475
+  anchor_kind: api-contract
+  canonical_anchor: accounts.urls:registration_register
+  domain: authentication
+  evidence:
+  - accounts/urls.py:8-12
+  id: e29a723ef2693475
+  rule: Registration goes through the django-registration-redux default backend with
+    a captcha-bearing form.
+  state: observed
+- anchor_id: e4e6bb20e444bb27
+  anchor_kind: external-dependency
+  canonical_anchor: django
+  domain: platform
+  evidence:
+  - pyproject.toml:12-12
+  id: e4e6bb20e444bb27
+  rule: The site is a Django application pinned to one exact framework version.
+  state: observed
+- anchor_id: e7308ec3aff314e4
+  anchor_kind: external-dependency
+  canonical_anchor: libsass
+  domain: frontend
+  evidence:
+  - pyproject.toml:25-25
+  id: e7308ec3aff314e4
+  rule: Stylesheets are compiled from SCSS by libsass.
+  state: observed
+- anchor_id: e8a4b424ad94e571
+  anchor_kind: system-of-record
+  canonical_anchor: djangoproject/settings/prod.py::CACHES
+  domain: caching
+  evidence:
+  - djangoproject/settings/prod.py:20-30
+  id: e8a4b424ad94e571
+  rule: Production runs two Redis caches so the documentation cache can be purged
+    on its own.
+  state: observed
+- anchor_id: f146e0e251009ebf
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: djangoproject/middleware.py::ExcludeHostsLocaleMiddleware
+  domain: i18n
+  evidence:
+  - djangoproject/middleware.py:27-56
+  id: f146e0e251009ebf
+  rule: Locale negotiation is skipped for hosts named in settings, so the documentation
+    host is not translated per request.
+  state: observed

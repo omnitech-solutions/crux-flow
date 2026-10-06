@@ -1,0 +1,32 @@
+# ADR-0129:151, :150 and :143 (fixture E): a `.package(path:)` that leaves
+# the checkout lexically renders `path-escape`; a product qualified by its
+# identity renders the refused-reference line and draws no edge.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `AppCore` | `App/Package.swift` | library"
+    - "| `CoreKit` | `Other/Package.swift` | library"
+
+absent:
+  module-graph:
+    - "-->"
+    - "path dependency"
+    - "Outside"
+    - "CorePkg"
+    - "resolves to"
+    - "Other_Package_swift__CoreKit"
+
+residuals:
+  - class: path-escape
+    path: App/Package.swift
+    kind: a `.package(path:)` reference leaves the checkout; nothing is read through it
+    first_line: 5
+    last_line: 5
+    count: 2
+  - class: unresolved-reference
+    path: App/Package.swift
+    kind: product CoreKit of target AppCore names a package whose `.package(path:)` reference was refused; no edge is drawn
+    first_line: 8
+    last_line: 8
+    count: 1

@@ -1,0 +1,365 @@
+[
+  {
+    "id": "architect",
+    "name": "architect",
+    "description": "Use when the user says \"propose an ADR\", \"record this decision\", \"formalize this decision\", \"review this ADR\", \"accept ADR-NNNN\", \"draft a promptbook\", \"plan the build for X\", or \"design the architecture for X\".",
+    "tools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Edit",
+      "Write",
+      "Bash",
+      "Skill",
+      "WebSearch",
+      "WebFetch"
+    ],
+    "model": "opus",
+    "tags": [
+      "agents",
+      "architecture",
+      "adr",
+      "decisions"
+    ],
+    "bundles": [
+      "crux-agents"
+    ],
+    "risk_level": "medium",
+    "maxTurns": 75,
+    "effort": "high",
+    "skills": [
+      "propose-adr",
+      "transition-adr",
+      "review-decisions",
+      "council",
+      "srde",
+      "author-promptbook",
+      "dev-cycle",
+      "link-adr-graph",
+      "propose-brief",
+      "log-work",
+      "forge-skill"
+    ]
+  },
+  {
+    "id": "brainstormer",
+    "name": "brainstormer",
+    "description": "Use when the user says \"brainstorm\", \"let's explore X\", \"whiteboard this\", \"I have an idea\", \"help me think through Y\", \"explore options for X before a decision\", or wants pre-decision exploration of a feature or change. Explores OPTIONS before a decision is made \u2014 distinct from the architect, who \"designs the architecture for X\" once an approach is chosen.",
+    "tools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Skill",
+      "WebSearch",
+      "WebFetch"
+    ],
+    "model": "opus",
+    "tags": [
+      "agents",
+      "brainstorming",
+      "exploration",
+      "design"
+    ],
+    "bundles": [
+      "crux-agents"
+    ],
+    "risk_level": "low",
+    "maxTurns": 50,
+    "skills": [
+      "whiteboarding",
+      "query-docs",
+      "forge-skill",
+      "log-work"
+    ]
+  },
+  {
+    "id": "commander",
+    "name": "commander",
+    "description": "Use when the user says \"run promptbook\", \"run PB-NNNN\", \"start the cycle\", \"execute the promptbook\", \"advance the run\", \"orchestrate this build\", or wants a promptbook / dev-cycle driven to completion. A dedicated conductor to free the main thread \u2014 NOT the same as a direct `run-promptbook advance` call (which mutates one run snapshot); the commander delegates and gates the whole run.",
+    "tools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Agent(architect)",
+      "Agent(brainstormer)",
+      "Agent(dev-lead)",
+      "Agent(historian)",
+      "Agent(librarian)",
+      "Agent(night-gardener)",
+      "Agent(reviewer)",
+      "Agent(wayfinder)",
+      "Skill",
+      "TodoWrite"
+    ],
+    "model": "claude-opus-5-5",
+    "tags": [
+      "agents",
+      "orchestration",
+      "conductor",
+      "runtime"
+    ],
+    "bundles": [
+      "crux-agents"
+    ],
+    "risk_level": "medium",
+    "maxTurns": 200,
+    "skills": [
+      "run-promptbook",
+      "dev-cycle",
+      "council",
+      "srde",
+      "forge-skill",
+      "log-work"
+    ]
+  },
+  {
+    "id": "dev-lead",
+    "name": "dev-lead",
+    "description": "Use when the user says \"implement this\", \"build the feature\", \"lead the development\", \"coordinate the dev work\", \"do the delicate refactor\", or an accepted ADR / plan needs to be turned into working, tested code.",
+    "tools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Edit",
+      "Write",
+      "Bash",
+      "Agent(developer)",
+      "Agent(historian)",
+      "Agent(reviewer)",
+      "Agent(wayfinder)",
+      "Skill",
+      "TodoWrite"
+    ],
+    "model": "opus",
+    "tags": [
+      "agents",
+      "implementation",
+      "lead",
+      "coordination"
+    ],
+    "bundles": [
+      "crux-agents"
+    ],
+    "risk_level": "high",
+    "maxTurns": 150,
+    "skills": [
+      "forge-skill",
+      "log-work"
+    ]
+  },
+  {
+    "id": "developer",
+    "name": "developer",
+    "description": "Use when a single, scoped implementation unit needs to be built \u2014 typically dispatched by dev-lead with a specific work unit, the ADR, and its acceptance criteria (e.g. 'implement this unit', 'build this module', 'write this function and its tests').",
+    "tools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Edit",
+      "Write",
+      "Bash",
+      "Skill",
+      "TodoWrite"
+    ],
+    "model": "claude-sonnet-5-5",
+    "tags": [
+      "agents",
+      "implementation",
+      "worker"
+    ],
+    "bundles": [
+      "crux-agents"
+    ],
+    "risk_level": "medium",
+    "maxTurns": 150,
+    "effort": "medium",
+    "skills": [
+      "forge-skill",
+      "log-work"
+    ],
+    "isolation": "worktree"
+  },
+  {
+    "id": "historian",
+    "name": "historian",
+    "description": "Use when the user says \"set up docs\", \"init docs\", \"audit the docs\", \"clean up the docs\", \"log this work\", \"journal this\", \"file this\", \"ingest this\", \"process the inbox\", \"regenerate code docs\", or \"archive the promptbook\". Session filing (a brainstormer's whiteboarding session) is reached by *dispatch* through the inbox \u2192 process-inbox pipeline, not by direct user invocation.",
+    "tools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Edit",
+      "Write",
+      "Bash",
+      "Skill",
+      "TodoWrite"
+    ],
+    "model": "claude-sonnet-5-5",
+    "tags": [
+      "agents",
+      "docs",
+      "maintenance",
+      "custodian"
+    ],
+    "bundles": [
+      "crux-agents"
+    ],
+    "risk_level": "medium",
+    "maxTurns": 75,
+    "effort": "medium",
+    "skills": [
+      "init-docs",
+      "audit-docs",
+      "cleanup-campsite",
+      "link-adr-graph",
+      "check-drift",
+      "transition-adr",
+      "ingest-research",
+      "process-inbox",
+      "propose-adr",
+      "propose-brief",
+      "log-work",
+      "archive-promptbook",
+      "extract-code-docs",
+      "verify-code-docs",
+      "run-promptbook",
+      "forge-skill"
+    ],
+    "memory": "project"
+  },
+  {
+    "id": "librarian",
+    "name": "librarian",
+    "description": "Use when the user asks a question answerable from docs/ \u2014 \"what does X do?\", \"why did we choose Y?\", \"what's our plan for Z?\", \"what do we know about W?\", \"find the ADR about V\", \"where is U documented?\" \u2014 or another agent needs a fact retrieved mid-task.",
+    "tools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Skill"
+    ],
+    "model": "claude-sonnet-5-5",
+    "tags": [
+      "agents",
+      "retrieval",
+      "read-only",
+      "research"
+    ],
+    "bundles": [
+      "crux-agents"
+    ],
+    "risk_level": "low",
+    "maxTurns": 50,
+    "effort": "medium",
+    "skills": [
+      "query-docs",
+      "forge-skill",
+      "log-work"
+    ]
+  },
+  {
+    "id": "night-gardener",
+    "name": "night-gardener",
+    "description": "Use when the user says \"tend the garden\", \"night pass\", \"run the night gardener\", or \"morning note\", or when a scheduled overnight session starts. The night gardener is the generative and strategic overnight presence \u2014 she notices what shipped, names what's missing, thinks a quarter ahead, and writes a morning note. Distinct from cleanup-campsite (mechanical process scans), retrospective (skill harvest from friction), and audit-docs (graph integrity) \u2014 the gardener is generative and strategic \u2014 new ideas, improvement vectors, missing engineering substrate, research directions, and news that changes options.",
+    "tools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Edit",
+      "Write",
+      "Bash",
+      "Agent(historian)",
+      "Agent(wayfinder)",
+      "Agent(librarian)",
+      "Skill",
+      "TodoWrite",
+      "WebSearch",
+      "WebFetch"
+    ],
+    "model": "claude-opus-5-5",
+    "tags": [
+      "agents",
+      "garden",
+      "strategic",
+      "overnight",
+      "generative"
+    ],
+    "bundles": [
+      "crux-agents"
+    ],
+    "risk_level": "high",
+    "maxTurns": 100,
+    "skills": [
+      "tend-garden",
+      "cleanup-campsite",
+      "read-news",
+      "refresh-research-sources",
+      "retrospective",
+      "council",
+      "srde",
+      "whiteboarding",
+      "query-docs",
+      "prose-review",
+      "forge-skill",
+      "log-work"
+    ],
+    "memory": "project"
+  },
+  {
+    "id": "reviewer",
+    "name": "reviewer",
+    "description": "Use when the user says \"review this code\", \"review the diff\", \"verify this is correct\", \"is this ready to ship\", \"security review\", or a change authored by a *different* agent/session needs independent verification before it advances. Not for self-verifying your own work (that is the developer's own completion gate).",
+    "tools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Bash",
+      "Skill"
+    ],
+    "model": "claude-opus-5-5",
+    "tags": [
+      "agents",
+      "review",
+      "verification",
+      "security"
+    ],
+    "bundles": [
+      "crux-agents"
+    ],
+    "risk_level": "low",
+    "maxTurns": 150,
+    "effort": "high",
+    "skills": [
+      "prose-review",
+      "council",
+      "srde",
+      "forge-skill",
+      "log-work"
+    ]
+  },
+  {
+    "id": "wayfinder",
+    "name": "wayfinder",
+    "description": "Use when an agent needs to read or evaluate large/uncertain or external data BEFORE spending context to consume it \u2014 \"wayfind this file/URL/corpus\", \"scope out this source\", \"is this source worth reading?\", \"summarize this\", \"search this for X\", \"go wayfind <domain>\" \u2014 or when a primary wants to preserve its context window by delegating a bulky or uncertain read. Returns a fitness verdict + a condensed digest, never the raw content. Distinct from the librarian (which answers recorded-fact questions from the docs/ tree); the wayfinder triages arbitrary/external data.",
+    "tools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "model": "claude-sonnet-5-5",
+    "tags": [
+      "agents",
+      "wayfinder",
+      "read-only",
+      "context-preservation",
+      "reconnaissance"
+    ],
+    "bundles": [
+      "crux-agents"
+    ],
+    "risk_level": "medium",
+    "maxTurns": 50,
+    "effort": "medium",
+    "skills": []
+  }
+]

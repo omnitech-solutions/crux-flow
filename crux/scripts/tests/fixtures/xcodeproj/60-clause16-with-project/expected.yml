@@ -1,0 +1,13 @@
+# ADR-0130 clause 16 postcondition (item 1): the "with" member adds a
+# companion App.xcodeproj naming the @main file in its Sources phase.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `App` | `App.xcodeproj` |"
+  api-surface:
+    - "`App (App.xcodeproj)`"
+
+absent:
+  module-graph:
+    - "`missing-input` `project.yml`"

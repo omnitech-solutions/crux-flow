@@ -1,0 +1,19 @@
+# ADR-0130 clause 17 hostile form: `project.pbxproj` materialized as a FIFO
+# -- refused as `project-unreadable` / `not-regular`, never opened for a
+# blocking read. Swift entities elsewhere in the tree still render.
+materialize:
+  - path: App.xcodeproj/project.pbxproj
+    kind: fifo
+
+exit_code: 0
+
+rows:
+  data-model:
+    - "| `Model` | struct | public |"
+
+residuals:
+  - class: project-unreadable
+    path: App.xcodeproj/project.pbxproj
+    kind: "not-regular"
+    first_line: null
+    last_line: null

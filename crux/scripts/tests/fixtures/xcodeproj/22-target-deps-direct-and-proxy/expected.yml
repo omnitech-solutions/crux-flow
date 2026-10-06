@@ -1,0 +1,16 @@
+# ADR-0130 clause 17 form: a direct PBXTargetDependency (App1 -> App2) and a
+# proxy-only PBXTargetDependency (App3 -> App2 via a same-container
+# PBXContainerItemProxy) render identical graph edges to App2.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `App1` | `App.xcodeproj` | app | application | — |"
+    - "| `App3` | `App.xcodeproj` | app | application | — |"
+    - "[\"App1 (App.xcodeproj)\"] --> "
+    - "[\"App3 (App.xcodeproj)\"] --> "
+    - "App2 (App.xcodeproj)"
+
+absent:
+  module-graph:
+    - "unresolved-reference"

@@ -1,0 +1,14 @@
+# ADR-0130 clause 7: a requirement dict carrying a key beyond its kind's
+# expected value key renders unsupported-project-form; the row still renders.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `App` | `Alpha` | remote product | `https://example.com/a/alpha.git` |"
+
+residuals:
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: null
+    first_line: null
+    last_line: null

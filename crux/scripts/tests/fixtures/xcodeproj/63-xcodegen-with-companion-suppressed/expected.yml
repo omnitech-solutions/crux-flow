@@ -1,0 +1,4 @@
+exit_code: 0
+absent:
+  module-graph:
+    - "`missing-input` `project.yml`"

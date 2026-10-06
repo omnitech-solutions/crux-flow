@@ -1,0 +1,11 @@
+schema_version: "5"
+code:
+  extractors:
+    elixir:
+      glob: ["lib/**/*.ex"]
+    fallback_py:
+      extractor: fallback
+      glob: ["scripts/*.py"]
+    fallback_sh:
+      extractor: fallback
+      glob: ["scripts/*.sh"]

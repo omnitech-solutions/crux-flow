@@ -1,0 +1,90 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+				TGT_APP,
+				TGT_OTHER,
+			);
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				SYNC_APP,
+				FR_POD,
+			);
+		};
+		SYNC_APP = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "App";
+			sourceTree = "<group>";
+			exceptions = (
+				EXC_OTHER,
+			);
+		};
+		FR_POD = {
+			isa = PBXFileReference;
+			path = "Pods/PodFile.swift";
+			sourceTree = "<group>";
+		};
+		TGT_APP = {
+			isa = PBXNativeTarget;
+			name = "App";
+			productType = "com.apple.product-type.application";
+			fileSystemSynchronizedGroups = (
+				SYNC_APP,
+			);
+			buildPhases = (
+			);
+			dependencies = (
+			);
+		};
+		TGT_OTHER = {
+			isa = PBXNativeTarget;
+			name = "Other";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+				SRC_OTHER,
+			);
+			dependencies = (
+			);
+			packageProductDependencies = (
+				PD_POD,
+			);
+		};
+		SRC_OTHER = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				BF_POD,
+			);
+		};
+		BF_POD = {
+			isa = PBXBuildFile;
+			fileRef = FR_POD;
+		};
+		EXC_OTHER = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			target = TGT_OTHER;
+			membershipExceptions = (
+				"Pods/Extra.swift",
+			);
+		};
+		PD_POD = {
+			isa = XCSwiftPackageProductDependency;
+			package = LOCALREF_POD;
+			productName = PodPkg;
+		};
+		LOCALREF_POD = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "Pods/PodPkg";
+		};
+	};
+	rootObject = PRJ;
+}

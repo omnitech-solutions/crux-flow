@@ -1,0 +1,129 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+				TGT_APP,
+			);
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				GRP_SOURCES,
+				GRP_NOPATH,
+				VG_CONFIG,
+				FR_ORPHAN,
+				FR_PRODUCT,
+			);
+		};
+		GRP_SOURCES = {
+			isa = PBXGroup;
+			path = "Sources";
+			sourceTree = "<group>";
+			children = (
+				GRP_MODELS,
+			);
+		};
+		GRP_MODELS = {
+			isa = PBXGroup;
+			path = "Models";
+			sourceTree = "<group>";
+			children = (
+				GRP_DEEP,
+			);
+		};
+		GRP_DEEP = {
+			isa = PBXGroup;
+			path = "Deep";
+			sourceTree = "<group>";
+			children = (
+				FR_APPMAIN,
+			);
+		};
+		FR_APPMAIN = {
+			isa = PBXFileReference;
+			path = "AppMain.swift";
+			sourceTree = "<group>";
+		};
+		GRP_NOPATH = {
+			isa = PBXGroup;
+			name = "NoPath";
+			sourceTree = "<group>";
+			children = (
+				FR_SRCROOT,
+			);
+		};
+		FR_SRCROOT = {
+			isa = PBXFileReference;
+			path = "Extra/SourceRootFile.swift";
+			sourceTree = "SOURCE_ROOT";
+		};
+		VG_CONFIG = {
+			isa = PBXVariantGroup;
+			name = "Config.swift";
+			sourceTree = "<group>";
+			children = (
+				FR_CONFIG_EN,
+				FR_CONFIG_FR,
+			);
+		};
+		FR_CONFIG_EN = {
+			isa = PBXFileReference;
+			path = "en.lproj/Config.swift";
+			sourceTree = "<group>";
+		};
+		FR_CONFIG_FR = {
+			isa = PBXFileReference;
+			path = "fr.lproj/Config.swift";
+			sourceTree = "<group>";
+		};
+		FR_ORPHAN = {
+			isa = PBXFileReference;
+			path = "Orphan.swift";
+			sourceTree = "<group>";
+		};
+		FR_PRODUCT = {
+			isa = PBXFileReference;
+			path = "App.app";
+			sourceTree = "BUILT_PRODUCTS_DIR";
+		};
+		BF_APPMAIN = {
+			isa = PBXBuildFile;
+			fileRef = FR_APPMAIN;
+		};
+		BF_SRCROOT = {
+			isa = PBXBuildFile;
+			fileRef = FR_SRCROOT;
+		};
+		BF_CONFIG = {
+			isa = PBXBuildFile;
+			fileRef = VG_CONFIG;
+		};
+		PHASE_SOURCES = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				BF_APPMAIN,
+				BF_SRCROOT,
+				BF_CONFIG,
+			);
+		};
+		TGT_APP = {
+			isa = PBXNativeTarget;
+			name = "App";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+				PHASE_SOURCES,
+			);
+			dependencies = (
+			);
+		};
+	};
+	rootObject = PRJ;
+}

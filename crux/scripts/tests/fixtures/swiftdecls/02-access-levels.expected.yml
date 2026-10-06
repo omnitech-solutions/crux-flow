@@ -1,0 +1,23 @@
+# Access levels, `package` and `open` included. Schema: 01-actor.expected.yml.
+types:
+  - {name: Widget, kind: struct, access: public, at: [1, 1], conditional: false}
+  - {name: Base, kind: class, access: open, at: [14, 14], conditional: false}
+  - {name: Hidden, kind: enum, access: fileprivate, at: [18, 18], conditional: false}
+stored_properties:
+  - {owner: Widget, name: id, type: Int, access: public, at: [2, 2]}
+  - {owner: Widget, name: tag, type: String, access: package, at: [3, 3]}
+  - {owner: Widget, name: note, type: String, access: internal, at: [4, 4]}
+  - {owner: Widget, name: cache, type: Int, access: fileprivate, at: [5, 5]}
+  - {owner: Widget, name: secret, type: Int, access: private, at: [6, 6]}
+relationships: []
+interfaces:
+  - {name: Widget, kind: struct, access: public, at: [1, 1], attributes: [], conditional: false}
+  - {name: Widget.id, kind: let, access: public, at: [2, 2], attributes: [], conditional: false}
+  - {name: Widget.tag, kind: let, access: package, at: [3, 3], attributes: [], conditional: false}
+  - {name: "Widget.publicMethod()", kind: func, access: public, at: [8, 8], attributes: [], conditional: false}
+  - {name: "Widget.packageMethod()", kind: func, access: package, at: [9, 9], attributes: [], conditional: false}
+  - {name: Base, kind: class, access: open, at: [14, 14], attributes: [], conditional: false}
+  - {name: "Base.hook()", kind: func, access: open, at: [15, 15], attributes: [], conditional: false}
+requirements: []
+mains: []
+residuals: []

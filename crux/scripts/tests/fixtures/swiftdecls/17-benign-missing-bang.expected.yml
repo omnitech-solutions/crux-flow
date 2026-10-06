@@ -1,0 +1,14 @@
+# The benign shape: the pinned grammar inserts a MISSING `!` after the
+# empty-argument attribute `@Stored()` on a stored property. It renders no
+# line, and the facts equal those of the same code without the parentheses.
+# Schema: 01-actor.expected.yml.
+types:
+  - {name: Wrapper, kind: struct, access: internal, at: [1, 1], conditional: false}
+stored_properties:
+  - {owner: Wrapper, name: name, type: String, access: internal, at: [2, 2]}
+  - {owner: Wrapper, name: plain, type: String, access: internal, at: [3, 3]}
+relationships: []
+interfaces: []
+requirements: []
+mains: []
+residuals: []

@@ -1,0 +1,14 @@
+# ADR-0130 clauses 3, 7: a local package reference whose relativePath
+# leaves the checkout after lexical normalisation renders path-escape.
+exit_code: 0
+
+residuals:
+  - class: path-escape
+    path: App.xcodeproj/project.pbxproj
+    kind: null
+    first_line: null
+    last_line: null
+
+absent:
+  module-graph:
+    - "unresolved-reference"

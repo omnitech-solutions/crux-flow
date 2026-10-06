@@ -1,0 +1,46 @@
+# Every call form of the closed literal Package.swift subset, plus a local
+# package reached by `.package(path:)`. Rows are compared as exact sets against
+# the rendered api-surface and module-graph (test_swift_pack.ManifestFixtureTests).
+#
+#   containers:   [path]
+#   products:     [{name, kind, container, at: [a, b]}]
+#   targets:      [{name, container, kind, conditional, at: [a, b]}]
+#   edges:        [[from label, to label]]   label = "name (container)"
+#   dependencies: [{from, dependency, kind, location, requirement, at: [a, b], path}]
+#   residuals:    [{class, path, lines}]      module-graph ## Residuals
+#
+# `location` and `requirement` null render `—`. Names carry decoded escapes.
+containers: [Package.swift, Local/Helper/Package.swift]
+products:
+  - {name: Kit, kind: library, container: Package.swift, at: [8, 8]}
+  - {name: kit-tool, kind: executable, container: Package.swift, at: [9, 9]}
+  - {name: KitFormat, kind: command plugin, container: Package.swift, at: [10, 10]}
+  - {name: KitGen, kind: build-tool plugin, container: Package.swift, at: [11, 11]}
+  - {name: Helper, kind: library, container: Local/Helper/Package.swift, at: [6, 6]}
+targets:
+  - {name: Kit, container: Package.swift, kind: library, conditional: false, at: [22, 22]}
+  - {name: KitCore, container: Package.swift, kind: library, conditional: false, at: [23, 23]}
+  - {name: KitSupport, container: Package.swift, kind: library, conditional: false, at: [24, 24]}
+  - {name: KitTool, container: Package.swift, kind: executable, conditional: false, at: [25, 25]}
+  - {name: KitTests, container: Package.swift, kind: test, conditional: false, at: [26, 26]}
+  - {name: KitFormat, container: Package.swift, kind: command plugin, conditional: false, at: [27, 27]}
+  - {name: KitGen, container: Package.swift, kind: build-tool plugin, conditional: false, at: [28, 28]}
+  - {name: "Esc\t\"Q\"\\", container: Package.swift, kind: library, conditional: false, at: [29, 29]}
+  - {name: "Trés", container: Package.swift, kind: library, conditional: false, at: [30, 30]}
+  - {name: Helper, container: Local/Helper/Package.swift, kind: library, conditional: false, at: [7, 7]}
+edges:
+  - ["Kit (Package.swift)", "KitCore (Package.swift)"]
+  - ["Kit (Package.swift)", "KitSupport (Package.swift)"]
+  - ["Kit (Package.swift)", "Helper (Local/Helper/Package.swift)"]
+  - ["KitTool (Package.swift)", "Kit (Package.swift)"]
+  - ["KitTests (Package.swift)", "Kit (Package.swift)"]
+  - ["KitFormat (Package.swift)", "KitTool (Package.swift)"]
+dependencies:
+  - {from: ".", dependency: "https://example.com/a/alpha.git", kind: remote package, location: "https://example.com/a/alpha.git", requirement: "from: 1.2.0", at: [14, 14], path: Package.swift}
+  - {from: ".", dependency: "https://example.com/a/beta.git", kind: remote package, location: "https://example.com/a/beta.git", requirement: "exact: 2.0.0", at: [15, 15], path: Package.swift}
+  - {from: ".", dependency: "https://example.com/a/gamma.git", kind: remote package, location: "https://example.com/a/gamma.git", requirement: "branch: main", at: [16, 16], path: Package.swift}
+  - {from: ".", dependency: "https://example.com/a/delta.git", kind: remote package, location: "https://example.com/a/delta.git", requirement: "revision: 0123abcd", at: [17, 17], path: Package.swift}
+  - {from: ".", dependency: "https://example.com/a/epsilon.git", kind: remote package, location: "https://example.com/a/epsilon.git", requirement: "1.0.0..<2.0.0", at: [18, 18], path: Package.swift}
+  - {from: ".", dependency: Local/Helper, kind: path dependency, location: Local/Helper, requirement: null, at: [19, 19], path: Package.swift}
+  - {from: KitSupport, dependency: Alpha, kind: remote product, location: "https://example.com/a/alpha.git", requirement: null, at: [24, 24], path: Package.swift}
+residuals: []

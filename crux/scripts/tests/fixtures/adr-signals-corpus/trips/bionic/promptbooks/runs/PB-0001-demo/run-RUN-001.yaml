@@ -1,0 +1,9 @@
+format_version: '1'
+run_id: RUN-001
+book_id: PB-0001
+started_at: '2026-02-09T10:00:00Z'
+completed_at: '2026-02-09T18:00:00Z'
+status: completed
+notes: |
+  Implements ADR-0002. One snapshot note, so the run-snapshot leg is present
+  and non-empty.

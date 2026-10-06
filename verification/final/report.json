@@ -1,0 +1,93 @@
+{
+  "status": "passed",
+  "scope": "core",
+  "prerequisites": {
+    "python": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+    "missing": [],
+    "ready": true,
+    "scope": "reference"
+  },
+  "checks": [
+    {
+      "name": "flow",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "-m",
+        "pytest",
+        "tests/flow",
+        "-q",
+        "--tb=short",
+        "--durations=15"
+      ],
+      "deadline_seconds": 300,
+      "status": "ok",
+      "exit_code": 0,
+      "elapsed_seconds": 77.185018,
+      "output_bytes": 2013,
+      "stdout_digest": "27faf259eea993ccf280130d48173edf85bfbbf34afd9e2fcd16b45de5ac9501",
+      "stderr_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "upstream-core",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "-m",
+        "pytest",
+        "crux/scripts/tests/test_models_catalog.py",
+        "crux/scripts/tests/test_generate_codex_agents.py",
+        "crux/scripts/tests/test_generate_opencode_agents.py",
+        "crux/scripts/tests/test_crux_llm_router.py",
+        "crux/scripts/tests/test_crux_async_council.py",
+        "crux/scripts/tests/test_gateway_errors.py",
+        "crux/scripts/tests/test_advance_run.py",
+        "crux/scripts/tests/test_archive_precondition.py",
+        "crux/scripts/tests/test_validate_promptbook.py",
+        "crux/scripts/tests/test_check_promptbook_index.py",
+        "crux/scripts/tests/test_validate_catalog.py",
+        "crux/scripts/tests/test_validate_catalog_agents.py",
+        "crux/scripts/tests/test_generate_runtime_compat.py",
+        "crux/scripts/tests/test_generate_routing_table.py",
+        "-q",
+        "--tb=short",
+        "--durations=15"
+      ],
+      "deadline_seconds": 1800,
+      "status": "ok",
+      "exit_code": 0,
+      "elapsed_seconds": 69.838282,
+      "output_bytes": 3644,
+      "stdout_digest": "48f0d19a259b5321c463382ae30d4a78d29eb92a2a4dc977af289b61583bdf61",
+      "stderr_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "catalog",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "crux/scripts/validate-catalog.py",
+        "--dry-run"
+      ],
+      "deadline_seconds": 60,
+      "status": "ok",
+      "exit_code": 0,
+      "elapsed_seconds": 0.82097,
+      "output_bytes": 1712,
+      "stdout_digest": "f0952dfe10e1e54776045539a1a8a77034a29adea71b592c3a1ff3bd98296b10",
+      "stderr_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "runtime-compatibility",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "crux/scripts/generate-runtime-compat.py",
+        "--dry-run"
+      ],
+      "deadline_seconds": 60,
+      "status": "ok",
+      "exit_code": 0,
+      "elapsed_seconds": 0.566631,
+      "output_bytes": 95,
+      "stdout_digest": "a9898d28ca7042ea6c97165b4c6e3698d91889c19af98e367c45945888d769fb",
+      "stderr_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

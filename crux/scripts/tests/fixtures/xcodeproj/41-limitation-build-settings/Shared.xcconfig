@@ -1,0 +1,2 @@
+// Not read: baseConfigurationReference is never followed (ADR-0130 clause 12).
+SWIFT_VERSION = 5.9

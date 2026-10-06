@@ -1,0 +1,164 @@
+# Cycle module: Dev loop (4 prompts) — YAML partial
+#
+# This module is a YAML fragment: a list of prompt mappings ({title, purpose, prompt,
+# expected_output, side_effects, module_tag}) that `dev-cycle` concatenates
+# into a book's `prompts:` array and then renumbers (`n: 1..total`). It is NOT
+# a standalone book — it has no top-level keys, only the prompt list.
+#
+# Reusable building block for a cycle's development phase. One instance of this
+# module produces one implementation, one round of quality gates, and one
+# internal review. A cycle MUST have at least one dev module — internal review
+# is the artifact-quality floor enforced by this module.
+#
+# Placeholder tokens (substituted INSIDE the scalar values at assembly):
+#
+# - `{M}` — dev-loop iteration label (`#1`, `#2`, ...). Omitted in
+#   single-dev-loop cycles; otherwise the prompt title reads
+#   `Develop (loop #M): ...`. (Prompt numbering is no longer a token —
+#   `dev-cycle` assigns sequential `n:` after concatenation.)
+# - `{SCOPE}` — short phrase describing what THIS dev loop implements. In a
+#   single-loop cycle, this is "the accepted ADR" verbatim. In multi-loop
+#   cycles, it disambiguates which slice of work this loop covers (e.g.
+#   "the backend schema", "the LiveView UI", "the migration script").
+# - `{RULE_REFS}` — one or more `rule:<slug>` citations this dev loop
+#   implements, where the slug is the part of a rule's governs handle after
+#   the slash (e.g. `rule:rule-slug-citation-token`). A dev loop that
+#   implements several rules enumerates every citation. `iterate`, whose
+#   cycle has no ADR, substitutes the verified Diagnosis + commit-approach
+#   journal entry instead — the meaning is "what this loop implements", and
+#   the citation is its ordinary shape. Substitute inside the block scalar
+#   only: a `rule:` token opening a YAML line parses as a mapping key.
+#
+# `module_tag: dev-{M}` — every prompt in THIS module carries the same tag,
+# where `{M}` is the 1-based occurrence of the dev module within the book
+# (first dev loop → `dev-1`, second → `dev-2`, ...). NOTE: here `{M}`'s
+# resolved value is the BARE integer (`dev-1`) — distinct from the title's
+# `{M}` LABEL (`#1`). Substitute the integer, not the label: `dev-#1` is
+# INVALID (schema pattern `^(adr|dev|review)-\d+$`). Replaces the retired
+# `<!-- MODULE BOUNDARY -->` comments; makes the internal-review invariant
+# checkable by counting `^dev-`-tagged elements.
+#
+# Invariant enforced by this module: every implementation is gated by quality
+# checks AND an internal review BEFORE external review. A dev loop without
+# those gates violates the cycle contract.
+
+- title: "Develop {M}: derive an implementation plan for {SCOPE}"
+  module_tag: dev-{M}
+  purpose: |
+    Convert the architectural commitment(s) into ordered work units.
+  prompt: |
+    Read the rules this loop implements: {RULE_REFS}. Resolve each citation
+    through `docs/adrs/doctrine/index.md` to its rule and its ADR; read the
+    ADR for the rationale. Produce an implementation plan scoped to {SCOPE}
+    with:
+      - Files to create / modify (paths)
+      - Ordered work units (each ≤ ~200 LOC; each independently testable)
+      - Risks specific to implementation (not architecture)
+      - Quality gates: which tests, which linters, which static-analysis
+        and security tools must pass before review.
+
+    The plan is a working document — capture it in this run snapshot's
+    Notes field under the label `Implementation plan {M}`. Do NOT write a
+    separate ADR for the implementation plan; the architectural decision
+    is already recorded.
+  expected_output: |
+    Implementation plan in this run's Notes; clear ordered work units.
+  side_effects: []
+
+- title: "Develop {M}: spawn implementation team"
+  module_tag: dev-{M}
+  purpose: |
+    Implement the plan with parallel agents where independent.
+  prompt: |
+    Group the work units from this loop's planning prompt by independence.
+    Dispatch one `Agent` per independent group in parallel. Each agent
+    receives: the ADR(s), the implementation plan, its assigned work units,
+    and explicit conventions from `docs/AGENTS.md`.
+
+    Each agent also receives the book's `goal` statements — the Outcome, the
+    Evidence, and the Constraint. A dispatch passes them forward verbatim, or
+    narrows the Outcome and says so: a narrowed Outcome is entailed by its
+    parent and names the parent it narrowed and what it dropped. The Evidence
+    and the Constraint pass whole — a dispatch may add an Evidence item or a
+    Constraint, saying which it added, and may drop neither. Record any
+    narrowing in this run snapshot's Notes under the label
+    `Outcome narrowing {M}` — never by editing the book.
+
+    Each agent must make actual edits and run the relevant tests for its
+    scope. Each returns: files changed, tests added/updated, test results,
+    and any unilateral decisions with rationale.
+
+    After all agents return, integrate. If two agents edited overlapping
+    files (they should not have, given grouping), reconcile manually.
+  expected_output: |
+    All work units implemented; per-agent reports collected.
+  side_effects: []
+
+- title: "Develop {M}: run quality gates; loop until clean"
+  module_tag: dev-{M}
+  purpose: |
+    Verify the implementation passes every gate before review.
+  prompt: |
+    Run, in this order:
+      - The repo's **full test suite** — the COMPLETE run (e.g.
+        `python3 -m unittest discover -s crux/scripts/tests`, `mix test`,
+        `pytest`), NOT a hand-picked subset of "the tests that look relevant".
+        Capture the exact command from `docs/AGENTS.md` or root AGENTS.md.
+        **The full run is mandatory whenever the change touches any shared or
+        enumerated surface** — the agent roster, model/router config, the
+        catalog, or anything a *different* file hardcodes a list or count of.
+        Rationale: a stale hardcoded enumeration in a file the diff never
+        touched is invisible to diff-review (you cannot see a missing edit by
+        reading the edits that were made) and only fails when its own assertion
+        runs — so the full suite is the only gate that catches it. Running a
+        curated subset here is exactly the gap that shipped a red suite in a
+        prior cycle.
+      - The linter / formatter (e.g. `mix format --check-formatted`,
+        `ruff check`, `eslint`).
+      - Static analysis (e.g. `mix credo --strict`, `mypy`, `tsc --noEmit`).
+      - Security analysis (e.g. `mix sobelow`, `bandit`, `npm audit`).
+      - `verify-code-docs` — ensure no docstring drift was introduced.
+      - **Release-content scan** — if the diff touches any distributed
+        surface (`crux/skills/`, `crux/agents/`, `crux/templates/`), run
+        `check-public-release-content.py` (the permanent release-content
+        scan) so a banned internal-reference leak fails IN-CYCLE, not only at
+        release time.
+        Read its exit code as a gate, not a log line: **exit 0 = clean;
+        exit 1 = FINDINGS** — one `<path>:<lineno>: <line>` row per hit on
+        stdout, each a real gate failure to FIX by re-editing the offending
+        surface (NOT an environment error — do not wave it through); a crash
+        / **exit ≥ 2 / non-zero with empty or unparseable stdout = an
+        environment-capability error** (surface stderr; a distinct lane, not
+        a findings result).
+
+    For any failure: fix it (re-edit code), then re-run the failed gate
+    AND every subsequent gate. Repeat until all gates return clean. After
+    3 full loops without convergence, STOP and escalate.
+
+    **Record each gate in the run snapshot Notes with its exact command AND
+    a concrete result token** (e.g. `validate-catalog --dry-run → exit 0`,
+    `unittest → 149 OK`) — NOT a bare "all gates green". The review module's
+    dev-practice conformance reviewer corroborates these tokens
+    against the diff; an unrecorded gate reads as fabrication-by-omission (a
+    Tier-1 conformance FAIL).
+  expected_output: |
+    All gates green; each gate's command + result token captured in the run
+    snapshot Notes.
+  side_effects: [verify-code-docs]
+
+- title: "Develop {M}: internal review"
+  module_tag: dev-{M}
+  purpose: |
+    First-pass self-review before external eyes.
+  prompt: |
+    Invoke the `code-review` skill (use the default effort level, no
+    `--comment` flag — this is a private dry-run). The skill produces a
+    ranked list of findings scoped to the diff this dev loop produced.
+
+    For each `CONFIRMED` finding, fix in place. For each `PLAUSIBLE`,
+    evaluate and decide. Do NOT exit this module until every `CONFIRMED`
+    finding is resolved or explicitly deferred with rationale captured in
+    the run snapshot Notes under `Dev loop {M} review deferrals`.
+  expected_output: |
+    Internal-review findings list and resolutions.
+  side_effects: []

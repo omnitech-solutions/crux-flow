@@ -1,0 +1,21 @@
+# `some`, `any` and typed `throws`. A stored property whose type is a protocol
+# draws no `stores` relationship: only model types count. Schema: 01-actor.expected.yml.
+types:
+  - {name: ParseFailure, kind: enum, access: public, at: [1, 1], conditional: false}
+  - {name: Reader, kind: struct, access: public, at: [5, 5], conditional: false}
+  - {name: FileSource, kind: struct, access: internal, at: [12, 12], conditional: false}
+stored_properties:
+  - {owner: Reader, name: source, type: any Source, access: public, at: [6, 6]}
+relationships:
+  - {from: ParseFailure, relation: conforms, to: Error, at: [1, 1]}
+  - {from: FileSource, relation: conforms, to: Source, at: [12, 12]}
+interfaces:
+  - {name: ParseFailure, kind: enum, access: public, at: [1, 1], attributes: [], conditional: false}
+  - {name: Source, kind: protocol, access: public, at: [3, 3], attributes: [], conditional: false}
+  - {name: Reader, kind: struct, access: public, at: [5, 5], attributes: [], conditional: false}
+  - {name: Reader.source, kind: var, access: public, at: [6, 6], attributes: [], conditional: false}
+  - {name: "Reader.open()", kind: func, access: public, at: [8, 8], attributes: [], conditional: false}
+  - {name: "Reader.parse()", kind: func, access: public, at: [9, 9], attributes: [], conditional: false}
+requirements: []
+mains: []
+residuals: []

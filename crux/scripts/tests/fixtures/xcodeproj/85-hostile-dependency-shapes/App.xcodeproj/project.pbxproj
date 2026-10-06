@@ -1,0 +1,89 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG;
+			packageReferences = (
+				RR,
+			);
+			targets = (
+				T1,
+				T2,
+			);
+		};
+		MG = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+			);
+		};
+		RR = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = (
+				"a",
+			);
+			requirement = {
+				kind = (
+					"x",
+				);
+			};
+		};
+		PX = {
+			isa = PBXContainerItemProxy;
+			containerPortal = PRJ;
+			remoteGlobalIDString = {
+				a = b;
+			};
+		};
+		DEP1 = {
+			isa = PBXTargetDependency;
+			targetProxy = PX;
+		};
+		DEP2 = {
+			isa = PBXTargetDependency;
+			target = (
+				T2,
+			);
+		};
+		PD1 = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Kit;
+			package = (
+				A,
+			);
+		};
+		T1 = {
+			isa = PBXNativeTarget;
+			name = "T1";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+			);
+			dependencies = (
+				DEP1,
+				DEP2,
+				{
+					a = b;
+				},
+			);
+			packageProductDependencies = (
+				PD1,
+				{
+					a = b;
+				},
+			);
+		};
+		T2 = {
+			isa = PBXNativeTarget;
+			name = "T2";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+			);
+		};
+	};
+	rootObject = PRJ;
+}

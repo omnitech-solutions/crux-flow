@@ -1,0 +1,28 @@
+# An `#if` block inside a list argument rather than around a top-level
+# mutation. The grammar attaches each directive to the list element that
+# follows it, so the reader tracks the directives per element. Every element
+# inside a block renders marked conditional, every element after `#endif`
+# renders unconditional, and each block renders one `non-literal-manifest`
+# line spanning `#if` to `#endif`. The pinned grammar cannot place the `#if`
+# ahead of a string element, so that block also renders a `parse-error`; the
+# element it wraps still renders. Schema: literal-subset/expected.yml.
+containers: [Package.swift]
+products:
+  - {name: Base, kind: library, container: Package.swift, at: [7, 7]}
+targets:
+  - {name: Base, container: Package.swift, kind: library, conditional: false, at: [10, 10]}
+  - {name: Glue, container: Package.swift, kind: library, conditional: true, at: [12, 12]}
+  - {name: Bridge, container: Package.swift, kind: library, conditional: true, at: [14, 14]}
+  - {name: Front, container: Package.swift, kind: library, conditional: false, at: [16, 16]}
+  - {name: FrontTests, container: Package.swift, kind: test, conditional: false, at: [22, 22]}
+edges:
+  - ["Bridge (Package.swift)", "Base (Package.swift)"]
+  - ["Front (Package.swift)", "Base (Package.swift)"]
+  - ["Front (Package.swift)", "Bridge (Package.swift)"]
+  - ["FrontTests (Package.swift)", "Front (Package.swift)"]
+  - ["Glue (Package.swift)", "Base (Package.swift)"]
+dependencies: []
+residuals:
+  - {class: non-literal-manifest, path: Package.swift, lines: "11-15"}
+  - {class: non-literal-manifest, path: Package.swift, lines: "18-20"}
+  - {class: parse-error, path: Package.swift, lines: "18-19"}

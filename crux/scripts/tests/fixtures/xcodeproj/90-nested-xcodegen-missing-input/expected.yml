@@ -1,0 +1,12 @@
+# ADR-0130 clause 13: a qualifying XcodeGen manifest that sits NESTED under
+# `ios/`, with no companion `*.xcodeproj` beside it, renders a
+# `missing-input` residual scoped to ITS OWN directory (`ios/project.yml`)
+# -- not silently dropped because it is not at the checkout root, and not
+# misattributed to the root, which carries no XcodeGen manifest at all.
+exit_code: 0
+residuals:
+  - class: missing-input
+    path: ios/project.yml
+    kind: XcodeGen
+    first_line: null
+    last_line: null

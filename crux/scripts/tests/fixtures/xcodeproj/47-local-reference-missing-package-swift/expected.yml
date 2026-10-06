@@ -1,0 +1,10 @@
+# ADR-0130 clause 7: a local package reference whose contained directory
+# holds no Package.swift renders missing-input.
+exit_code: 0
+
+residuals:
+  - class: missing-input
+    path: App.xcodeproj/project.pbxproj
+    kind: null
+    first_line: null
+    last_line: null

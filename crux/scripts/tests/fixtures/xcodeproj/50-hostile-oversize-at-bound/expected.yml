@@ -1,0 +1,28 @@
+# ADR-0130 clause 17 hostile form: project.pbxproj materialized at EXACTLY
+# the 16 MiB bound (ADR-0130 clause 2) -- the companion of 31-hostile-oversize's
+# "one byte past" case. `kind: padded` pads a small VALID pbxproj with a
+# `/* ... */` comment block to this exact size, so the file still parses
+# and its target row still renders. `st_size > max_bytes` in
+# `_safe_read_bytes` (crux/scripts/crux/arch/core.py) is a strict `>`, so a
+# file of EXACTLY `_MAX_PBXPROJ_BYTES` (16 * 1024 * 1024) is admitted, never
+# flagged `oversize`. The aggregate per-concern byte cap
+# (`core._MAX_SCAN_BYTES`, 64 MiB) is well clear of one 16 MiB file, so this
+# case does not turn into `scan-cap` either.
+materialize:
+  - path: App.xcodeproj/project.pbxproj
+    kind: padded
+    source: source.pbxproj
+    size_bytes: 16777216
+
+exit_code: 0
+
+rows:
+  data-model:
+    - "| `Model` | struct | public |"
+  module-graph:
+    - "| `App` | `App.xcodeproj` | app | application | \u2014 |"
+
+absent:
+  module-graph:
+    - "oversize"
+    - "scan-cap"

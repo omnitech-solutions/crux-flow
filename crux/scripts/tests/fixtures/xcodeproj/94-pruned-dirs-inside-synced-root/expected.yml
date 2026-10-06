@@ -1,0 +1,59 @@
+# ADR-0129 clause 8: the folder-synced walk prunes what every Swift walk
+# prunes -- the core's skipped directories, every dot-directory, and the
+# Swift exclusion set -- by the directory's repo-relative name.
+# `App/Main.swift` renders; nothing under the seven materialized pruned
+# directories beside it does, and no residual renders.
+materialize:
+  - path: App/Pods/P.swift
+    kind: repeated
+    head: "public struct PodsType {}\n"
+    count: 1
+  - path: App/.build/checkouts/B.swift
+    kind: repeated
+    head: "public struct DotBuildType {}\n"
+    count: 1
+  - path: App/node_modules/N.swift
+    kind: repeated
+    head: "public struct NodeModulesType {}\n"
+    count: 1
+  - path: App/.git/G.swift
+    kind: repeated
+    head: "public struct DotGitType {}\n"
+    count: 1
+  - path: App/SourcePackages/S.swift
+    kind: repeated
+    head: "public struct SourcePackagesType {}\n"
+    count: 1
+  - path: App/Carthage/C.swift
+    kind: repeated
+    head: "public struct CarthageType {}\n"
+    count: 1
+  - path: App/build/U.swift
+    kind: repeated
+    head: "public struct BuildType {}\n"
+    count: 1
+
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `App/Main.swift` | `App` | folder-synced root App | — |"
+
+absent:
+  module-graph:
+    - "App/Pods"
+    - "App/.build"
+    - "App/node_modules"
+    - "App/.git"
+    - "App/SourcePackages"
+    - "App/Carthage"
+    - "App/build"
+    - "unresolved-reference"
+  data-model:
+    - "PodsType"
+    - "DotBuildType"
+    - "NodeModulesType"
+    - "DotGitType"
+    - "SourcePackagesType"
+    - "CarthageType"
+    - "BuildType"

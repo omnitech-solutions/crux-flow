@@ -1,0 +1,50 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG;
+			projectDirPath = (
+				Dir,
+			);
+			targets = (
+				TGT,
+			);
+		};
+		MG = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				F_D,
+			);
+		};
+		F_D = {
+			isa = PBXFileReference;
+			path = Dir/Main.swift;
+			sourceTree = "<group>";
+		};
+		BF_D = {
+			isa = PBXBuildFile;
+			fileRef = F_D;
+		};
+		PH_SRC = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				BF_D,
+			);
+		};
+		TGT = {
+			isa = PBXNativeTarget;
+			name = DirTool;
+			productType = "com.apple.product-type.tool";
+			buildPhases = (
+				PH_SRC,
+			);
+		};
+	};
+	rootObject = PRJ;
+}

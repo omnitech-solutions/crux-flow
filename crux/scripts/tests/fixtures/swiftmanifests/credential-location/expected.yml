@@ -1,0 +1,12 @@
+# A dependency location carrying userinfo, a query and a fragment. Every
+# rendered location has all three removed (ADR-0129 clause 4). Schema:
+# literal-subset/expected.yml.
+containers: [Package.swift]
+products: []
+targets:
+  - {name: Cred, container: Package.swift, kind: library, conditional: false, at: [7, 7]}
+edges: []
+dependencies:
+  - {from: ".", dependency: "https://host/x.git", kind: remote package, location: "https://host/x.git", requirement: "from: 1.0.0", at: [6, 6], path: Package.swift}
+  - {from: Cred, dependency: X, kind: remote product, location: "https://host/x.git", requirement: null, at: [7, 7], path: Package.swift}
+residuals: []

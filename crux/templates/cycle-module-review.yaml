@@ -1,0 +1,234 @@
+# Cycle module: Review cycle (3 prompts) — YAML partial
+#
+# This module is a YAML fragment: a list of prompt mappings ({title, purpose, prompt,
+# expected_output, side_effects, module_tag}) that `dev-cycle` concatenates
+# into a book's `prompts:` array and then renumbers (`n: 1..total`). It is NOT
+# a standalone book — it has no top-level keys, only the prompt list.
+#
+# Reusable building block for a cycle's external review phase. One instance of
+# this module is one independent multi-dimension review pass with feedback
+# incorporated. A cycle MUST have at least one review module — this is the
+# "proper review cycle for any artifacts produced" invariant.
+#
+# Placeholder tokens (substituted INSIDE the scalar values at assembly):
+#
+# - `{M}` — review-cycle iteration label (`#1`, `#2`, ...). Omitted in
+#   single-review cycles; otherwise the prompt title reads
+#   `Review (cycle #M): ...`. (Prompt numbering is no longer a token —
+#   `dev-cycle` assigns sequential `n:` after concatenation.)
+# - `{SCOPE}` — what this review pass covers. Usually "the full cycle's diff"
+#   for a single-review cycle; for multi-review cycles, may scope to one dev
+#   loop's output (`Dev loop #1 output`) or one ADR's implementation
+#   (`ADR-NNNN implementation`).
+#
+# `module_tag: review-{M}` — every prompt in THIS module carries the same tag,
+# where `{M}` is the 1-based occurrence of the review module within the book
+# (first review cycle → `review-1`, second → `review-2`, ...). NOTE: here
+# `{M}`'s resolved value is the BARE integer (`review-1`) — distinct from the
+# title's `{M}` LABEL (`#1`). Substitute the integer, not the label:
+# `review-#1` is INVALID (schema pattern `^(adr|dev|review)-\d+$`). Replaces
+# the retired `<!-- MODULE BOUNDARY -->` comments; makes the fix-loop invariant
+# checkable by counting `^review-`-tagged elements.
+#
+# Invariant enforced by this module: every external review pass has the three
+# quality dimensions (correctness, consistency, clarity), a dedicated
+# multi-subagent security review (threat classes S1–S5), and a test/docs +
+# dev-practice-conformance audit — plus a fix-loop that closes ALL MUST-FIX
+# findings (including security MUST-FIX and any Tier-1 conformance FAIL) before
+# the cycle advances. The security review + conformance audit fold into the
+# existing 3 prompts (no extra prompt; the `3K` count is unchanged). A review
+# module missing any of
+# these violates the cycle contract.
+
+- title: "Review {M}: external team review (multi-dimension + dedicated security review) of {SCOPE}"
+  module_tag: review-{M}
+  purpose: |
+    Independent verification of correctness, consistency, clarity, and security.
+  prompt: |
+    Dispatch parallel `Agent` reviewers scoped to {SCOPE}, each blind to the
+    others. **Three quality-dimension reviewers:**
+      (a) Correctness — re-runs the dev module's **full quality-gate suite**
+          (the COMPLETE test run, not a subset — same mandate as the dev gate),
+          then reads the diff for behavior bugs the gates can't catch.
+      (b) Consistency — checks the change against the rules it cites: the
+          `rule:<slug>` citations recorded in this run's Artifacts
+          (INCLUDING every rule an ADR accepted earlier in this cycle
+          authored), read through `docs/adrs/doctrine/index.md`; plus
+          existing conventions in `docs/AGENTS.md` and adjacent code
+          patterns. A change that contradicts a cited rule is MUST-FIX
+          unless an ADR in this cycle retires that rule.
+      (c) Clarity — reads the code as a new engineer would; flags
+          confusing names, undocumented invariants, magic numbers.
+
+    Commission these reviewers yourself for the units you dispatched.
+    Where you integrated across those units, that integration is your own
+    authorship, so its review is commissioned by your delegator and not by
+    you.
+
+    **PLUS a dedicated multi-subagent security review** — one `Agent` per threat class
+    over {SCOPE}:
+      (S1) Injection & untrusted-input — SQL/command/template injection,
+           deserialization, path traversal, missing validation/encoding at
+           trust boundaries.
+      (S2) Secrets & credentials — hardcoded keys/tokens, secrets in
+           logs/errors/fixtures, anything bypassing the `~/.crux/`
+           contract (`docs/AGENTS.md` §13 — values never committed or logged).
+      (S3) Authz & privilege — missing/incorrect access checks, scope
+           confusion, IDOR, privilege boundaries crossed without a check.
+      (S4) Supply-chain & dependency — new/bumped deps, lockfile changes,
+           install scripts, unpinned versions, typosquat-adjacent names.
+      (S5) Unsafe file/shell/path & resource ops — shell-out with
+           interpolation, unsafe temp files, broad perms, SSRF, unbounded
+           resource use.
+      Scope-adaptive with MANDATORY report: if a threat class has no relevant
+      surface in {SCOPE} (e.g. a docs-only change), that reviewer returns
+      "N/A — no executable surface" rather than being omitted (auditability).
+
+    Each reviewer (quality + security) returns a ranked findings list with
+    severity (MUST-FIX / SHOULD-CONSIDER / NIT). A `[SECURITY:Sn]` finding
+    exploitable on a reachable path is MUST-FIX and CANNOT be downgraded;
+    deferred (SHOULD-CONSIDER) security items go in run-snapshot Notes under
+    `Review {M} security deferrals` with residual-risk rationale.
+
+    Every reviewer receives the book's `goal` statements — the Outcome, the
+    Evidence, and the Constraint. Each judges the change against the Outcome
+    rather than against the diff alone.
+    Each returns one disposition per Evidence item:
+      - verified, with the command and the result token, or the observation
+        and where it is recorded when no command produced it;
+      - contradicted, which is a finding;
+      - unobserved, with what was attempted, what limited it, and what
+        would settle it.
+    Each states whether the Constraint held and what shows that. A result
+    token is an exit code, a pass count, or a named verdict — never raw
+    output, an environment value, or a secret.
+    A disposition is re-derived, never adopted from the author's report:
+    an item stands verified only where this reviewer ran the command and
+    read the result token, or re-read the observation where it is
+    recorded; anything it cannot re-derive is unobserved in its own report.
+  expected_output: |
+    Aggregated external-review + security findings for {SCOPE}, plus a
+    disposition per Evidence item.
+  side_effects: []
+
+- title: "Review {M}: tests, docs, and dev-practice conformance audit of {SCOPE}"
+  module_tag: review-{M}
+  purpose: |
+    Ensure the change is tested, documented, and that proper development
+    practices were followed.
+  prompt: |
+    Dispatch 3 parallel `Agent` reviewers scoped to {SCOPE}:
+      (a) Test coverage — for every code path the diff introduced or
+          changed within {SCOPE}, is there a test that exercises it? Are
+          edge cases covered? Are the tests reliable (no flakes, no
+          false-greens)?
+      (b) Comments and docs — are non-obvious decisions explained (per
+          `docs/AGENTS.md` commenting rules: only for WHY, not WHAT)?
+          Are public APIs documented? Does `extract-code-docs --dry-run`
+          report drift?
+      (c) **Dev-practice conformance**
+          — inspect THIS run's snapshot cross-checked against the diff for
+          evidence proper practices were followed. **Corroboration-based and
+          tiered (it raises the cost of a violation; it is not a proof):**
+          - **Tier-1 (mandatory, directly checkable):** GOOD — every dev-loop
+            quality gate appears in Notes with a command + concrete result
+            token (`exit 0`, `149 OK`), not a bare "all green"; internal
+            reviews `done` with non-empty resolutions; prior-review MUST-FIX
+            closed. NOT-ALLOWED — a gate's claimed pass with no command/result
+            token (fabrication-by-omission); a schema/data change in the diff
+            with no migration file.
+          - **Tier-2 (best-effort heuristic, flag-not-block, reviewer judgment):**
+            tests added/changed disproportionate to the code (judgment call, no
+            fixed threshold — corroborate with the test-coverage reviewer);
+            an assertion weakened / `skip`/`xfail` added with no corresponding
+            code fix (e.g. `tests/x_test.py` loosened from `== 149` to `>= 1`,
+            or `@pytest.mark.skip` added, with no code change in the same loop);
+            prose indicating a hand-mutated DB / manual `UPDATE`/`ALTER`/`psql`
+            console edit (the motivating NOT-ALLOWED example — detectable only
+            if it left textual evidence); secrets committed (overlaps S2).
+          - **Deferred to the commit phase (Prep):** `--no-verify` on a commit
+            (no commit exists at review time).
+          Return a verdict in run-snapshot Notes under `Review {M} conformance`:
+          `CONFORMANCE: PASS|FAIL`, GOOD-present list (with tier + ✓/N/A),
+          NOT-ALLOWED hits (Tier-1 → MUST-FIX), SUSPECTED (Tier-2 →
+          SHOULD-CONSIDER unless clearly pass-forcing). Any Tier-1 NOT-ALLOWED
+          hit ⇒ FAIL ⇒ MUST-FIX ⇒ cycle blocked at this module's fix prompt.
+
+    Every reviewer receives the book's `goal` statements — the Outcome, the
+    Evidence, and the Constraint. Each judges the change against the Outcome
+    rather than against the diff alone.
+    Each returns one disposition per Evidence item:
+      - verified, with the command and the result token, or the observation
+        and where it is recorded when no command produced it;
+      - contradicted, which is a finding;
+      - unobserved, with what was attempted, what limited it, and what
+        would settle it.
+    Each states whether the Constraint held and what shows that. A result
+    token is an exit code, a pass count, or a named verdict — never raw
+    output, an environment value, or a secret.
+    A disposition is re-derived, never adopted from the author's report:
+    an item stands verified only where this reviewer ran the command and
+    read the result token, or re-read the observation where it is
+    recorded; anything it cannot re-derive is unobserved in its own report.
+
+    Each returns a findings list with severity.
+  expected_output: |
+    Aggregated test/doc/conformance findings + conformance verdict for {SCOPE},
+    plus a disposition per Evidence item.
+  side_effects: []
+
+- title: "Review {M}: implement feedback; loop until clean"
+  module_tag: review-{M}
+  purpose: |
+    Address all review findings before advancing.
+  prompt: |
+    Combine the findings from this module's two review prompts — quality,
+    **security (incl. any non-downgradable `[SECURITY:Sn]` MUST-FIX)**, and
+    **dev-practice conformance (any Tier-1 NOT-ALLOWED hit / `CONFORMANCE:
+    FAIL`)**. For each MUST-FIX, dispatch a fix `Agent` (or fix directly if
+    small). A fix dispatch is an assignment: it carries the finding, the book's
+    Outcome and Constraint, and the Evidence item the finding bears on. Narrow
+    the Outcome to the finding and say what the narrowing dropped; pass the
+    Evidence and the Constraint whole. A fixer that is told only what is broken
+    optimizes for the gate rather than for the user the fix is meant to serve.
+    For each SHOULD-CONSIDER, decide and document in the run snapshot
+    Notes under `Review {M} deferrals`.
+
+    Where you fixed a MUST-FIX yourself rather than dispatching it, that
+    fix is your own authorship: the re-review of it is commissioned by
+    your delegator, not by you, and you re-dispatch only the reviewers of
+    work you did not write. At the top of the chain the delegator is the
+    human who approved the run.
+
+    After fixes land, re-run the relevant quality gates from the most
+    recent dev module. If they still pass AND the original reviewers
+    (re-dispatched) report zero MUST-FIX findings within {SCOPE}, exit
+    this module. Otherwise loop back to this module's external-review prompt.
+
+    After 3 review-fix loops without convergence within this module,
+    STOP and escalate.
+
+    **Forge-log `used` recording (on this module's CONVERGED EXIT only).** When
+    this pass is the one that advances OUT of the module (NOT on each fix-loop
+    iteration — recording per-pass would triple-count a single use), then for
+    **each distinct forged skill this review module invoked** (a
+    `.claude/skills/<name>/` skill run during any of this module's review or
+    fix passes), do BOTH:
+      - Write one forge-log `used` entry conforming to forge-skill's locked
+        format: the forge-skill-validated slug `<name>`, an outcome token
+        `ok` or `partial`, with the `(same-session)` suffix when the skill was
+        forged this same session (so the literal forms are `ok (same-session)`
+        and `partial (same-session)`).
+      - Append one line to the run-snapshot Notes section `Forged skills used`
+        of the form `<skill-name> | <prompt n> | <outcome-token>`.
+    If this module invoked NO forged skill, write nothing — a clean no-op (the
+    empty `Forged skills used` section is the explicit "no forged use" signal,
+    distinguishable from a swallowed error). Injection/secret safety is
+    INHERITED from forge-skill's locked format — do not reinvent it: the
+    validated slug cannot contain `|`, `[`, or a newline; the outcome enum is
+    finite; the entry body is single-line and secret-free.
+  expected_output: |
+    Clean review cycle within {SCOPE}; quality gates still green. On converged
+    exit, one forge-log `used` entry + one `Forged skills used` Notes line per
+    distinct forged skill invoked (or a clean no-op if none).
+  side_effects: [forge-skill]

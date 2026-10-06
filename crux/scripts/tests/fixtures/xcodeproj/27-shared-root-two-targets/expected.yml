@@ -1,0 +1,12 @@
+# ADR-0130 clause 17 fixture-only form: a synced root owned by two targets
+# -- one membership row per owning target, no residual.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `Shared/Common.swift` | `TargetA` | folder-synced root Shared | \u2014 |"
+    - "| `Shared/Common.swift` | `TargetB` | folder-synced root Shared | \u2014 |"
+
+absent:
+  module-graph:
+    - "unresolved-reference"

@@ -1,0 +1,20 @@
+{
+  "openapi": "3.0.0",
+  "info": { "title": "PyService", "version": "1.0.0" },
+  "paths": {
+    "/users": {
+      "get": { "tags": ["users"], "summary": "List users" },
+      "post": { "tags": ["users"], "summary": "Create user" }
+    },
+    "/users/{id}": {
+      "get": { "tags": ["users"], "summary": "Get user" },
+      "delete": { "tags": ["users"], "summary": "Delete user" }
+    },
+    "/posts": {
+      "post": { "tags": ["posts"], "summary": "Create post" }
+    },
+    "/health": {
+      "get": { "summary": "Health check" }
+    }
+  }
+}

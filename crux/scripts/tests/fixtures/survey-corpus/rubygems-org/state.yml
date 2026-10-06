@@ -1,0 +1,368 @@
+candidates:
+- anchor_id: 0407dbd52b778306
+  anchor_kind: external-dependency
+  canonical_anchor: omniauth-github
+  domain: authentication
+  evidence:
+  - Gemfile:31-31
+  id: 0407dbd52b778306
+  rule: GitHub is an identity provider through omniauth-github.
+  state: observed
+- anchor_id: 08f3b3572ea7eb32
+  anchor_kind: external-dependency
+  canonical_anchor: blazer
+  domain: analytics
+  evidence:
+  - Gemfile:60-60
+  id: 08f3b3572ea7eb32
+  rule: Ad-hoc analytics queries are served by Blazer.
+  state: observed
+- anchor_id: 1234fd1357655659
+  anchor_kind: external-dependency
+  canonical_anchor: flipper
+  domain: feature-flags
+  evidence:
+  - Gemfile:21-21
+  id: 1234fd1357655659
+  rule: Feature flags are Flipper.
+  state: observed
+- anchor_id: 1a098fe5336a3d75
+  anchor_kind: api-contract
+  canonical_anchor: Api::BaseController:authenticate_with_api_key
+  domain: api
+  evidence:
+  - app/controllers/api/base_controller.rb:52-62
+  id: 1a098fe5336a3d75
+  rule: API requests authenticate by API key rather than by session cookie.
+  state: observed
+- anchor_id: 22b13e9b758c8f31
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: config/initializers/good_job.rb::retry_on_unhandled_error
+  domain: background-jobs
+  evidence:
+  - config/initializers/good_job.rb:5-5
+  id: 22b13e9b758c8f31
+  rule: The job adapter does not retry an unhandled error; retries are declared per
+    job class.
+  state: observed
+- anchor_id: 2a3f8cadcc16c21c
+  anchor_kind: external-dependency
+  canonical_anchor: maintenance_tasks
+  domain: operations
+  evidence:
+  - Gemfile:61-61
+  id: 2a3f8cadcc16c21c
+  rule: Long-running data repairs run as maintenance_tasks jobs, not as one-off console
+    scripts.
+  state: observed
+- anchor_id: 2d0666d60c9514b3
+  anchor_kind: system-of-record
+  canonical_anchor: app/models/version.rb::CONTENT_ADDRESSABLE_REQUIRED_RUBYGEMS_VERSION
+  domain: versioning
+  evidence:
+  - app/models/version.rb:7-9
+  id: 2d0666d60c9514b3
+  rule: Content-addressable version storage requires a minimum RubyGems client version.
+  state: observed
+- anchor_id: 3a277e9ec2aaa310
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: config/initializers/clearance.rb::cookie_expiration
+  domain: sessions
+  evidence:
+  - config/initializers/clearance.rb:12-12
+  id: 3a277e9ec2aaa310
+  rule: A session cookie expires two weeks after sign-in.
+  state: observed
+- anchor_id: 3e7eb78a9fcf3429
+  anchor_kind: module-boundary
+  canonical_anchor: Api::BaseController->ApplicationController
+  domain: api
+  evidence:
+  - app/controllers/api/base_controller.rb:3-6
+  id: 3e7eb78a9fcf3429
+  rule: API controllers inherit the web application controller and skip CSRF verification.
+  state: observed
+- anchor_id: 4d7b9c492bada40d
+  anchor_kind: external-dependency
+  canonical_anchor: aws-sdk-s3
+  domain: storage
+  evidence:
+  - Gemfile:10-10
+  id: 4d7b9c492bada40d
+  rule: Gem files and index artifacts are stored in S3 rather than on local disk.
+  state: observed
+- anchor_id: 5590769a08b51c5a
+  anchor_kind: external-dependency
+  canonical_anchor: webauthn
+  domain: authentication
+  evidence:
+  - Gemfile:57-57
+  id: 5590769a08b51c5a
+  rule: Second-factor authentication accepts WebAuthn security keys.
+  state: observed
+- anchor_id: 61beb68514fe8f49
+  anchor_kind: external-dependency
+  canonical_anchor: faraday-restrict-ip-addresses
+  domain: security
+  evidence:
+  - Gemfile:20-20
+  id: 61beb68514fe8f49
+  rule: Outbound HTTP is restricted away from private IP ranges.
+  state: observed
+- anchor_id: 6925c16976cffac6
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: config/initializers/clearance.rb::password_strategy
+  domain: authentication
+  evidence:
+  - config/initializers/clearance.rb:9-9
+  id: 6925c16976cffac6
+  rule: Passwords are hashed with BCrypt through Clearance's password strategy.
+  state: observed
+- anchor_id: 6de4c962c66c5c1f
+  anchor_kind: external-dependency
+  canonical_anchor: phlex-rails
+  domain: presentation
+  evidence:
+  - Gemfile:63-63
+  id: 6de4c962c66c5c1f
+  rule: View components are Phlex classes rather than ERB partials.
+  state: observed
+- anchor_id: 7ac32a4dd39fc2bc
+  anchor_kind: external-dependency
+  canonical_anchor: clearance
+  domain: authentication
+  evidence:
+  - Gemfile:13-13
+  id: 7ac32a4dd39fc2bc
+  rule: Session authentication is Clearance rather than Devise.
+  state: observed
+- anchor_id: 8462999c1736e59a
+  anchor_kind: system-of-record
+  canonical_anchor: app/models/api_key.rb::hashed_key
+  domain: security
+  evidence:
+  - app/models/api_key.rb:29-29
+  id: 8462999c1736e59a
+  rule: An API key is stored only as a hash, and the hash is unique.
+  state: observed
+- anchor_id: 877021e7d3eb012c
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: config/initializers/good_job.rb::preserve_job_records
+  domain: background-jobs
+  evidence:
+  - config/initializers/good_job.rb:4-4
+  id: 877021e7d3eb012c
+  rule: Finished job records are preserved rather than deleted, so job history is
+    queryable.
+  state: observed
+- anchor_id: 8a4901a0ca10b839
+  anchor_kind: external-dependency
+  canonical_anchor: openid_connect
+  domain: authentication
+  evidence:
+  - Gemfile:34-34
+  id: 8a4901a0ca10b839
+  rule: Trusted publishing verifies OIDC tokens with the openid_connect gem.
+  state: observed
+- anchor_id: 8f34674b46b7b922
+  anchor_kind: external-dependency
+  canonical_anchor: rack-attack
+  domain: rate-limiting
+  evidence:
+  - Gemfile:53-53
+  id: 8f34674b46b7b922
+  rule: Request throttling is Rack::Attack middleware.
+  state: observed
+- anchor_id: 91bddc5572476bad
+  anchor_kind: external-dependency
+  canonical_anchor: honeybadger
+  domain: observability
+  evidence:
+  - Gemfile:26-26
+  id: 91bddc5572476bad
+  rule: Uncaught exceptions are reported to Honeybadger.
+  state: observed
+- anchor_id: 9bf9d7ceff48242b
+  anchor_kind: api-contract
+  canonical_anchor: config/routes.rb:api/v1
+  domain: api
+  evidence:
+  - config/routes.rb:12-26
+  id: 9bf9d7ceff48242b
+  rule: The public API is versioned, with v1 mounted under an api namespace.
+  state: observed
+- anchor_id: 9cedf8333ea14cbd
+  anchor_kind: external-dependency
+  canonical_anchor: strong_migrations
+  domain: persistence
+  evidence:
+  - Gemfile:62-62
+  id: 9cedf8333ea14cbd
+  rule: Migrations are gated by strong_migrations, so an unsafe migration fails before
+    it runs.
+  state: observed
+- anchor_id: 9d588603ce5a622b
+  anchor_kind: external-dependency
+  canonical_anchor: searchkick
+  domain: search
+  evidence:
+  - Gemfile:50-50
+  id: 9d588603ce5a622b
+  rule: Gem search is served by Searchkick over an OpenSearch cluster.
+  state: observed
+- anchor_id: a2d63c2c555a424d
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: config/initializers/session_store.rb::session_store
+  domain: sessions
+  evidence:
+  - config/initializers/session_store.rb:10-10
+  id: a2d63c2c555a424d
+  rule: Sessions are cookie-backed under a named key with SameSite strict.
+  state: observed
+- anchor_id: a47c96a1dd95628c
+  anchor_kind: external-dependency
+  canonical_anchor: shoryuken
+  domain: background-jobs
+  evidence:
+  - Gemfile:46-46
+  id: a47c96a1dd95628c
+  rule: SQS queue consumers run on Shoryuken, a second job runtime beside GoodJob.
+  state: observed
+- anchor_id: b12aaf85a8a972f1
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: config/initializers/clearance.rb::sign_in_guards
+  domain: authentication
+  evidence:
+  - config/initializers/clearance.rb:10-10
+  id: b12aaf85a8a972f1
+  rule: A sign-in guard refuses a session to a user whose email is unconfirmed.
+  state: observed
+- anchor_id: b69d03075a6866dd
+  anchor_kind: external-dependency
+  canonical_anchor: pwned
+  domain: authentication
+  evidence:
+  - Gemfile:56-56
+  id: b69d03075a6866dd
+  rule: A chosen password is checked against the Pwned Passwords corpus.
+  state: observed
+- anchor_id: bb57b0dd0e671a38
+  anchor_kind: external-dependency
+  canonical_anchor: statsd-instrument
+  domain: observability
+  evidence:
+  - Gemfile:47-47
+  id: bb57b0dd0e671a38
+  rule: Custom application metrics are emitted as StatsD counters.
+  state: observed
+- anchor_id: bf077ac60ab2c4fb
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: config/initializers/rack_attack.rb::REQUEST_LIMIT
+  domain: rate-limiting
+  evidence:
+  - config/initializers/rack_attack.rb:6-10
+  id: bf077ac60ab2c4fb
+  rule: General requests are throttled at one hundred per ten-minute period.
+  state: observed
+- anchor_id: c482219865b750b4
+  anchor_kind: external-dependency
+  canonical_anchor: good_job
+  domain: background-jobs
+  evidence:
+  - Gemfile:24-24
+  id: c482219865b750b4
+  rule: Background jobs run on GoodJob, backed by the application database rather
+    than a separate broker.
+  state: observed
+- anchor_id: c959db8a298997b1
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: config/initializers/content_security_policy.rb::default_src
+  domain: security
+  evidence:
+  - config/initializers/content_security_policy.rb:10-15
+  id: c959db8a298997b1
+  rule: A content security policy restricts default sources to the application's own
+    origin.
+  state: observed
+- anchor_id: d6d9ab0353bdf7c7
+  anchor_kind: external-dependency
+  canonical_anchor: datadog
+  domain: observability
+  evidence:
+  - Gemfile:15-15
+  id: d6d9ab0353bdf7c7
+  rule: Application tracing and runtime metrics go to Datadog.
+  state: observed
+- anchor_id: d7b2d9e063175d69
+  anchor_kind: external-dependency
+  canonical_anchor: rotp
+  domain: authentication
+  evidence:
+  - Gemfile:55-55
+  id: d7b2d9e063175d69
+  rule: Time-based one-time passwords are generated and verified with rotp.
+  state: observed
+- anchor_id: d86bc379b9e0f56e
+  anchor_kind: external-dependency
+  canonical_anchor: dalli
+  domain: caching
+  evidence:
+  - Gemfile:14-14
+  id: d86bc379b9e0f56e
+  rule: The shared cache is Memcached, reached through dalli.
+  state: observed
+- anchor_id: dbbe839e19b9c6e5
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: config/initializers/rack_attack.rb::PUSH_LIMIT
+  domain: rate-limiting
+  evidence:
+  - config/initializers/rack_attack.rb:8-11
+  id: dbbe839e19b9c6e5
+  rule: Gem pushes carry their own throttle, four hundred per sixty-minute period.
+  state: observed
+- anchor_id: dcfa3e54dfafcf9e
+  anchor_kind: external-dependency
+  canonical_anchor: opensearch-ruby
+  domain: search
+  evidence:
+  - Gemfile:49-49
+  id: dcfa3e54dfafcf9e
+  rule: The search cluster client is opensearch-ruby, not the Elasticsearch client.
+  state: observed
+- anchor_id: f9f36d5dc55e8331
+  anchor_kind: module-boundary
+  canonical_anchor: ApplicationController->Pundit::Authorization
+  domain: authorization
+  evidence:
+  - app/controllers/application_controller.rb:5-5
+  id: f9f36d5dc55e8331
+  rule: Every controller authorizes through Pundit policies rather than inline permission
+    checks.
+  state: observed
+- anchor_id: fcc069740ca698ab
+  anchor_kind: cross-cutting-policy
+  canonical_anchor: config/initializers/flipper.rb::adapter
+  domain: feature-flags
+  evidence:
+  - config/initializers/flipper.rb:5-7
+  id: fcc069740ca698ab
+  rule: Feature-flag state lives in Active Record, so a flag is a database row.
+  state: observed
+- anchor_id: fcc1572449e76ce6
+  anchor_kind: external-dependency
+  canonical_anchor: discard
+  domain: persistence
+  evidence:
+  - Gemfile:64-64
+  id: fcc1572449e76ce6
+  rule: Soft deletion uses discard rather than a hand-rolled deleted-at column.
+  state: observed
+- anchor_id: ff65c0418c395b83
+  anchor_kind: external-dependency
+  canonical_anchor: pg
+  domain: persistence
+  evidence:
+  - Gemfile:35-35
+  id: ff65c0418c395b83
+  rule: The relational system of record is PostgreSQL, reached through the pg driver.
+  state: observed

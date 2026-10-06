@@ -1,0 +1,35 @@
+{
+  "name": "crux",
+  "version": "3.25.1",
+  "description": "Maintains a docs/ tree across seven concerns (code docs, research wiki, ADRs, briefs, work journal, promptbooks, invariants) for Codex and Claude Code.",
+  "author": {
+    "name": "Idyll",
+    "url": "https://github.com/idyll"
+  },
+  "homepage": "https://bionic-coding.com/crux/",
+  "repository": "https://github.com/bionic-coding/crux",
+  "license": "MIT",
+  "keywords": [
+    "documentation",
+    "architecture-decisions",
+    "agent-workflows"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "crux",
+    "shortDescription": "Project knowledge and delivery workflows",
+    "longDescription": "Maintain a docs/ tree across seven concerns \u2014 code docs, research wiki, ADRs, briefs, work journal, promptbooks, and invariants \u2014 with governed delivery workflows.",
+    "developerName": "Idyll",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://bionic-coding.com/crux/",
+    "defaultPrompt": [
+      "Initialize crux documentation for this project.",
+      "Start a governed development cycle for this feature.",
+      "Install the Crux Codex role agents in this project."
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+# A result builder and a property wrapper. The computed `wrappedValue` is an
+# interface and not a stored property. Schema: 01-actor.expected.yml.
+types:
+  - {name: ListBuilder, kind: enum, access: public, at: [1, 2], conditional: false}
+  - {name: Clamped, kind: struct, access: public, at: [6, 7], conditional: false}
+  - {name: Panel, kind: struct, access: public, at: [16, 16], conditional: false}
+stored_properties:
+  - {owner: Clamped, name: value, type: Int, access: private, at: [8, 8]}
+  - {owner: Panel, name: level, type: Int, access: public, at: [17, 17]}
+# `level` is declared `Int`; the wrapper is an attribute, so no `stores` edge
+# reaches `Clamped`.
+relationships: []
+interfaces:
+  - {name: ListBuilder, kind: enum, access: public, at: [1, 2], attributes: ["@resultBuilder"], conditional: false}
+  - {name: "ListBuilder.buildBlock(_:)", kind: func, access: public, at: [3, 3], attributes: [], conditional: false}
+  - {name: Clamped, kind: struct, access: public, at: [6, 7], attributes: ["@propertyWrapper"], conditional: false}
+  - {name: Clamped.wrappedValue, kind: var, access: public, at: [9, 9], attributes: [], conditional: false}
+  - {name: "Clamped.init(wrappedValue:)", kind: init, access: public, at: [13, 13], attributes: [], conditional: false}
+  - {name: Panel, kind: struct, access: public, at: [16, 16], attributes: [], conditional: false}
+  - {name: Panel.level, kind: var, access: public, at: [17, 17], attributes: ["@Clamped"], conditional: false}
+  - {name: "Panel.rows()", kind: func, access: public, at: [19, 20], attributes: ["@ListBuilder"], conditional: false}
+requirements: []
+mains: []
+residuals: []

@@ -1,0 +1,206 @@
+# Cycle module: ADR (4 prompts) — YAML partial
+#
+# This module is a YAML fragment: a list of prompt mappings ({title, purpose, prompt,
+# expected_output, side_effects, module_tag}) that `dev-cycle` concatenates
+# into a book's `prompts:` array and then renumbers (`n: 1..total`). It is NOT
+# a standalone book — it has no top-level keys, only the prompt list.
+#
+# Reusable building block for a cycle's planning phase. One instance of this
+# module produces one Accepted ADR. A cycle MUST have at least one ADR module
+# (the council-approved decision is the cycle's load-bearing artifact).
+#
+# Placeholder tokens (the cycle skill / human assembler substitutes these when
+# assembling the book — substitution happens INSIDE the scalar values, before
+# the block scalar is parsed):
+#
+# - `{M}` — the ADR iteration label (`#1`, `#2`, ...). When the cycle has
+#   exactly one ADR module, the iteration suffix is omitted; otherwise the
+#   prompt title reads `Plan (ADR #M): ...`. NOTE: prompt numbering is no
+#   longer a token — `dev-cycle` assigns sequential `n:` after concatenation,
+#   and intra-module references ("return to Prompt {N+1}") resolve to the
+#   `module_tag`-tagged element, restated with the absolute `n:` at assembly.
+# - `{ADR_TOPIC}` — a short phrase identifying what THIS ADR is about. Used to
+#   disambiguate ADRs within a multi-ADR cycle. Single-ADR cycles use the
+#   cycle goal verbatim.
+#
+# `module_tag: adr-{M}` — every prompt in THIS module carries the same tag,
+# where `{M}` is the 1-based occurrence of the ADR module within the book
+# (first ADR module → `adr-1`, second → `adr-2`, ...). NOTE: here `{M}`'s
+# resolved value is the BARE integer (`adr-1`) — distinct from the title's
+# `{M}` LABEL (`#1`). Substitute the integer, not the label: `adr-#1` is
+# INVALID (schema pattern `^(adr|dev|review)-\d+$`). This replaces the
+# retired `<!-- MODULE BOUNDARY -->` HTML comments: the tag (plus element
+# ordering) carries the module's begin/end + provenance forward, and makes the
+# council-prompt invariant checkable by counting `^adr-`-tagged elements.
+#
+# Invariant enforced by this module: the council prompt is non-optional. A
+# cycle that contains an ADR-creation prompt without a paired council prompt
+# violates the cycle contract.
+
+- title: "Plan {M}: spawn planning team, propose ADR for {ADR_TOPIC}"
+  module_tag: adr-{M}
+  purpose: |
+    Establish the architectural commitment before any code lands.
+  prompt: |
+    Read the cycle's Goal and any prior Accepted ADRs in this cycle. Invoke
+    `query-docs` to surface existing ADRs, briefs, or research sources
+    relevant to {ADR_TOPIC}. Then dispatch 2–3 planning agents in parallel
+    via the `Agent` tool. Each agent reads the affected code paths and
+    returns a one-page proposal: problem statement, options considered (≥2),
+    recommendation, risks, open questions.
+
+    Synthesize the proposals into a single recommendation. Then invoke the
+    `propose-adr` skill with the synthesized content. The ADR must contain:
+    Context, Decision, Alternatives Considered (≥2), Consequences,
+    References (linking to any related ADRs/briefs/research via wiki-links).
+    Status starts at `Proposed`.
+
+    Record the ADR id (`ADR-NNNN`) in this run snapshot's Artifacts field
+    under the label `ADR {M}`, and beside it the ADR's rule citations — one
+    `rule:<slug>` per `governs` entry, the slug being the part of the handle
+    after the slash. The id is the machine field the accept prompt reads;
+    the citations are what the dev and review modules implement and check.
+
+    Then run the rule-length advisory and read its `warnings` list:
+
+      uv run "${CRUX_PLUGIN_ROOT}/scripts/check-governs-coverage.py" --repo-root <repo-root>
+
+    A row naming this ADR means a `governs` rule is longer than the recommended
+    maximum; the row carries the handle, the length, that maximum, and the
+    guidance for shortening it. It is ADVISORY: it changes no exit code and
+    blocks nothing.
+
+    The principle it serves is `docs/AGENTS.md` §11.D rule 7 — read it there;
+    this prompt names it and does not restate it. Either shorten the rule as
+    that rule and the row's own message direct, or say in this prompt's Result
+    why the length is what precision costs here. Do not truncate a rule to
+    clear a row. Saying so in the Result is a note in an existing free-text
+    field, not a waiver: there is no waiver field to fill and no approval step
+    to pass.
+  expected_output: |
+    ADR file at `docs/adrs/ADR-NNNN-<slug>.md` with `status: Proposed`;
+    `manifest.yml`'s `adr.next_number` incremented; `docs/log.md` entry
+    appended.
+  side_effects: [propose-adr, query-docs]
+
+- title: "Plan {M}: convene LLM council to review the ADR"
+  module_tag: adr-{M}
+  purpose: |
+    Gate the ADR with multi-perspective review before acceptance.
+  prompt: |
+    Invoke the `council` skill (multi-model: Claude + Gemini + GPT, async)
+    — or, equivalently, dispatch 5 parallel review agents via the `Agent`
+    tool — each owning one quality dimension:
+      (1) Completeness — are Context/Decision/Alternatives/Consequences
+          all fleshed out? Any missing references?
+      (2) Correctness — does the proposal actually solve the problem?
+          Are the assumptions verifiable?
+      (3) Consistency — does this conflict with any prior `Accepted` ADRs
+          (INCLUDING any ADRs accepted earlier in this cycle), briefs, or
+          invariants in `docs/AGENTS.md`?
+      (4) Clarity — would a new engineer (or future Claude) understand the
+          decision from this ADR alone?
+      (5) **Security** — does the decision introduce a security risk?
+          Evaluate: new attack surface or trust boundary; secret/credential
+          handling (does it touch `~/.crux/`, env vars, or log values?);
+          injection or authz implications; supply-chain exposure (new
+          dependency, external fetch, or unpinned source). Return
+          `REQUEST_CHANGES` if the ADR creates a security risk it does not
+          explicitly mitigate.
+
+    Each agent must read: the proposed ADR, `docs/adrs/index.md`, and any
+    code paths or ADRs the proposal cites. Each returns a verdict
+    (`APPROVE` / `APPROVE_WITH_NITS` / `REQUEST_CHANGES`) plus a numbered
+    findings list.
+
+    Aggregate verdicts and route by exactly one of three cases:
+      - **Clean consensus** — ALL five `APPROVE`, zero findings → advance to
+        this module's accept prompt.
+      - **Minor nits only** — one or more `APPROVE_WITH_NITS` on
+        NON-safety-adjacent dimensions (Completeness, Clarity, or a
+        stylistic Consistency/Correctness nit), with NO `REQUEST_CHANGES`
+        and NO safety-adjacent dissent → advance directly to this module's
+        address-findings prompt (address the nits, re-convene). **No deeper
+        review** — a lone nit does not warrant the srde/deep-architecture pass.
+      - **Split verdict → deeper architectural review** (the case below).
+
+    **Deeper architectural review (auto-trigger, autonomous — part of the
+    hardened cycle contract).** A **split verdict** is,
+    operationally, ANY of: (i) any dimension returns `REQUEST_CHANGES`;
+    (ii) any `APPROVE_WITH_NITS` or dissent on a *safety-adjacent* dimension
+    (Security, or a Correctness dissent alleging a real defect rather than a
+    stylistic gap); (iii) the dimensions return verdict tokens spanning more
+    than one level AND at least one is `REQUEST_CHANGES` (a pure
+    APPROVE/APPROVE_WITH_NITS mix is "minor nits only" above, NOT a split).
+    On a split, deepen the review before looping, WITHOUT involving a
+    human: (a) collect the per-dimension dissents; (b) run the `srde` skill
+    to resolve dissents answerable from existing in-repo docs/probes (resolved
+    → drop). **`srde` auto-drop is excluded for safety-adjacent dissents** —
+    Security, and Correctness dissents alleging a real defect, are NEVER
+    silently auto-resolved; they always route to (c) or the findings loop.
+    (c) For dissents `srde` cannot resolve, dispatch ONE dedicated
+    deep-architecture-review `Agent` that reads the full ADR graph
+    (`docs/adrs/index.md`, every cited ADR, `docs/AGENTS.md` invariants) and
+    renders a binding architectural verdict **using the same vocabulary as
+    the council** (`APPROVE` / `APPROVE_WITH_NITS` / `REQUEST_CHANGES` + a
+    findings list); its surviving findings → the address-findings prompt like
+    any other. The `srde`/deep-review probes are read-only over in-repo
+    content: they MUST NOT run untrusted code, fetch unpinned external
+    content, or read/expose secret values. The `--deep-review` flag (if the
+    book was authored with it) forces steps (a)–(c) on round 1 regardless of
+    verdict.
+  expected_output: |
+    Aggregated 5-dimension council verdict; srde/deep-review resolution if
+    the verdict split; findings list (if any).
+  side_effects: [council, srde]
+
+- title: "Plan {M}: address council findings, re-convene the council"
+  module_tag: adr-{M}
+  purpose: |
+    Close the planning loop until the council approves.
+  prompt: |
+    For each finding from the council (this module's council prompt), edit
+    the proposed ADR in place to address it. Do NOT change `status:` — the
+    ADR remains `Proposed` throughout this loop. Preserve the body structure
+    (Context / Decision / Alternatives Considered / Consequences /
+    References).
+
+    Resolve findings **autonomously** — use the council/`srde` outputs and
+    dispatched `Agent`s; do NOT ask a human.
+
+    A revision lengthens a rule as easily as it shortens one, so re-run the
+    advisory before the next round and read its `warnings` list again:
+
+      uv run "${CRUX_PLUGIN_ROOT}/scripts/check-governs-coverage.py" --repo-root <repo-root>
+
+    Handle any row naming this ADR exactly as the drafting prompt says: shorten
+    it per `docs/AGENTS.md` §11.D rule 7, or say in this prompt's Result why the
+    length is necessary. Advisory throughout — it never blocks the round.
+
+    When every finding is resolved,
+    return to this module's council prompt to re-convene the council. After
+    3 full loops without convergence, STOP and escalate to the user — a
+    genuine fundamental disagreement (not a resolvable finding) is the only
+    thing that warrants human adjudication.
+  expected_output: |
+    Updated ADR; control returns to this module's council prompt.
+  side_effects: []
+
+- title: "Plan {M}: accept the ADR"
+  module_tag: adr-{M}
+  purpose: |
+    Commit to the plan; freeze the body.
+  prompt: |
+    Invoke `transition-adr` with: `accept ADR-NNNN` (where `NNNN` is the
+    id recorded in this run snapshot's Artifacts under `ADR {M}`). This
+    sets `status: Accepted`, stamps `accepted_at:`, and writes both the
+    `adr | accept` log entry and the index update.
+
+    Then invoke `log-work` to append a journal entry summarizing this
+    ADR's planning loop: number of council rounds, the key debate(s) that
+    shaped the final decision, and any open questions deferred to later
+    phases. Per the journal contract, name at least one thing that didn't
+    work on the first attempt or surprised the reviewers.
+  expected_output: |
+    ADR at `status: Accepted`; new entry under `docs/journal/YYYY-MM.md`.
+  side_effects: [transition-adr, log-work]

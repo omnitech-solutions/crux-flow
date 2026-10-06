@@ -1,0 +1,80 @@
+{
+  "_note": "internal, unstable schema; not a downstream compatibility surface",
+  "concerns": [
+    {
+      "concern": "data-model",
+      "extractor": "node",
+      "inputs_found": [
+        "express-main-example/express/app.js",
+        "express-main-example/express/helpers.js",
+        "express-main-example/express/routes/instruments.js",
+        "express-main-example/express/routes/orchestras.js",
+        "express-main-example/express/routes/users.js",
+        "express-main-example/index.js",
+        "express-main-example/sequelize/extra-setup.js",
+        "express-main-example/sequelize/index.js",
+        "express-main-example/sequelize/models/instrument.model.js",
+        "express-main-example/sequelize/models/orchestra.model.js",
+        "express-main-example/sequelize/models/user.model.js",
+        "express-main-example/sqlite-example-database/helpers/random.js",
+        "express-main-example/sqlite-example-database/setup.js"
+      ],
+      "n_entities": 7,
+      "n_sources": 13,
+      "verdict": "populated"
+    },
+    {
+      "concern": "api-surface",
+      "extractor": "node",
+      "inputs_found": [
+        "express-main-example/express/app.js",
+        "express-main-example/express/helpers.js",
+        "express-main-example/express/routes/instruments.js",
+        "express-main-example/express/routes/orchestras.js",
+        "express-main-example/express/routes/users.js",
+        "express-main-example/index.js",
+        "express-main-example/sequelize/extra-setup.js",
+        "express-main-example/sequelize/index.js",
+        "express-main-example/sequelize/models/instrument.model.js",
+        "express-main-example/sequelize/models/orchestra.model.js",
+        "express-main-example/sequelize/models/user.model.js",
+        "express-main-example/sqlite-example-database/helpers/random.js",
+        "express-main-example/sqlite-example-database/setup.js"
+      ],
+      "n_entities": 1,
+      "n_sources": 13,
+      "verdict": "populated"
+    },
+    {
+      "concern": "module-graph",
+      "extractor": "node",
+      "inputs_found": [
+        "express-main-example/express/app.js",
+        "express-main-example/express/helpers.js",
+        "express-main-example/express/routes/instruments.js",
+        "express-main-example/express/routes/orchestras.js",
+        "express-main-example/express/routes/users.js",
+        "express-main-example/index.js",
+        "express-main-example/sequelize/extra-setup.js",
+        "express-main-example/sequelize/index.js",
+        "express-main-example/sequelize/models/instrument.model.js",
+        "express-main-example/sequelize/models/orchestra.model.js",
+        "express-main-example/sequelize/models/user.model.js",
+        "express-main-example/sqlite-example-database/helpers/random.js",
+        "express-main-example/sqlite-example-database/setup.js"
+      ],
+      "n_entities": 17,
+      "n_sources": 13,
+      "verdict": "populated"
+    },
+    {
+      "concern": "decision-index",
+      "expected": "an ADR index at `<docs_dir>/adrs/index.md` with Accepted, non-archived entries",
+      "extractor": "stub",
+      "found": "no matching input",
+      "inputs_found": [],
+      "stub_reason": "precondition_missing",
+      "verdict": "stubbed"
+    }
+  ]
+}

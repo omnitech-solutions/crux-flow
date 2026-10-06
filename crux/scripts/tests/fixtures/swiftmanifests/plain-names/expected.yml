@@ -1,0 +1,2 @@
+# The plain twin of hostile-names/. Schema: literal-subset/expected.yml.
+counts: {api-surface: 1, module-graph: 1}

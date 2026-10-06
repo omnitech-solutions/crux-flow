@@ -1,0 +1,22 @@
+# ADR-0130 clause 17 limitation form: a build-phase membership exception set
+# (PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet) withholds
+# a file from membership, and an explicitFileTypes retype withholds another
+# -- both render no membership row plus an unsupported-project-form
+# residual; a plain synced member still renders.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `SyncSrc2/Normal.swift` | `SyncTarget` | folder-synced root SyncSrc2 | \u2014 |"
+
+absent:
+  module-graph:
+    - "| `SyncSrc2/WithheldBP.swift`"
+    - "| `SyncSrc2/Retyped.swift`"
+
+residuals:
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: null
+    first_line: null
+    last_line: null

@@ -1,0 +1,17 @@
+# ADR-0129:143 and :150 (fixture C, control): a contained `.package(path:)`
+# renders its dependency row, and a product qualified by its identity draws
+# exactly one edge, to that local package. The decoy `Other` declaring the
+# same product name gets no edge.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `App` | `../Local/CorePkg` | path dependency | `Local/CorePkg` | — | `App/Package.swift:5-5` |"
+    - "App_Package_swift__AppCore[\"AppCore (App/Package.swift)\"] --> Local_CorePkg_Package_swift__CoreKit[\"CoreKit (Local/CorePkg/Package.swift)\"]"
+    - "| `CoreKit` | `Other/Package.swift` | library"
+
+absent:
+  module-graph:
+    - "Other_Package_swift__CoreKit"
+    - "unresolved-reference"
+    - "path-escape"

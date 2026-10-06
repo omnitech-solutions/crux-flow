@@ -1,0 +1,18 @@
+# Three seeded values the spine must never render: a stored-property
+# initializer (8675309), a default argument (8675310) and an enum raw value
+# (8675311). Schema: 01-actor.expected.yml.
+types:
+  - {name: FixtureCanaryHolder, kind: struct, access: public, at: [1, 1], conditional: false}
+  - {name: Level, kind: enum, access: public, at: [6, 6], conditional: false}
+stored_properties:
+  - {owner: FixtureCanaryHolder, name: seed, type: Int, access: public, at: [2, 2]}
+relationships:
+  - {from: Level, relation: conforms, to: Int, at: [6, 6]}
+interfaces:
+  - {name: FixtureCanaryHolder, kind: struct, access: public, at: [1, 1], attributes: [], conditional: false}
+  - {name: FixtureCanaryHolder.seed, kind: let, access: public, at: [2, 2], attributes: [], conditional: false}
+  - {name: "FixtureCanaryHolder.pick(limit:)", kind: func, access: public, at: [3, 3], attributes: [], conditional: false}
+  - {name: Level, kind: enum, access: public, at: [6, 6], attributes: [], conditional: false}
+requirements: []
+mains: []
+residuals: []

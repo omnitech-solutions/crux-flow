@@ -1,0 +1,424 @@
+# Canonical 1×verify + 1×dev + 1×review iterate cycle (13 prompts) — full YAML book skeleton.
+#
+# An `iterate` book is a cycle book with `cycle_kind: verify`: it swaps the ADR
+# module for a VERIFY module (research/reproduce/root-cause + council review of
+# the diagnosis), for NON-architectural reactive work (bug fixes, drift
+# remediation, refinements to existing behavior). This file is the default
+# assembly `iterate` emits for the minimum cycle (V=D=R=1): the top-level keys
+# below plus the assembled `prompts:` list with sequential `n: 1..13`.
+#
+# For cycles with additional modules, `iterate` concatenates the YAML prompt-
+# lists from cycle-module-{verify,dev,review}.yaml (verify modules, then dev
+# modules, then review modules), appends the two fixed prep + summary prompts,
+# then assigns sequential `n:`.
+#
+# Invariants enforced (machine-checked by validate-promptbook.py's cycle-coverage
+# pass):
+#   1. total_prompts >= 13
+#   2. Every verify module has a paired council prompt (count `^verify-` tags)
+#   3. Every artifact has a review cycle (count `^review-` tags)
+#   4. cycle_kind: verify <-> modules {verify,dev_loops,review_cycles} <-> only
+#      verify-/dev-/review- module tags (no adr- tags — adr/verify XOR)
+# total_prompts == 4*verify + 4*dev_loops + 3*review_cycles + 2.
+
+format_version: "1"
+id: PB-NNNN
+title: "Iterate: <bug, drift, or refinement to existing behavior>"
+status: active
+created_at: YYYY-MM-DD
+total_prompts: 13
+current_run: null
+current_prompt: null
+forked_from: null
+tags: [cycle, workflow, iterate]
+cycle_kind: verify
+modules:
+  verify: 1
+  dev_loops: 1
+  review_cycles: 1
+
+goal: |
+  <One paragraph: the bug / drift / refinement being fixed through this iterate
+  cycle. Open it with three statements: the Outcome — what improves for the
+  affected user when the work is done; the Evidence — what would demonstrate
+  that improvement; and the Constraint — what the change must preserve. Prose
+  in this field: no new field, no form, no gate. NON-architectural by definition —
+  if it needs a new architectural decision, the verify council routes it to
+  `dev-cycle`. End-state: a reviewed, tested, documented PR ready for human
+  merge.>
+
+strategy: |
+  Drive a single non-architectural fix through the iterate cycle: verify
+  (reproduce + root-cause + council-review the diagnosis), develop (implement +
+  quality gates), review (external + test/doc audit + fixes), prep (changelog +
+  docs + journal + PR notes), summarize. Each phase has an internal loop with
+  explicit exit criteria; 3-round non-convergence escalates.
+
+  Skills exercised: `query-docs`, `council`, `srde`, `log-work`, `code-review`,
+  `verify-code-docs`, `audit-docs`, plus the `Agent` tool for parallel dispatch.
+  Out of scope: net-new/architectural features (use `dev-cycle`); cutting a
+  release tag; merging the PR.
+
+run_autonomy: |
+  Once this cycle's run is started, it runs to completion without human review.
+  Questions and decisions are resolved by the `council` skill and dispatched
+  `Agent`s. The only stops are (a) a module escalation loop firing (3-round
+  non-convergence on council, quality gates, or review fix-loop), (b) the verify
+  council's "this is actually architectural -> use dev-cycle" escape verdict, and
+  (c) a genuinely irreversible/outward-facing action the plan did not authorize
+  (push/merge, deploy, external send, data deletion, spend). In-repo edits —
+  including `docs/AGENTS.md`, skill files, and code — are never stop points. See
+  `docs/AGENTS.md` §11 "Run execution autonomy" for the full contract.
+
+prompts:
+  # --- Verify module #1 (4 prompts) — from cycle-module-verify.yaml, module_tag verify-1 ---
+  - n: 1
+    title: "Verify: research & reproduce the issue"
+    module_tag: verify-1
+    purpose: |
+      Establish that the issue is real and understood before any fix lands —
+      the iterate cycle's substitute for an ADR (a verified diagnosis, not a
+      decision).
+    prompt: |
+      Read the goal above. Invoke `query-docs` for relevant ADRs/briefs/research/
+      journal. Dispatch 2–3 research agents in parallel: each returns a
+      reproduction (steps / failing test / concretely-cited drift, not a vague
+      description), the root cause (cause vs. symptom), the scope, and a proposed
+      MINIMAL remediation approach. Synthesize into a `Diagnosis` block in this
+      run snapshot's `notes`. Do NOT write an ADR; if the work turns out to be
+      architectural, the council's escape verdict (next) routes it to `dev-cycle`.
+    expected_output: |
+      A `Diagnosis` block in the run `notes`: reproduction/evidence, root cause,
+      scope, proposed minimal approach.
+    side_effects: [query-docs]
+
+  - n: 2
+    title: "Verify: convene LLM council to review the diagnosis"
+    module_tag: verify-1
+    purpose: |
+      Gate the diagnosis + approach with multi-perspective review before code.
+    prompt: |
+      Invoke the `council` skill (Claude + Gemini + GPT, async) — or 5 parallel
+      review agents — each owning one dimension over the `Diagnosis`: (1)
+      Evidence/Reproduction, (2) Root-cause correctness, (3) Approach soundness +
+      **minimality** (no scope creep), (4) Consistency, (5) Security. **Escape
+      verdict:** if the work is actually ARCHITECTURAL, treat it as a
+      `docs/AGENTS.md` §11 premise-contradiction stop — mark this prompt
+      `blocked` (paused), escalate to the user, recommend a `dev-cycle` (the
+      diagnosis persists as a citable `learning`). Otherwise route: all APPROVE →
+      Prompt 4; minor non-safety nits → Prompt 3; split verdict → deeper review
+      autonomously (`srde`, then a read-only deep-review `Agent`) → Prompt 3.
+    expected_output: |
+      Aggregated 5-dimension verdict on the diagnosis; escape stop if it fired;
+      srde/deep-review resolution if split; findings.
+    side_effects: [council, srde]
+
+  - n: 3
+    title: "Verify: address council findings, return to Prompt 2"
+    module_tag: verify-1
+    purpose: |
+      Close the diagnosis loop until the council approves.
+    prompt: |
+      Revise the `Diagnosis` block in the run `notes` for each council finding
+      (sharpen root cause, tighten the minimal approach, add evidence). Resolve
+      autonomously. When every finding is resolved, return to Prompt 2 to
+      re-convene. After 3 full loops without convergence, STOP and escalate.
+    expected_output: |
+      Updated `Diagnosis`; control returns to Prompt 2.
+    side_effects: []
+
+  - n: 4
+    title: "Verify: commit to the approach"
+    module_tag: verify-1
+    purpose: |
+      Record the verified root cause + chosen approach (the no-ADR durable why).
+    prompt: |
+      Invoke `log-work` with a reflective `decision`/`learning` journal entry:
+      the root cause, the chosen minimal approach, why it's right, and any
+      council debate. Reference this run. Name at least one non-obvious thing the
+      reproduction/council surfaced. This commits the cycle to the approach; the
+      dev module implements it next, reading the `Diagnosis` + this entry.
+    expected_output: |
+      A new `decision`/`learning` entry in `docs/journal/YYYY-MM.md`.
+    side_effects: [log-work]
+
+  # --- Dev module #1 (4 prompts) — from cycle-module-dev.yaml, module_tag dev-1 ---
+  # {RULE_REFS} is substituted with "the verified Diagnosis (run notes) + the
+  # verify module's commit-approach journal entry" (an iterate cycle has no ADR).
+  - n: 5
+    title: "Develop: derive an implementation plan from the verified approach"
+    module_tag: dev-1
+    purpose: |
+      Convert the verified diagnosis + approach into ordered work units.
+    prompt: |
+      Read the verified approach: the `Diagnosis` block in this run's `notes` +
+      the verify module's commit-approach journal entry (an iterate cycle has no
+      ADR — this is the `{RULE_REFS}` substitute). Produce an implementation plan:
+      files to create/modify (paths); ordered work units (each ≤ ~200 LOC,
+      independently testable); implementation-specific risks; quality gates
+      (tests, linters, static analysis, security, `verify-code-docs`). Capture
+      the plan in this run snapshot's `notes`. Keep the change MINIMAL — the
+      council approved a fix, not a refactor.
+    expected_output: |
+      Implementation plan in this run's `notes`; clear ordered work units.
+    side_effects: []
+
+  - n: 6
+    title: "Develop: spawn implementation team"
+    module_tag: dev-1
+    purpose: |
+      Implement the plan with parallel agents where independent.
+    prompt: |
+      Group the Prompt 5 work units by independence. Dispatch one `Agent` per
+      independent group; each receives the diagnosis, the plan, its work units,
+      and `docs/AGENTS.md` conventions.
+
+      Each agent also receives the book's `goal` statements — the Outcome, the
+      Evidence, and the Constraint. A dispatch passes them forward verbatim, or
+      narrows the Outcome and says so: a narrowed Outcome is entailed by its
+      parent and names the parent it narrowed and what it dropped. The Evidence
+      and the Constraint pass whole — a dispatch may add an Evidence item or a
+      Constraint, saying which it added, and may drop neither. Record any
+      narrowing in this run snapshot's Notes under the label `Outcome narrowing`
+      — never by editing the book.
+
+      Each agent makes actual edits, adds/updates tests, and reports files
+      changed + test results + any unilateral decisions. Integrate; reconcile
+      overlaps. Stay within the approved minimal scope.
+    expected_output: |
+      All work units implemented; per-agent reports collected.
+    side_effects: []
+
+  - n: 7
+    title: "Develop: run quality gates; loop until clean"
+    module_tag: dev-1
+    purpose: |
+      Verify the fix passes every gate before review.
+    prompt: |
+      Run, in order, and RECORD each in the run `notes` with its exact command +
+      a concrete result token (e.g. `unittest → 149 OK`, `validate-catalog
+      --dry-run → exit 0`), NOT a bare "all green": the test suite; the linter/
+      formatter; static analysis; security analysis; `verify-code-docs`; and — if
+      the diff touches any distributed surface (`crux/skills/`, `crux/agents/`,
+      `crux/templates/`) — the **release-content scan** `check-public-release-content.py`
+      (the permanent release-content scan) so a banned internal-reference leak fails
+      IN-CYCLE, not only at release time. Read its exit code as a gate: exit 0 = clean; **exit 1 =
+      FINDINGS** (one `<path>:<lineno>: <line>` row per hit on stdout — a real gate
+      failure to FIX by re-editing, NOT an environment error); a crash / exit ≥ 2 /
+      non-zero with empty or unparseable stdout = an environment-capability error
+      (surface stderr; a distinct lane). Fix any
+      failure (re-edit), then re-run the failed gate AND every subsequent gate.
+      After 3 full loops without convergence, STOP and escalate.
+    expected_output: |
+      All gates green; each gate's command + result token captured in `notes`.
+    side_effects: [verify-code-docs]
+
+  - n: 8
+    title: "Develop: internal review"
+    module_tag: dev-1
+    purpose: |
+      First-pass self-review before external eyes.
+    prompt: |
+      Invoke the `code-review` skill (default effort, no `--comment` — a private
+      dry-run) scoped to this loop's diff. Fix every `CONFIRMED` finding; evaluate
+      `PLAUSIBLE`. Do NOT advance until every `CONFIRMED` is resolved or deferred
+      with rationale in the run `notes`.
+    expected_output: |
+      Internal-review findings list and resolutions.
+    side_effects: []
+
+  # --- Review module #1 (3 prompts) — from cycle-module-review.yaml, module_tag review-1 ---
+  - n: 9
+    title: "Review: external team review (multi-dimension + dedicated security review)"
+    module_tag: review-1
+    purpose: |
+      Independent verification of correctness, consistency, clarity, and security.
+    prompt: |
+      Dispatch parallel `Agent` reviewers, each blind to the others, scoped to the
+      full cycle diff. **Three quality dimensions:** (a) Correctness — re-run the
+      Prompt 7 gates, then read the diff for behavior bugs + confirm the fix
+      actually resolves the diagnosed root cause; (b) Consistency — vs ADRs,
+      `docs/AGENTS.md`, adjacent patterns; (c) Clarity. **PLUS a dedicated
+      multi-subagent security review** — one `Agent` per threat class (S1
+      injection, S2 secrets incl. `~/.crux/`, S3 authz, S4 supply-chain, S5
+      unsafe file/shell/resource), scope-adaptive with MANDATORY N/A reports. A
+      `[SECURITY:Sn]` finding on a reachable path is non-downgradable MUST-FIX.
+
+      Commission these reviewers yourself for the units you dispatched.
+      Where you integrated across those units, that integration is your own
+      authorship, so its review is commissioned by your delegator and not by
+      you.
+
+      Every reviewer receives the book's `goal` statements — the Outcome, the
+      Evidence, and the Constraint. Each judges the change against the Outcome
+      rather than against the diff alone.
+      Each returns one disposition per Evidence item:
+        - verified, with the command and the result token, or the observation
+          and where it is recorded when no command produced it;
+        - contradicted, which is a finding;
+        - unobserved, with what was attempted, what limited it, and what
+          would settle it.
+      Each states whether the Constraint held and what shows that. A result
+      token is an exit code, a pass count, or a named verdict — never raw
+      output, an environment value, or a secret.
+      A disposition is re-derived, never adopted from the author's report:
+      an item stands verified only where this reviewer ran the command and
+      read the result token, or re-read the observation where it is
+      recorded; anything it cannot re-derive is unobserved in its own report.
+    expected_output: |
+      Aggregated external-review + security findings, plus a disposition
+      per Evidence item.
+    side_effects: []
+
+  - n: 10
+    title: "Review: tests, docs, and dev-practice conformance audit"
+    module_tag: review-1
+    purpose: |
+      Ensure the fix is tested, documented, and that proper practices were followed.
+    prompt: |
+      Dispatch 3 parallel `Agent` reviewers: (a) Test coverage — every changed
+      path tested? the root-cause regression now covered by a test? edge cases?
+      no false-greens? (b) Comments/docs — non-obvious WHY explained;
+      `extract-code-docs --dry-run` drift? (c) Dev-practice conformance:
+      Tier-1 — every gate in `notes` has a command + result token,
+      internal review done, a schema/data change has a migration; Tier-2 —
+      weakened assertions / `skip` added with no code fix / hand-mutated-DB prose.
+      Verdict in `notes` `Review conformance`: PASS/FAIL; Tier-1 NOT-ALLOWED ⇒
+      FAIL ⇒ MUST-FIX.
+
+      Every reviewer receives the book's `goal` statements — the Outcome, the
+      Evidence, and the Constraint. Each judges the change against the Outcome
+      rather than against the diff alone.
+      Each returns one disposition per Evidence item:
+        - verified, with the command and the result token, or the observation
+          and where it is recorded when no command produced it;
+        - contradicted, which is a finding;
+        - unobserved, with what was attempted, what limited it, and what
+          would settle it.
+      Each states whether the Constraint held and what shows that. A result
+      token is an exit code, a pass count, or a named verdict — never raw
+      output, an environment value, or a secret.
+      A disposition is re-derived, never adopted from the author's report:
+      an item stands verified only where this reviewer ran the command and
+      read the result token, or re-read the observation where it is
+      recorded; anything it cannot re-derive is unobserved in its own report.
+    expected_output: |
+      Aggregated test/doc/conformance findings + verdict, plus a
+      disposition per Evidence item.
+    side_effects: []
+
+  - n: 11
+    title: "Review: implement feedback; loop until clean"
+    module_tag: review-1
+    purpose: |
+      Address all review findings before PR.
+    prompt: |
+      Combine the Prompt 9 + 10 findings (quality, security, conformance). Fix
+      every MUST-FIX (dispatch fix `Agent`s or fix directly); document
+      SHOULD-CONSIDER deferrals in `notes`. A fix dispatch is an assignment: it
+      carries the finding, the book's Outcome and Constraint, and the Evidence
+      item the finding bears on. Narrow the Outcome to the finding and say what
+      the narrowing dropped; pass the Evidence and the Constraint whole. A fixer
+      that is told only what is broken optimizes for the gate rather than for the
+      user the fix is meant to serve. Re-run the Prompt 7 gates; if green
+      AND re-dispatched reviewers report zero MUST-FIX, advance to Prompt 12.
+      Otherwise loop to Prompt 9. After 3 review-fix loops without convergence,
+      STOP and escalate.
+
+      Where you fixed a MUST-FIX yourself rather than dispatching it, that
+      fix is your own authorship: the re-review of it is commissioned by
+      your delegator, not by you, and you re-dispatch only the reviewers of
+      work you did not write. At the top of the chain the delegator is the
+      human who approved the run.
+
+      **Forge-log `used` recording (on this module's CONVERGED EXIT only).**
+      When this pass is the one that advances OUT of the module (NOT on each
+      fix-loop iteration — per-pass recording would triple-count a single use),
+      then for **each distinct forged skill this review module invoked** (a
+      `.claude/skills/<name>/` skill run during any of this module's review or
+      fix passes), do BOTH: write one forge-log `used` entry conforming to
+      forge-skill's locked format (the forge-skill-validated slug `<name>`, an
+      outcome token `ok` or `partial`, with the `(same-session)` suffix when
+      the skill was forged this same session — so `ok (same-session)` /
+      `partial (same-session)`); AND append one line to the run-snapshot Notes
+      section `Forged skills used` of the form `<skill-name> | <prompt n> |
+      <outcome-token>`. If this module invoked NO forged skill, write nothing —
+      a clean no-op. Injection/secret safety is INHERITED from forge-skill's
+      locked format (validated slug cannot contain `|`/`[`/newline; finite
+      outcome enum; single-line secret-free body) — do not reinvent it.
+    expected_output: |
+      Clean review cycle; quality gates still green. On converged exit, one
+      forge-log `used` entry + one `Forged skills used` Notes line per distinct
+      forged skill invoked (or a clean no-op if none).
+    side_effects: [forge-skill]
+
+  # --- Fixed prep + summary (2 prompts) — inline; NO module_tag ---
+  - n: 12
+    title: "Prep: changelog, docs, journal, PR notes"
+    purpose: |
+      Make the fix shippable to humans.
+    prompt: |
+      1. **Changelog**: update the repo-root `CHANGELOG.md` `## [Unreleased]` with
+         a 1–3 line entry. Link the verify journal entry / the fixed issue.
+      2. **Documentation**: run `audit-docs`; address every BROKEN finding. If the
+         fix changed a documented contract, update `docs/AGENTS.md` (and the
+         `AGENTS.md.tmpl` twin) in lock-step.
+      3. **Journal**: invoke `log-work` with a reflective entry — what the fix
+         was, what the reproduction taught you, what to watch for next time.
+      4. **Prose review**: run `prose-review` over the prose this prompt just
+         wrote — the changelog entry, any doc edits, the journal entry, and
+         the PR body. Apply every `fix` finding; resolve each `confirm`
+         finding by supplying the fact or dropping the claim. Advisory here;
+         the release gate is where they bind.
+      5. **PR notes**: draft a PR body (do NOT open the PR) — Summary, the verified
+         root cause, Test plan (incl. the regression test), Risk notes. Store it
+         in the run snapshot's `pr_draft` field.
+    expected_output: |
+      CHANGELOG updated; docs clean per audit-docs; journal entry; PR draft stored.
+    side_effects: [audit-docs, log-work]
+
+  - n: 13
+    title: "Summary: completion report AND archive the book"
+    purpose: |
+      Hand off cleanly AND close the cycle's tracked artifact inside its own
+      final prompt.
+    prompt: |
+      **Forge-log `evaluated` fold (before/at archival).** Read the run-snapshot
+      Notes section `Forged skills used`. For **each DISTINCT forged skill name**
+      in that section, write exactly ONE forge-log `evaluated` entry (one per
+      distinct skill, NOT one per use / per review pass — the structural defense
+      against K-fold duplicate entries that would inflate the promotion floor's
+      distinct-dates signal), conforming to forge-skill's locked two-line
+      `evaluated` format. Derive the `verdict` from that skill's recorded outcome
+      tokens, ignoring any `(same-session)` suffix (treat `ok (same-session)` as
+      `ok` and `partial (same-session)` as `partial`):
+      all `ok` → `effective`; any `partial` → `mixed`. Write a
+      `fell-short` verdict ONLY when this session judges the skill genuinely
+      failed its task (a qualitative judgment, NOT derived from the `ok`/`partial`
+      outcome tokens — it routes the skill to forge-skill's revise condition). If
+      the `Forged skills used` section is empty (no forged skill used in this
+      cycle), write nothing — a clean no-op.
+
+      Write a completion summary to the run snapshot's `summary` field:
+      one-paragraph outcome; links (the verify journal entry, CHANGELOG entry,
+      this run); stats (prompts, council rounds, dev gate loops, review-fix loops,
+      files changed, tests added); outstanding deferred work; and the `pr_draft`
+      text. THEN run `uv run "${CRUX_PLUGIN_ROOT}/scripts/advance-run.py" <run-RUN-NNN.yaml>
+      --outcome done --result "summary written; archiving next"
+      --book <active-book.yaml>`. This prompt's `result` records
+      the hand-off, NOT "book archived" — the archive has not happened yet at
+      the instant that string is written. The run reaches `status: completed`,
+      `current_prompt` is nulled on both book and run, and the book's
+      `current_run` SURVIVES. THEN invoke `archive-promptbook PB-NNNN` to
+      finalize (moves to `archive/`, sets `status: archived`, nulls
+      `current_run`/`current_prompt`, writes the archive note + the
+      `promptbook | archived` log entry). Do NOT manually null
+      `current_run`/`current_prompt` first — archive-promptbook reads
+      `current_run`. Prep already journaled; archive does not re-journal. The
+      archive act itself is recorded in the archive note and the
+      `promptbook | archived` log entry, never in a prompt `result`.
+    expected_output: |
+      Completion summary written; one forge-log `evaluated` entry per distinct
+      forged skill used in the cycle (or a clean no-op if none); book archived;
+      `promptbook | archived` log entry.
+    side_effects: [archive-promptbook, forge-skill]

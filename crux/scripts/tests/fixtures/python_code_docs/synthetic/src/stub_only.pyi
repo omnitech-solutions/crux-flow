@@ -1,0 +1,3 @@
+"""A stub with no runtime module."""
+
+def ping(host: str, *, timeout: float = ...) -> bool: ...

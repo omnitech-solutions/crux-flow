@@ -1,0 +1,52 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+				TGT_APP,
+			);
+			packageReferences = (
+				PKGREF,
+			);
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+			);
+		};
+		TGT_APP = {
+			isa = PBXNativeTarget;
+			name = "App";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+			);
+			dependencies = (
+			);
+			packageProductDependencies = (
+				PD_ALPHA,
+			);
+		};
+		PD_ALPHA = {
+			isa = XCSwiftPackageProductDependency;
+			package = PKGREF;
+			productName = Alpha;
+		};
+		PKGREF = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://example.com/a/alpha.git";
+			requirement = {
+				kind = exactVersion;
+				version = "1.0.0";
+				surprise = yes;
+			};
+		};
+	};
+	rootObject = PRJ;
+}

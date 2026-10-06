@@ -1,0 +1,189 @@
+# crux/catalog/models.yml — the upstream resolution table for agent models.
+# Fork-mode Codex tier overrides live in crux/flow/codex_bindings.json; they
+# do not change upstream-mode assignments or this catalog's agent identity.
+# Hand-authored. Validated by validate-catalog.py. NEVER regenerated.
+# schema_version is read by models_catalog.load(), which refuses any value it
+# does not recognize (rule V0). It is not decoration.
+schema_version: "4"
+
+# Table 1 — providers: the allowlist for the provider half of an alias value.
+# Adding a provider is a deliberate one-line edit, reviewed like any other.
+providers:
+  - openrouter
+
+# Table 2 — aliases: short name -> provider/model-id. THE ONLY PLACE in this
+# file where an OpenCode model id appears. An alias that no cell references is
+# a PARKED ALTERNATE: legal, silent, and deliberate. Do not add a reachability
+# check — alternating between two models in one cell is why this table exists.
+#
+# Every value has the form `openrouter/<vendor>/<upstream-slug>`. The providers
+# table above holds one entry, so the provider half is always `openrouter`, and
+# the part AFTER it is the upstream slug pinned VERBATIM — never normalized,
+# never a redirect. Distinctness between two values reads the vendor namespace
+# (the first segment after `openrouter/`), not the shared provider half.
+#
+# PROVENANCE. The eight slugs below were read 2026-08-26 from the OpenRouter
+# models endpoint, https://openrouter.ai/api/v1/models, and are spelled as that
+# response spells them. Two spellings a reader would otherwise guess wrong:
+# Haiku is served as `claude-haiku-4.5`, NOT the dated
+# `claude-haiku-4-5-20251001` this table carried before, and Anthropic point
+# releases use a DOT (`claude-opus-4.8`) where the previous provider used a
+# hyphen. Never derive one row's slug from a neighbouring row's shape — read
+# the endpoint. See ADR-0072 §3 for why the alias table is the only place a
+# model id may appear.
+# `sonnet-latest` was re-read 2026-09-28 from https://openrouter.ai/api/v1/models.
+# `sol-latest` was re-read 2026-09-29 from the same endpoint: `openai/gpt-6.1-sol`,
+# canonical slug `openai/gpt-6.1-sol-20260929`.
+aliases:
+  fable-latest: openrouter/anthropic/claude-fable-5.1
+  opus-latest: openrouter/anthropic/claude-opus-5.5
+  opus-stable: openrouter/anthropic/claude-opus-4.8
+  sonnet-latest: openrouter/anthropic/claude-sonnet-5.5
+  haiku-latest: openrouter/anthropic/claude-haiku-4.5
+  kimi-latest: openrouter/moonshotai/kimi-k3
+  sol-latest: openrouter/openai/gpt-6.1-sol
+  qwen-max: openrouter/qwen/qwen3.8-2.4t-a95b
+  deepseek-flash: openrouter/deepseek/deepseek-v4.1-flash
+
+  # The separator asymmetry in the GLM pair is UPSTREAM'S and not a typo here:
+  # the base SKU is `glm-5.3` (dot) and the fast SKU is `glm-5.3-flash` (hyphen
+  # before `flash`). Verbatim upstream slugs, as the header requires — never
+  # "fix" a perceived typo against the gateway's own spelling, and never derive
+  # one row's shape from a neighbouring row. The flash SKU remains a parked
+  # alternate for developer tasks.
+  glm-latest: openrouter/z-ai/glm-5.3
+  glm-flash: openrouter/z-ai/glm-5.3-flash
+
+# Table 3 — roster: agent role -> level. A value is either a level name or a
+# mapping {level, claude, opencode, codex}. `claude` overrides the Claude Code
+# column and must be a Table 5 member; the agent file's `model:` then equals it
+# (rule V6). `opencode` overrides the OpenCode column. `codex` atomically
+# replaces the complete Codex runtime from the level. Each override leaves the
+# other columns resolving from the level. The KEY SET is in bijection with the
+# stems of crux/agents/*.md.
+#
+# A `claude` override is a per-agent exception that an Accepted decision must
+# authorize. Each one records its basis beside it, as the reviewer's Codex
+# override does in the Table 4 header. Re-pointing an authorized override to a
+# successor model is a catalog edit that records its own basis.
+agents:
+  architect: flagship
+  brainstormer: flagship
+  # commander: Claude Code override to Opus 5.5, from the 2026-09-22 trial.
+  # Opus met every acceptance criterion for the commander at 55% lower cost
+  # per call. The record is the PB-0116 trial report in the crux development
+  # repository (2026-09-22).
+  commander:
+    level: apex
+    claude: claude-opus-5-5
+    opencode: glm-latest
+  dev-lead:
+    level: flagship
+  developer:
+    level: standard
+    opencode: deepseek-flash
+  historian: standard
+  librarian: standard
+  # night-gardener: runs at apex by owner instruction, 2026-09-22, so it
+  # resolves to Opus 5.5 on Claude Code with no override. Untrialled: the
+  # trial above had no night-gardener arm.
+  night-gardener:
+    level: apex
+  # reviewer: Claude inherits the apex cell, pinned to Opus 5.5. Codex
+  # overrides to GPT-6.1 Sol by owner instruction; effort stays xhigh.
+  reviewer:
+    level: apex
+    opencode: sol-latest
+    codex:
+      model: gpt-6.1-sol
+      reasoning_effort: xhigh
+      verified: "2026-09-29"
+      source: "OpenAI GPT-6.1 Sol model documentation and Codex 0.159.0 models_cache.json checked 2026-09-29"
+  wayfinder: standard
+
+# Table 4 — level -> per-harness resolution. `opencode` is optional; a level
+# that omits it forces every agent at that level to name its own (rule V2).
+#
+# Apex selects Astra on Codex. Flagship and standard both select Sol, because
+# GPT-6 has no Terra. All three use high effort. Flagship and standard stay two
+# rungs: their Claude and OpenCode cells differ, and rule V8 compares the whole
+# tuple. Apex sets an OpenCode default of `opus-latest`; an apex agent that
+# names its own alias overrides it.
+#
+# `source` records where a Codex pair was READ FROM. `verified` records the
+# date the pair was last checked against that source — rule V4 warns past 180
+# days — so the two fields answer different questions and neither is decoration.
+#
+# Astra and its high effort setting were re-verified 2026-09-22 against the
+# local Codex 0.155.1 models_cache.json, fetched that day. The exact slug is
+# `gpt-6-astra`. Codex availability does not establish OpenRouter availability.
+#
+# PROVENANCE for Sol. The slug is an external contract owned by OpenAI. It was
+# verified 2026-09-29 against two sources. (1) The official model page:
+#   https://developers.openai.com/api/docs/models/gpt-6.1-sol
+# which lists the efforts low, medium (the default), high, xhigh and max, and
+# neither none nor minimal. (2) The local codex-cli 0.159.0 catalog, fetched
+# 2026-09-29, which lists `gpt-6.1-sol` with the efforts low, medium, high,
+# xhigh, max, ultra. Bare `gpt-6.1` is not a Codex slug, so the concrete slug is
+# pinned here. The GPT-6 Sol slug `gpt-6-sol` is retired from this file and from
+# the router registry.
+#
+# The reviewer is an approved per-agent exception. Its complete Codex runtime
+# block cites the official GPT-6.1 Sol model documentation and the Codex 0.159.0
+# catalog, both checked 2026-09-29. Both list `xhigh` as a supported reasoning
+# effort for `gpt-6.1-sol`.
+levels:
+  apex:
+    claude: claude-opus-5-5
+    opencode: opus-latest
+    codex:
+      model: gpt-6-astra
+      reasoning_effort: high
+      verified: "2026-09-22"
+      source: "Codex 0.155.1 models_cache.json fetched 2026-09-22"
+  flagship:
+    claude: opus
+    opencode: sol-latest
+    codex:
+      model: gpt-6.1-sol
+      reasoning_effort: high
+      verified: "2026-09-29"
+      source: "OpenAI GPT-6.1 Sol model documentation + Codex 0.159.0 models_cache.json fetched 2026-09-29"
+  standard:
+    claude: claude-sonnet-5-5
+    opencode: glm-latest
+    codex:
+      model: gpt-6.1-sol
+      reasoning_effort: high
+      verified: "2026-09-29"
+      source: "OpenAI GPT-6.1 Sol model documentation + Codex 0.159.0 models_cache.json fetched 2026-09-29"
+
+# Table 5 — legal values for the `model:` key in crux/agents/*.md frontmatter,
+# and for every Claude cell above: a level's `claude` and an agent's `claude`
+# override. An ENUM, not a mapping: membership is the repo's accepted set,
+# pinned by rule V0. Reachability does not apply — `haiku` and `inherit` are
+# permitted values no cell names, and that is what a permitted value is.
+#
+# The enum holds family aliases and full model IDs. An assignment that needs
+# one model version names its full ID: a family alias never selects a
+# version. The `opus` alias resolves to Opus 4.6 on Microsoft Foundry. The
+# `sonnet` alias resolves to Sonnet 5.5 only on the Anthropic API. It
+# resolves to Sonnet 4.6 on Claude Platform on AWS, and to Sonnet 4.5 on
+# Amazon Bedrock, Google Cloud's Agent Platform and Microsoft Foundry. The
+# full ID `claude-opus-5-5` needs Claude Code v2.1.280 or later, and
+# `claude-sonnet-5-5` needs v2.1.284 or later. Source for both alias
+# resolutions and both version floors:
+# https://code.claude.com/docs/en/model-config, fetched 2026-09-28. A family
+# alias in an agent's `model:` also resolves to the main conversation's model
+# when that model is in the family. Source:
+# https://code.claude.com/docs/en/sub-agents, fetched 2026-09-28. The full
+# IDs are the Claude Code spelling; the router registry names the same models
+# `claude-opus-5.5` and `claude-sonnet-5.5`.
+claude_aliases:
+  - fable
+  - opus
+  - sonnet
+  - haiku
+  - inherit
+  - claude-opus-5-5
+  - claude-sonnet-5-5

@@ -1,0 +1,17 @@
+# .crux — per-project crux configuration (config_version 1)
+# LEGACY: superseded by `.bionic.yml` (see bionic-yml.tmpl); still read for
+# back-compat. New repos should commit `.bionic.yml` instead.
+config_version: "1"        # REQUIRED. String, like every other crux version field.
+docs_dir: docs             # OPTIONAL. Repo-root-relative path to the tree. The historical
+                           # default shown here is "docs"; the current default is "bionic".
+artifact_prefix: ""        # OPTIONAL. ^[A-Z][A-Z0-9]{1,9}$ or blank. Blank/absent = bare ids.
+
+# This file is OPTIONAL. Absent it (and with no `.bionic.yml`), crux resolves the tree by
+# content-validated bare-directory discovery: an established tree with a valid crux manifest
+# keeps resolving (a legacy `docs/` tree wins when it is the only one); two valid trees refuse
+# loudly; with no valid manifest anywhere, the location defaults to `bionic`.
+# Malformed or invalid values fail loud (exit 1).
+# Designed to be committed so the team shares one config — everything works identically untracked.
+# NEVER put secrets/tokens/keys here — this file is meant to be shared. Secrets live in ~/.crux/ (the user-home directory).
+# Full contract: <docs_dir>/AGENTS.md §14; resolved via the plugin's bionic-config CLI
+# (e.g. `python3 "${CRUX_PLUGIN_ROOT}/scripts/bionic-config.py"`).

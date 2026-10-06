@@ -1,0 +1,28 @@
+[project]
+name = "crux-flow"
+version = "0.2.0"
+requires-python = ">=3.13"
+dependencies = ["PyYAML>=6.0,<7", "ruamel.yaml>=0.18,<0.19", "httpx>=0.27,<1"]
+
+[dependency-groups]
+test = ["pytest>=9,<10", "jsonschema>=4,<5", "packaging>=24"]
+upstream-test = [
+    {include-group = "test"},
+    "PyYAML==6.0.3",
+    "griffelib==2.3.0",
+    "tree-sitter==0.26.0",
+    "tree-sitter-elixir==0.3.5",
+    "tree-sitter-ruby==0.23.1",
+    "tree-sitter-swift==0.7.3",
+    "tree-sitter-typescript==0.23.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["crux/scripts", "crux/scripts/tests"]
+testpaths = ["tests/flow"]
+addopts = "-ra"
+markers = [
+    "native: opt-in installed coding-host tests in disposable homes; no model call",
+    "provider: requires explicit paid-model authorization",
+    "upstream: isolated Git release and update integration tests",
+]

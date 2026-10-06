@@ -1,0 +1,39 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+				TGT_APP,
+			);
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+			);
+		};
+		TGT_APP = {
+			isa = PBXNativeTarget;
+			name = "App";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+			);
+			dependencies = (
+			);
+			packageProductDependencies = (
+				PD_FOO,
+			);
+		};
+		PD_FOO = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Foo;
+		};
+	};
+	rootObject = PRJ;
+}

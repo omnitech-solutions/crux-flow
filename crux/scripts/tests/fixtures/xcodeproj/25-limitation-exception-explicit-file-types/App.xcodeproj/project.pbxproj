@@ -1,0 +1,53 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+				TGT_SYNC,
+			);
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				SYNC_ROOT,
+			);
+		};
+		SYNC_ROOT = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "SyncSrc2";
+			sourceTree = "<group>";
+			exceptions = (
+				EXC_BP,
+			);
+			explicitFileTypes = {
+				"Retyped.swift" = "sourcecode.swift.other";
+			};
+		};
+		TGT_SYNC = {
+			isa = PBXNativeTarget;
+			name = "SyncTarget";
+			productType = "com.apple.product-type.application";
+			fileSystemSynchronizedGroups = (
+				SYNC_ROOT,
+			);
+			buildPhases = (
+			);
+			dependencies = (
+			);
+		};
+		EXC_BP = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			membershipExceptions = (
+				"WithheldBP.swift",
+			);
+		};
+	};
+	rootObject = PRJ;
+}

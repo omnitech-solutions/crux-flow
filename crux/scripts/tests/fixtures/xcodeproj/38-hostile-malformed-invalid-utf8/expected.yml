@@ -1,0 +1,15 @@
+# ADR-0130 clause 17 hostile form: `project.pbxproj` bytes that do not
+# decode as UTF-8 -- refused as `project-unreadable` / 'undecodable'. Swift
+# entities elsewhere in the tree still render.
+exit_code: 0
+
+rows:
+  data-model:
+    - "| `Model` | struct | public |"
+
+residuals:
+  - class: project-unreadable
+    path: App.xcodeproj/project.pbxproj
+    kind: "undecodable"
+    first_line: null
+    last_line: null

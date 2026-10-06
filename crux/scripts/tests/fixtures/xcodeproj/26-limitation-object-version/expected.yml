@@ -1,0 +1,15 @@
+# ADR-0130 clause 17 limitation form: an untested `objectVersion` (99, not
+# in the fixture-pinned {56, 76, 77} set) does not refuse the read -- one
+# unsupported-project-form line renders and every row still renders.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `App` | `App.xcodeproj` | app | application | \u2014 |"
+
+residuals:
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: null
+    first_line: null
+    last_line: null

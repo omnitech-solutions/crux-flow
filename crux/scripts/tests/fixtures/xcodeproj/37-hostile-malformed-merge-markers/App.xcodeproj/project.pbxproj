@@ -1,0 +1,15 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+<<<<<<< HEAD
+		PRJ = { isa = PBXProject; };
+=======
+		PRJ = { isa = PBXProject; };
+>>>>>>> branch
+	};
+	rootObject = PRJ;
+}

@@ -1,0 +1,32 @@
+{
+  "python": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+  "platform": "linux",
+  "packages": {
+    "pytest": "9.0.2",
+    "PyYAML": "6.0.3",
+    "ruamel.yaml": "0.18.17",
+    "httpx": "0.28.1",
+    "jsonschema": "4.26.0",
+    "packaging": "25.0",
+    "griffelib": null,
+    "tree-sitter": null,
+    "tree-sitter-swift": null,
+    "tree-sitter-elixir": null,
+    "tree-sitter-typescript": null,
+    "tree-sitter-ruby": null
+  },
+  "executables": {
+    "uv": "/opt/pyvenv/bin/uv",
+    "git": "/usr/bin/git",
+    "node": "/opt/nvm/versions/node/v22.16.0/bin/node",
+    "pnpm": null,
+    "claude": null,
+    "codex": null,
+    "opencode": null,
+    "omp": null
+  },
+  "network_dependency_retrieval": "unavailable in this execution environment",
+  "native_host_execution": "not observed",
+  "desktop_execution": "not observed",
+  "paid_provider_execution": "not attempted"
+}

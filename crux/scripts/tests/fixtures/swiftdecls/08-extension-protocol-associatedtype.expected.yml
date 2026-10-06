@@ -1,0 +1,19 @@
+# Extension conformances and a protocol with an associated type. An extension
+# member takes the extended type's name. Schema: 01-actor.expected.yml.
+types:
+  - {name: Square, kind: struct, access: public, at: [6, 6], conditional: false}
+stored_properties:
+  - {owner: Square, name: side, type: Double, access: public, at: [7, 7]}
+relationships:
+  - {from: Square, relation: conforms (extension), to: Shape, at: [10, 10]}
+  - {from: Square, relation: conforms (extension), to: Equatable, at: [14, 14]}
+interfaces:
+  - {name: Shape, kind: protocol, access: public, at: [1, 1], attributes: [], conditional: false}
+  - {name: Square, kind: struct, access: public, at: [6, 6], attributes: [], conditional: false}
+  - {name: Square.side, kind: let, access: public, at: [7, 7], attributes: [], conditional: false}
+  - {name: Square.area, kind: var, access: public, at: [11, 11], attributes: [], conditional: false}
+requirements:
+  - {protocol: Shape, name: Measure, kind: associatedtype, at: [2, 2]}
+  - {protocol: Shape, name: area, kind: var, at: [3, 3]}
+mains: []
+residuals: []

@@ -1,0 +1,1 @@
+not a real compiled extension: placeholder bytes for a same-stem non-.py sibling that the glob (**/*.py) must never select. If this file's own marker (h9-sibling.EXECUTED) is ever observed to exist, the extractor imported it in error.

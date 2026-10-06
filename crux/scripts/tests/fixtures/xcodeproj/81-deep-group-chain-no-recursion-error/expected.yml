@@ -1,0 +1,20 @@
+# ADR-0130 clause 2: a 3000-level single-child group chain under
+# mainGroup, three times CPython's default recursion limit of 1000. Group
+# descent (`descend` in crux/scripts/crux/arch/packs/swift_xcode.py) walks
+# the chain with an explicit stack, never Python recursion, so this depth
+# raises no `RecursionError`. A per-project try/except at the file boundary
+# also turns any exception one project raises into a `project-unreadable`
+# residual, so the derive continues and never exits 2. Exit 0, no
+# `project-unreadable` line; the target and Model.swift (found by source
+# walk) both still render.
+exit_code: 0
+
+rows:
+  data-model:
+    - "| `Model` | struct | public |"
+  module-graph:
+    - "| `TargetA` | `App.xcodeproj` | app | application | \u2014 |"
+
+absent:
+  module-graph:
+    - "project-unreadable"

@@ -1,0 +1,66 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+				TGT,
+			);
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				SYNC_ROOT,
+				GRP_SOURCES,
+			);
+		};
+		SYNC_ROOT = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "LinkedShared";
+			sourceTree = "<group>";
+		};
+		GRP_SOURCES = {
+			isa = PBXGroup;
+			path = "Sources";
+			sourceTree = "<group>";
+			children = (
+				FR_MODEL,
+			);
+		};
+		FR_MODEL = {
+			isa = PBXFileReference;
+			path = "Model.swift";
+			sourceTree = "<group>";
+		};
+		BF_MODEL = {
+			isa = PBXBuildFile;
+			fileRef = FR_MODEL;
+		};
+		PHASE = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				BF_MODEL,
+			);
+		};
+		TGT = {
+			isa = PBXNativeTarget;
+			name = "App";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+				PHASE,
+			);
+			fileSystemSynchronizedGroups = (
+				SYNC_ROOT,
+			);
+			dependencies = (
+			);
+		};
+	};
+	rootObject = PRJ;
+}

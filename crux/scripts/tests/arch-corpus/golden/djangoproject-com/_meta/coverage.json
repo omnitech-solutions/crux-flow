@@ -1,0 +1,68 @@
+{
+  "_note": "internal, unstable schema; not a downstream compatibility surface",
+  "concerns": [
+    {
+      "concern": "data-model",
+      "extractor": "python",
+      "inputs_found": [
+        "accounts/models.py",
+        "aggregator/models.py",
+        "blog/models.py",
+        "checklists/models.py",
+        "dashboard/models.py",
+        "docs/models.py",
+        "foundation/models.py",
+        "fundraising/models.py",
+        "members/models.py",
+        "releases/models.py",
+        "tracdb/models.py"
+      ],
+      "n_entities": 340,
+      "n_sources": 11,
+      "verdict": "populated"
+    },
+    {
+      "concern": "api-surface",
+      "extractor": "python",
+      "inputs_found": [
+        "accounts/urls.py",
+        "aggregator/urls.py",
+        "blog/urls.py",
+        "checklists/urls.py",
+        "contact/urls.py",
+        "dashboard/urls.py",
+        "djangoproject/urls/docs.py",
+        "djangoproject/urls/www.py",
+        "docs/urls.py",
+        "foundation/urls/meetings.py",
+        "fundraising/urls.py",
+        "legacy/urls.py",
+        "members/urls.py",
+        "releases/urls.py",
+        "svntogit/urls.py",
+        "tracdb/urls.py"
+      ],
+      "n_entities": 109,
+      "n_sources": 16,
+      "verdict": "populated"
+    },
+    {
+      "concern": "module-graph",
+      "expected": "one importable package to graph, or a recorded choice among the candidates",
+      "extractor": "stub",
+      "found": "16 candidate packages \u2014 _sphinx_13448_workaround, accounts, aggregator, blog, checklists, contact, dashboard, djangoproject, docs, foundation, fundraising, legacy, members, releases, svntogit, tracdb",
+      "inputs_found": [],
+      "stub_reason": "ambiguous_package",
+      "verdict": "stubbed"
+    },
+    {
+      "concern": "decision-index",
+      "expected": "an ADR index at `<docs_dir>/adrs/index.md` with Accepted, non-archived entries",
+      "extractor": "stub",
+      "found": "no matching input",
+      "inputs_found": [],
+      "stub_reason": "precondition_missing",
+      "verdict": "stubbed"
+    }
+  ]
+}

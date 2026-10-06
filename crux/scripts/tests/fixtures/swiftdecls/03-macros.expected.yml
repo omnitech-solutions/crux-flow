@@ -1,0 +1,19 @@
+# `@Observable`, `#Preview` and a body-scope `#expect`. Schema: 01-actor.expected.yml.
+# The `#expect` inside `check()` is a freestanding macro in a function body and
+# renders nothing.
+types:
+  - {name: Speedometer, kind: class, access: public, at: [4, 5], conditional: false}
+stored_properties:
+  - {owner: Speedometer, name: speedMph, type: Int, access: public, at: [6, 6]}
+relationships: []
+interfaces:
+  - {name: Speedometer, kind: class, access: public, at: [4, 5], attributes: ["@Observable"], conditional: false}
+  - {name: Speedometer.speedMph, kind: var, access: public, at: [6, 6], attributes: [], conditional: false}
+requirements: []
+mains: []
+imports:
+  - {module: Observation, kind: plain, line: 1}
+  - {module: Testing, kind: plain, line: 2}
+residuals:
+  - {concern: data-model, class: macro-not-expanded, lines: "4-5", detail: "attached macro @Observable is not expanded; code it generates does not render"}
+  - {concern: api-surface, class: macro-not-expanded, lines: "13-15", detail: "freestanding macro #Preview is not expanded; code it generates does not render"}

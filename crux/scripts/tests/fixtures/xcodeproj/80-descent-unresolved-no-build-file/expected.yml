@@ -1,0 +1,22 @@
+# ADR-0130 clause 2: a group diamond (two groups both list the SAME shared
+# child), a self-cycle group, and a dangling child id -- ALL reached only
+# through group descent, with NO Sources build phase pointing at any of
+# them. Descent renders one `unresolved-reference` bullet per referencing
+# list-item entry, whether or not a Sources phase names the id: the
+# diamond's second `children` entry (`GRP_DIAMOND_B` naming `GRP_SHARED`
+# again), the self-cycle's own `children` entry (`GRP_CYCLE` naming
+# itself), and the dangling `DANGLING_REF` entry in `MG_ROOT.children`.
+# Swift entities elsewhere (Model.swift, found by source walk, never by
+# Xcode membership) still render regardless.
+exit_code: 0
+
+rows:
+  data-model:
+    - "| `Model` | struct | public |"
+  module-graph:
+    - "| `TargetA` | `App.xcodeproj` | app | application | \u2014 |"
+
+residuals:
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    count: 3

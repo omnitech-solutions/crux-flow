@@ -1,0 +1,22 @@
+{
+  "cases": [
+    {
+      "description": "filename containing a line break",
+      "source_repo_relative_path_escaped": "weird\\nname.py",
+      "expected_h1": "# weird\\nname.py",
+      "expected_index_line": "- [weird\\nname.py](python/weird%0Aname.py.md)"
+    },
+    {
+      "description": "filename containing a carriage return",
+      "source_repo_relative_path_escaped": "cr\\rname.py",
+      "expected_h1": "# cr\\rname.py",
+      "expected_index_line": "- [cr\\rname.py](python/cr%0Dname.py.md)"
+    },
+    {
+      "description": "filename containing a terminal escape sequence",
+      "source_repo_relative_path_escaped": "esc\\x1b[31mname.py",
+      "expected_h1": "# esc\\x1b\\[31mname.py",
+      "expected_index_line": "- [esc\\x1b\\[31mname.py](python/esc%1B%5B31mname.py.md)"
+    }
+  ]
+}

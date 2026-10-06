@@ -1,0 +1,57 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = (
+				MG,
+			);
+			targets = (
+				TGT,
+			);
+		};
+		MG = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				F_G,
+				SR,
+			);
+		};
+		F_G = {
+			isa = PBXFileReference;
+			path = Grouped/G.swift;
+			sourceTree = "<group>";
+		};
+		SR = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Grouped;
+			sourceTree = "<group>";
+		};
+		BF_G = {
+			isa = PBXBuildFile;
+			fileRef = F_G;
+		};
+		PH_SRC = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				BF_G,
+			);
+		};
+		TGT = {
+			isa = PBXNativeTarget;
+			name = Grouped;
+			productType = "com.apple.product-type.framework";
+			buildPhases = (
+				PH_SRC,
+			);
+			fileSystemSynchronizedGroups = (
+				SR,
+			);
+		};
+	};
+	rootObject = PRJ;
+}

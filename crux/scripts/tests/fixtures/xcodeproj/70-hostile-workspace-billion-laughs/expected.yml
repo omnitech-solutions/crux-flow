@@ -1,0 +1,7 @@
+exit_code: 0
+residuals:
+  - class: project-unreadable
+    path: App.xcworkspace/contents.xcworkspacedata
+    kind: entity-declaration
+    first_line: null
+    last_line: null

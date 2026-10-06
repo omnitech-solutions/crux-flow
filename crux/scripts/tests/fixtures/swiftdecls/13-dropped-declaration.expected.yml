@@ -1,0 +1,33 @@
+# Expected extraction for 13-dropped-declaration.swift. Schema:
+# 01-actor.expected.yml. The recovery unit's own tests (RecoveryTests) also
+# read the `recovery` block below.
+#
+# A top-level ERROR swallows `public actor ShelfCatalog`: a two-clause `guard`
+# of `as?` subscript bindings followed by three `as? … ?? …` bindings inside
+# `absorb(_:)` trigger it. Grammar-only recovery re-parses the ERROR's bytes up
+# to the last complete member and brings back the actor, its stored property,
+# its initializer and `isEmpty()`. `absorb(_:)`, the trigger, sits after the
+# slice and carries no expected fact.
+types:
+  - {name: ShelfCatalog, kind: actor, access: public, at: [4, 4], conditional: false}
+stored_properties:
+  - {owner: ShelfCatalog, name: shelfCount, type: Int, access: public, at: [6, 6]}
+relationships: []
+interfaces:
+  - {name: ShelfCatalog, kind: actor, access: public, at: [4, 4], attributes: [], conditional: false}
+  - {name: ShelfCatalog.shelfCount, kind: let, access: public, at: [6, 6], attributes: [], conditional: false}
+  - {name: "ShelfCatalog.init(shelves:)", kind: init, access: public, at: [8, 8], attributes: [], conditional: false}
+  - {name: "ShelfCatalog.isEmpty()", kind: func, access: public, at: [12, 12], attributes: [], conditional: false}
+requirements: []
+mains: []
+imports:
+  - {module: Foundation, kind: plain, line: 1}
+  - {module: Shelving, kind: plain, line: 2}
+residuals:
+  - {concern: data-model, class: declaration-recovered, lines: "4-25", detail: "location top level; actor ShelfCatalog dropped by a top-level error, recovered from lines 4-14"}
+  - {concern: api-surface, class: declaration-recovered, lines: "4-25", detail: "location top level; actor ShelfCatalog dropped by a top-level error, recovered from lines 4-14"}
+recovery:
+  keyword: actor
+  name: ShelfCatalog
+  error_span: [4, 25]
+  slice_span: [4, 14]

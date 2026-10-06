@@ -1,0 +1,17 @@
+# `.package(path:)`: a contained `../lib` is normalised to the `lib` container;
+# an escaping relative path and an absolute path each render `path-escape`
+# naming only the declaring file and range, and nothing is read through them.
+# The derive root is this case directory. Schema: literal-subset/expected.yml.
+containers: [app/Package.swift, lib/Package.swift]
+products:
+  - {name: Lib, kind: library, container: lib/Package.swift, at: [6, 6]}
+targets:
+  - {name: App, container: app/Package.swift, kind: library, conditional: false, at: [11, 11]}
+  - {name: Lib, container: lib/Package.swift, kind: library, conditional: false, at: [7, 7]}
+edges:
+  - ["App (app/Package.swift)", "Lib (lib/Package.swift)"]
+dependencies:
+  - {from: app, dependency: ../lib, kind: path dependency, location: lib, requirement: null, at: [7, 7], path: app/Package.swift}
+residuals:
+  - {class: path-escape, path: app/Package.swift, lines: "8-8"}
+  - {class: path-escape, path: app/Package.swift, lines: "9-9"}

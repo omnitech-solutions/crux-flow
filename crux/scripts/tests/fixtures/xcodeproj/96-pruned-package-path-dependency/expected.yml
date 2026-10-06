@@ -1,0 +1,26 @@
+# ADR-0129 clause 8: a `.package(path:)` that stays inside the checkout but
+# names a directory the Swift walk skips renders no dependency row and one
+# `unresolved-reference` line, in each concern that reads the manifest.
+materialize:
+  - path: Pods/PodPkg/Package.swift
+    kind: repeated
+    head: "let package = Package(name: \"PodPkg\", targets: [.target(name: \"PodPkg\")])\n"
+    count: 1
+
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `Core` | `Package.swift` | library"
+
+absent:
+  module-graph:
+    - "path dependency"
+    - "Pods/PodPkg"
+    - "path-escape"
+
+residuals:
+  - class: unresolved-reference
+    path: Package.swift
+    kind: a `.package(path:)` reference names a directory the Swift walk skips; no dependency row renders
+    count: 2

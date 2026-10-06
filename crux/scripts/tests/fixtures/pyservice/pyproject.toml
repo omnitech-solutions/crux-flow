@@ -1,0 +1,8 @@
+[project]
+name = "app"
+version = "0.1.0"
+description = "Synthetic FastAPI + SQLAlchemy + Alembic fixture for the python arch stack pack (ADR-0066)."
+requires-python = ">=3.10"
+
+[tool.setuptools]
+packages = ["app"]

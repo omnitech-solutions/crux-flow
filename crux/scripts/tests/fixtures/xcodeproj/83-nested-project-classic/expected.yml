@@ -1,0 +1,13 @@
+# ADR-0130 clause 3: a project nested at ios/App.xcodeproj resolves a
+# classic Sources-phase member (App/Main.swift, a plain <group> path)
+# against ITS OWN directory (ios/), never the checkout root. A root-level
+# decoy at App/Main.swift must never render.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `ios/App/Main.swift` | `App` | classic Sources build phase | — |"
+
+absent:
+  module-graph:
+    - "| `App/Main.swift` |"

@@ -1,0 +1,77 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		"PRJ" = {
+			"isa" = "PBXProject";
+			"mainGroup" = "MG";
+			"targets" = (
+				"NL1",
+				"NL2",
+				"DUP|1",
+				"DUP`2",
+				"NL1",
+			);
+		};
+		"MG" = {
+			"isa" = "PBXGroup";
+			"sourceTree" = "<group>";
+			"children" = (
+				"SR",
+			);
+		};
+		"SR" = {
+			"isa" = "PBXFileSystemSynchronizedRootGroup";
+			"sourceTree" = "<group>";
+			"path" = "Shared";
+		};
+		"NL1" = {
+			"isa" = "PBXNativeTarget";
+			"productType" = "com.apple.product-type.application";
+			"fileSystemSynchronizedGroups" = (
+				"SR",
+			);
+		};
+		"NL2" = {
+			"isa" = "PBXNativeTarget";
+			"name" = (
+				"x",
+			);
+			"productType" = "com.apple.product-type.tool";
+			"fileSystemSynchronizedGroups" = (
+				"SR",
+			);
+			"dependencies" = (
+				"D1",
+			);
+		};
+		"D1" = {
+			"isa" = "PBXTargetDependency";
+			"target" = "NL1";
+		};
+		"DUP|1" = {
+			"isa" = "PBXNativeTarget";
+			"name" = "Dup";
+			"productType" = "com.apple.product-type.application";
+			"fileSystemSynchronizedGroups" = (
+				"SR",
+			);
+		};
+		"DUP`2" = {
+			"isa" = "PBXNativeTarget";
+			"name" = "Dup";
+			"productType" = "com.apple.product-type.tool";
+			"dependencies" = (
+				"D2",
+			);
+		};
+		"D2" = {
+			"isa" = "PBXTargetDependency";
+			"target" = "DUP|1";
+		};
+	};
+	rootObject = "PRJ";
+}

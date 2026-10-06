@@ -1,0 +1,28 @@
+# Harness control: Swift-package-only inputs, with no Xcode project,
+# workspace or generator manifest. The schema is in the module docstring of
+# xcode_fixture_harness.py. The control exercises the harness's materialize
+# machinery with a dangling symlink and a FIFO. The Swift walk lists files
+# by name, not by file type, so the pack declares both as inputs. It
+# reports each as a `parse-error` residual (`effect step read failed`), and
+# the derive neither hangs nor crashes.
+materialize:
+  - path: Sources/Core/Link.swift
+    kind: symlink
+    target: ../../nowhere/Missing.swift
+  - path: Sources/Core/Trap.swift
+    kind: fifo
+
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `Core` | `Package.swift` | library"
+  data-model:
+    - "| `Widget` | struct | public |"
+    - "`parse-error` `Sources/Core/Link.swift`"
+    - "`parse-error` `Sources/Core/Trap.swift`"
+
+absent:
+  data-model:
+    - "| `Trap`"
+    - "| `Link`"

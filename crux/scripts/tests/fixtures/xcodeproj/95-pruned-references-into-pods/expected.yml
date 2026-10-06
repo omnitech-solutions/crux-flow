@@ -1,0 +1,46 @@
+# ADR-0129 clause 8: an exception entry, a classic Sources-phase member and a
+# local package reference that each name a path under `Pods` are refused
+# before any filesystem access. Each renders one `unresolved-reference` line
+# whose detail names no path; none renders a row, and no edge reaches the
+# pod's package.
+materialize:
+  - path: App/Pods/Extra.swift
+    kind: repeated
+    head: "public struct ExtraPodType {}\n"
+    count: 1
+  - path: Pods/PodFile.swift
+    kind: repeated
+    head: "public struct PodFileType {}\n"
+    count: 1
+  - path: Pods/PodPkg/Package.swift
+    kind: repeated
+    head: "let package = Package(name: \"PodPkg\", products: [.library(name: \"PodPkg\", targets: [\"PodPkg\"])], targets: [.target(name: \"PodPkg\")])\n"
+    count: 1
+
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `App/Main.swift` | `App` | folder-synced root App | — |"
+
+absent:
+  module-graph:
+    - "Pods/"
+    - "PodPkg"
+  data-model:
+    - "ExtraPodType"
+    - "PodFileType"
+
+residuals:
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: an exception entry names a path in a directory the Swift walk skips; it is not read
+    count: 1
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: a Sources-phase file reference names a path in a directory the Swift walk skips; it is not read
+    count: 1
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: a local package reference names a directory the Swift walk skips; no edge is drawn
+    count: 1

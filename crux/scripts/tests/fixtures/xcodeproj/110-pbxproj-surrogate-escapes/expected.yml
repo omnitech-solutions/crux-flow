@@ -1,0 +1,52 @@
+# ADR-0130 clause 2 hostile form (clause 4: strict UTF-8, and any other
+# grammar failure is `malformed`): a `\U` escape in a quoted pbxproj
+# string is one UTF-16 code unit. Before the fix each project below made
+# the derive exit 2 with `UnicodeEncodeError`, because a
+# surrogate code unit reached the writer as a lone surrogate.
+#
+# `Pair.xcodeproj`: `\UD83D\UDE00` is a high surrogate followed at once by a
+# `\U` low surrogate. The pair is one scalar, U+1F600, and the target row
+# renders it.
+#
+# The other four projects each carry one lone surrogate: a high surrogate at
+# the end of the string, a low surrogate alone, a high surrogate followed by
+# a `\U` escape that is not a low surrogate, and a reversed pair. Each is a
+# grammar failure (ADR-0130:188, "any other grammar failure"), so each
+# renders `project-unreadable` `malformed` in the existing template, the same
+# verdict the same code point spelled as UTF-8 bytes already gets as
+# `undecodable`. No U+FFFD is fabricated and no part of the name renders.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `Pair.xcodeproj` | xcode project |"
+    - "| `Pair\U0001F600` | `Pair.xcodeproj` | app | application | — | `Pair.xcodeproj/project.pbxproj:21-29` |"
+
+absent:
+  module-graph:
+    - "\\UD83D"
+    - "\uFFFD"
+    - "| `LoneHigh.xcodeproj` | app |"
+    - "| `LoneLow.xcodeproj` | app |"
+    - "| `HighNonLow.xcodeproj` | app |"
+    - "| `Reversed.xcodeproj` | app |"
+    - "`project-unreadable` `Pair.xcodeproj"
+
+residuals:
+  - class: project-unreadable
+    path: LoneHigh.xcodeproj/project.pbxproj
+    kind: malformed
+  - class: project-unreadable
+    path: LoneLow.xcodeproj/project.pbxproj
+    kind: malformed
+  - class: project-unreadable
+    path: HighNonLow.xcodeproj/project.pbxproj
+    kind: malformed
+  - class: project-unreadable
+    path: Reversed.xcodeproj/project.pbxproj
+    kind: malformed
+  # One bullet in module-graph and one in api-surface, the two concerns
+  # that read the project: the refusal is not repeated within a concern.
+  - class: project-unreadable
+    path: LoneHigh.xcodeproj/project.pbxproj
+    count: 2

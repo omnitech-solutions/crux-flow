@@ -1,0 +1,15 @@
+# ADR-0130 clause 17 hostile form: a duplicate key (`objectVersion` twice)
+# at the document's own top level -- refused as `project-unreadable` /
+# 'malformed'. Swift entities elsewhere in the tree still render.
+exit_code: 0
+
+rows:
+  data-model:
+    - "| `Model` | struct | public |"
+
+residuals:
+  - class: project-unreadable
+    path: App.xcodeproj/project.pbxproj
+    kind: "malformed"
+    first_line: null
+    last_line: null

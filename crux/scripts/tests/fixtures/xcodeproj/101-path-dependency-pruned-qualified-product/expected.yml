@@ -1,0 +1,40 @@
+# ADR-0129:151, :150 and :143 (fixture D): a `.package(path:)` naming a
+# pruned directory is refused, and a product qualified by that package's
+# identity renders one `unresolved-reference` naming no package and draws no
+# edge. `Other` declares the same product name; no checkout-wide product-name
+# search may guess it (ADR-0130:270-273).
+materialize:
+  - path: Pods/CorePkg/Package.swift
+    kind: repeated
+    head: "let package = Package(name: \"CorePkg\", products: [.library(name: \"CoreKit\", targets: [\"CoreKit\"])], targets: [.target(name: \"CoreKit\")])\n"
+    count: 1
+
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `AppCore` | `App/Package.swift` | library"
+    - "| `CoreKit` | `Other/Package.swift` | library"
+
+absent:
+  module-graph:
+    - "-->"
+    - "path dependency"
+    - "CorePkg"
+    - "Pods"
+    - "resolves to"
+    - "Other_Package_swift__CoreKit"
+
+residuals:
+  - class: unresolved-reference
+    path: App/Package.swift
+    kind: a `.package(path:)` reference names a directory the Swift walk skips; no dependency row renders
+    first_line: 5
+    last_line: 5
+    count: 2
+  - class: unresolved-reference
+    path: App/Package.swift
+    kind: product CoreKit of target AppCore names a package whose `.package(path:)` reference was refused; no edge is drawn
+    first_line: 8
+    last_line: 8
+    count: 1

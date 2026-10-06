@@ -1,0 +1,90 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		APP_PRJ = {
+			isa = PBXProject;
+			mainGroup = APP_MG;
+			targets = (
+				APP_TGT,
+			);
+		};
+		APP_MG = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				APP_GRP,
+				APP_FR_LIBPROJ,
+			);
+		};
+		APP_GRP = {
+			isa = PBXGroup;
+			path = "App";
+			sourceTree = "<group>";
+			children = (
+				APP_FR_MAIN,
+			);
+		};
+		APP_FR_MAIN = {
+			isa = PBXFileReference;
+			path = "Main.swift";
+			sourceTree = "<group>";
+		};
+		APP_FR_LIBPROJ = {
+			isa = PBXFileReference;
+			lastKnownFileType = "wrapper.pb-project";
+			path = "Lib.xcodeproj";
+			sourceTree = "<group>";
+		};
+		APP_BF_MAIN = {
+			isa = PBXBuildFile;
+			fileRef = APP_FR_MAIN;
+		};
+		APP_PH_SOURCES = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				APP_BF_MAIN,
+			);
+		};
+		APP_PROXY_LIB = {
+			isa = PBXContainerItemProxy;
+			containerPortal = APP_FR_LIBPROJ;
+			proxyType = 1;
+			remoteGlobalIDString = LIB_TGT;
+			remoteInfo = "Lib";
+		};
+		APP_PROXY_NOT_A_TARGET = {
+			isa = PBXContainerItemProxy;
+			containerPortal = APP_FR_LIBPROJ;
+			proxyType = 1;
+			remoteGlobalIDString = LIB_GRP;
+			remoteInfo = "Lib";
+		};
+		APP_DEP_LIB = {
+			isa = PBXTargetDependency;
+			name = "Lib";
+			targetProxy = APP_PROXY_LIB;
+		};
+		APP_DEP_NOT_A_TARGET = {
+			isa = PBXTargetDependency;
+			name = "Lib";
+			targetProxy = APP_PROXY_NOT_A_TARGET;
+		};
+		APP_TGT = {
+			isa = PBXNativeTarget;
+			name = "App";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+				APP_PH_SOURCES,
+			);
+			dependencies = (
+				APP_DEP_LIB,
+				APP_DEP_NOT_A_TARGET,
+			);
+		};
+	};
+	rootObject = APP_PRJ;
+}

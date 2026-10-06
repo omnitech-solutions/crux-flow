@@ -1,0 +1,7 @@
+exit_code: 0
+residuals:
+  - class: missing-input
+    path: project.yml
+    kind: XcodeGen
+    first_line: null
+    last_line: null

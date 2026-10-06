@@ -1,0 +1,13 @@
+{
+  "kind": "reconstructed-reference",
+  "audited_fork_commit": "b56bdb4d6ef2055eeb138d980e44eadc36dae2d4",
+  "upstream_commit": "732c355a5bc3130f6cd3763214f7c908b302a3e8",
+  "upstream_version": "3.25.1",
+  "reference_changes": "uncommitted local reference; no synthetic Git history",
+  "retained_correctness_exceptions": [
+    "owned Swift parser deadline",
+    "patch containment preflight",
+    "overall council deadline",
+    "role-named Anthropic helpers"
+  ]
+}

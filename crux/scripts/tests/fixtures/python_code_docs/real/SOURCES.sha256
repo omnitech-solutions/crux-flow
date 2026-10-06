@@ -1,0 +1,6 @@
+2970ad31854348b156c82c88804fd7055c93a172b4281dd2e5663a24f52261e2  ./crux/scripts/authoring_scope.py
+f2d2bac5010768af95e29c3700c7672ccf7e773490f34aaad643093bbada75f0  ./crux/scripts/base_commit_pin.py
+c2535ba648d673916853568dafc455a630583b82864cba9dd1f73f4f01966201  ./crux/scripts/crux-config.py
+d4dc89d5a8bc19c862971168996144e1878cf4cf5bca7df8e514828a12a5a230  ./crux/scripts/generate-codex-agents.py
+d3ad1139b61bebbef5107483ebca5db07563d26158369d7bdda89a47a5e87de8  ./tools/jev/answers.py
+a72c1d204561ac3c990306ee80350e87a73fca23fc305b347a30fc735e849519  ./crux/scripts/tests/test_council_refusal.py

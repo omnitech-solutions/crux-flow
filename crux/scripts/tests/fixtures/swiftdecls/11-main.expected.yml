@@ -1,0 +1,13 @@
+# `@main` is the only entry declaration. With no manifest, the owning target is
+# `—`. Schema: 01-actor.expected.yml.
+types:
+  - {name: EntryPoint, kind: struct, access: public, at: [1, 2], conditional: false}
+stored_properties: []
+relationships: []
+interfaces:
+  - {name: EntryPoint, kind: struct, access: public, at: [1, 2], attributes: ["@main"], conditional: false}
+  - {name: "EntryPoint.main()", kind: func, access: public, at: [3, 3], attributes: [], conditional: false}
+requirements: []
+mains:
+  - {type: EntryPoint, kind: struct, at: [1, 2]}
+residuals: []

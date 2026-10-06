@@ -1,0 +1,41 @@
+# ADR-0130 clause 2 hostile form for an `.xcconfig`: workspace data and
+# xcconfig files keep the core 2 MB bound, and a breach renders `oversize`.
+# `Config/Big.xcconfig` is materialized one byte past the bound: it renders
+# one `oversize` line naming it, is never read, and the derive exits 0.
+# `Config/AtBound.xcconfig` is exactly 2 MB of comment lines: it is read
+# and renders nothing, so the bound sits at 2 MB and not below it.
+# `Config/Small.xcconfig` is the reader control: its conditioned key
+# renders a `conditional-setting` line, so the walk reached the directory.
+# The project's own member and the Swift entities render unchanged.
+materialize:
+  - path: Config/Big.xcconfig
+    kind: oversize
+    size_bytes: 2097153
+  - path: Config/AtBound.xcconfig
+    kind: repeated
+    head: "// abcd\n"
+    count: 262144
+
+exit_code: 0
+
+rows:
+  data-model:
+    - "| `Model` | struct | public |"
+  module-graph:
+    - "| `App/Main.swift` | `App` | classic Sources build phase | — |"
+
+residuals:
+  - class: oversize
+    path: Config/Big.xcconfig
+    kind: "xcconfig exceeds the 2 MB bound and is not read"
+    count: 1
+  - class: conditional-setting
+    path: Config/Small.xcconfig
+    kind: "SWIFT_VERSION[sdk=iphoneos*]"
+    first_line: 2
+    last_line: 2
+
+absent:
+  module-graph:
+    - "`Config/AtBound.xcconfig`"
+    - "project-unreadable"

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE Workspace [
+<!ENTITY % pe "<!ENTITY a 'x'>">
+%pe;
+]>
+<Workspace version = "1.0">
+</Workspace>

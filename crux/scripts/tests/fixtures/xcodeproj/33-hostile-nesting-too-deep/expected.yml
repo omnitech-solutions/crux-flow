@@ -1,0 +1,17 @@
+# ADR-0130 clause 17 hostile-boundary form: a `project.pbxproj` nested one
+# level past the admitted depth (62 custom dict levels,
+# probed against the real grammar at fixture-authoring time) -- refused as
+# `project-unreadable` / `too-deep`, never a `RecursionError`. Swift
+# entities elsewhere in the tree still render.
+exit_code: 0
+
+rows:
+  data-model:
+    - "| `Model` | struct | public |"
+
+residuals:
+  - class: project-unreadable
+    path: App.xcodeproj/project.pbxproj
+    kind: "too-deep"
+    first_line: null
+    last_line: null

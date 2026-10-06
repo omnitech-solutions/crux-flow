@@ -1,0 +1,67 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+				TGT_APP1,
+				TGT_APP2,
+				TGT_APP3,
+			);
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+			);
+		};
+		TGT_APP1 = {
+			isa = PBXNativeTarget;
+			name = "App1";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+			);
+			dependencies = (
+				DEP_DIRECT,
+			);
+		};
+		TGT_APP2 = {
+			isa = PBXNativeTarget;
+			name = "App2";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+			);
+			dependencies = (
+			);
+		};
+		TGT_APP3 = {
+			isa = PBXNativeTarget;
+			name = "App3";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+			);
+			dependencies = (
+				DEP_PROXY,
+			);
+		};
+		DEP_DIRECT = {
+			isa = PBXTargetDependency;
+			target = TGT_APP2;
+		};
+		DEP_PROXY = {
+			isa = PBXTargetDependency;
+			targetProxy = PROXY1;
+		};
+		PROXY1 = {
+			isa = PBXContainerItemProxy;
+			containerPortal = PRJ;
+			remoteGlobalIDString = TGT_APP2;
+		};
+	};
+	rootObject = PRJ;
+}

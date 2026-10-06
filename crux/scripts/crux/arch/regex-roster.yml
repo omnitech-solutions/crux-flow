@@ -1,0 +1,90 @@
+# regex-roster.yml — the probes admitted to match regular expressions against
+# authored source (ADR-0097 part 1).
+#
+# HAND-AUTHORED. This file IS a source of truth; nothing regenerates it, so it
+# carries no row in the repo-root AGENTS.md regenerative-outputs roster.
+#
+# `regex-over-source` is one of the four input-class kinds a probe may declare,
+# and it is admissible only for a probe this file names. The pack-acceptance
+# gate in `tools/tests/test_schema_invariants.py` compares this file to the code
+# in BOTH directions and fails on any difference: a probe declaring
+# `regex-over-source` whose qualified name is absent here fails, and a row whose
+# qualified name resolves to no registered probe fails. A row whose
+# `admitting_adr` is not active fails too.
+#
+# The nine rows below were seeded verbatim from ADR-0097 part 1's table, which
+# is the record of what that decision admitted. Adding a tenth row takes an ADR
+# amending ADR-0097. Removing a row is a plain reviewed change, legal exactly
+# when no probe declares `regex-over-source` for it — so a conversion retires its
+# own admission and cannot leave a row here failing the gate.
+#
+# `admitting_adr` is a REVIEW invariant, not a mechanical one. The gate checks
+# that the named ADR is active; it cannot check that the ADR admits that probe,
+# because the admission lives in an ADR body and a body is prose.
+
+schema_version: "1"
+
+probes:
+  - probe: packs.python:extract_python_module_graph
+    pack: python
+    concern: module-graph
+    admitting_adr: ADR-0097
+    why_no_parser: >-
+      delegates to `core._extract_module_graph`, one engine two packs bind
+
+  - probe: packs.crux:extract_module_graph
+    pack: crux
+    concern: module-graph
+    admitting_adr: ADR-0097
+    why_no_parser: >-
+      the same engine; converting it moves both spines at once
+
+  - probe: packs.ruby:extract_ruby_module_graph
+    pack: ruby
+    concern: module-graph
+    admitting_adr: ADR-0097
+    why_no_parser: >-
+      `tree_sitter_ruby` is already pinned by this pack; effort, not
+      availability
+
+  - probe: packs.node:extract_node_module_graph
+    pack: node
+    concern: module-graph
+    admitting_adr: ADR-0097
+    why_no_parser: >-
+      `tree_sitter_typescript` is already pinned by this pack
+
+  - probe: packs.node:extract_node_data_model_prisma
+    pack: node
+    concern: data-model
+    admitting_adr: ADR-0097
+    why_no_parser: >-
+      no Prisma-schema grammar is pinned, and the DSL is not TypeScript
+
+  - probe: packs.node:extract_node_data_model_typeorm
+    pack: node
+    concern: data-model
+    admitting_adr: ADR-0097
+    why_no_parser: >-
+      `tree_sitter_typescript` is already pinned by this pack
+
+  - probe: packs.node:extract_node_data_model_sequelize
+    pack: node
+    concern: data-model
+    admitting_adr: ADR-0097
+    why_no_parser: >-
+      `tree_sitter_typescript` is already pinned by this pack
+
+  - probe: packs.elixir:extract_elixir_data_model
+    pack: elixir
+    concern: data-model
+    admitting_adr: ADR-0097
+    why_no_parser: >-
+      `tree_sitter_elixir` is already pinned by this pack
+
+  - probe: packs.elixir:extract_elixir_module_graph
+    pack: elixir
+    concern: module-graph
+    admitting_adr: ADR-0097
+    why_no_parser: >-
+      `tree_sitter_elixir` is already pinned by this pack

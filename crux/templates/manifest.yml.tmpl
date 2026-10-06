@@ -1,0 +1,107 @@
+# manifest.yml — schema + per-concern config for this project's documentation tree.
+# Owned by init-docs (creates), audit-docs (reads/repairs), other skills (read).
+# Treat this file as authoritative: skills look here before touching the tree.
+
+# Schema version. Bumps only on breaking layout changes. The installed plugin
+# refuses to operate on a tree whose schema_version is outside its supported
+# range (currently == "5"). For tree schemas 2–4, use the pinned public
+# v3.23.2 recovery ladder on a copy before upgrading. Current audit-docs
+# --migrate changes instruction files only. v3 retired research/new/ for the unified docs/inbox/; v4 adds the
+# invariants concern; v5 unifies the tree under `bionic/` — the invariants
+# concern is one folder (invariants/ with checks/ + reconciliation.yml inside).
+schema_version: "5"
+
+# Concerns this project has opted into. Skills no-op against a concern that
+# isn't enabled. Order is irrelevant. New repos enable the invariants concern
+# by default (docs/AGENTS.md §15); an existing schema-5 tree enables it
+# additively with the documented surfaces and manifest entry. The current
+# audit-docs --migrate does not enable concerns.
+# New repos also enable the derived arch concern by default (docs/AGENTS.md §4).
+concerns_enabled:
+  - code
+  - research
+  - adrs
+  - briefs
+  - journal
+  - promptbooks
+  - invariants
+  # arch: the derived architecture concern (docs/AGENTS.md §4). Fully in-tree +
+  # regenerated, so enabling it is ADDITIVE — no schema_version bump. Default-on
+  # for new repos; the spine is built on first `derive-arch` / `audit-docs`.
+  - arch
+  # observations: the observed-record concern (docs/AGENTS.md §17). Fully
+  # in-tree, so enabling it is ADDITIVE — no schema_version bump. Default-on
+  # for new repos; an existing tree opts in by adding it here.
+  - observations
+
+# Per-language code-doc extractors. Each entry maps a language name to one
+# extractor plugin under scripts/extractors/<name>.py, plus the glob(s) that
+# decide which files in this repo belong to that language. The Python
+# extractor also reads include_private and refuses any other key.
+code:
+  extractors:
+    # Example — uncomment and adjust to your project:
+    # elixir:
+    #   extractor: elixir          # matches scripts/extractors/elixir.py
+    #   glob: "lib/**/*.ex"        # or a list of globs
+    # python:
+    #   extractor: python          # matches scripts/extractors/python.py
+    #   glob: "src/**/*.py"        # or a list of globs
+    #   include_private: true      # a key of this entry, never under options:; default true
+    # typescript:
+    #   extractor: fallback        # a shipped extractor; names outside scripts/extractors/ refuse
+    #   glob: ["packages/*/src/**/*.ts", "packages/*/src/**/*.tsx"]
+
+# Research concern.
+research:
+  # How often refresh-research-sources is expected to re-check upstream URLs.
+  # Sources older than this with source_url != null and static != true become
+  # candidates for refresh. Default 90 days.
+  refresh_interval_days: 90
+
+# Journal concern. friction_line_from is this tree's adoption date for the
+# journal friction line (docs/AGENTS.md §7), prospective on the same cohort
+# model as adr.spec_rule_from: a reader counts `Friction:` lines only in
+# entries dated at or after it, so a zero count below the boundary means
+# "not yet adopted" rather than "no friction". init-docs substitutes the
+# initialization date, which is when this tree's conforming journal writer
+# came into use. NEVER move it earlier: an earlier date reintroduces the
+# ambiguity the boundary exists to remove. A re-bootstrap over an existing
+# tree carries that tree's recorded date forward instead of resetting it.
+journal:
+  friction_line_from: "{{today}}"
+
+# ADR allocation. propose-adr reads adr.next_number, allocates it, writes the
+# new ADR, and increments this field atomically. Numbers are NEVER reused.
+adr:
+  next_number: 1
+  # The rule-length advisory baseline: the ADR identities that predate the advisory in THIS
+  # tree. Empty is correct for a new tree and is self-maintaining — with no ADRs yet, every ADR
+  # you write is new relative to it and is advised on. It ships as an explicit empty list rather
+  # than being absent, because an absent key means "this tree has not snapshotted yet" and
+  # leaves the advisory inert.
+  #
+  # ADOPTING IT IN AN EXISTING TREE is a one-off snapshot, not a regenerated list: enumerate the
+  # ADR ids you already have, active and archived both, write them here once, and leave the list
+  # closed from then on. Do not regenerate it on each run and do not grow it to excuse a new ADR.
+  governs_rule_baseline: []
+
+# Promptbook allocation. Same contract as adr.next_number — monotonic, never
+# reused. A successor book always allocates a fresh id.
+promptbook:
+  next_number: 1
+
+# Observations concern. next_number has the same contract as adr.next_number —
+# monotonic, never reused. Allocated by propose-observation and by the
+# transition-decision observation terminal. stale_days is CHK-OBS-STALE's
+# threshold, on the research.refresh_interval_days model: an `observed` record
+# older than this is survey debt, reported as a count and never as a percentage.
+# next_survey_number has the same monotonic contract, and the survey scaffold
+# allocates it as the SVY-NNNN batch id (docs/AGENTS.md §17.5). survey_stub_days
+# is the window in which a receipt recording no completion is a WARNING rather
+# than BROKEN; absent it falls back to 1.
+observation:
+  next_number: 1
+  stale_days: 90
+  next_survey_number: 1
+  survey_stub_days: 1

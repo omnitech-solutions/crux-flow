@@ -1,0 +1,146 @@
+{
+  "budget_consumed": {
+    "candidates_emitted": 40,
+    "candidates_identified": 51,
+    "partitions_identified_in": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "partitions_represented": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "partitions_scanned": 8,
+    "stop_reason": "candidate cap of 40 reached; 11 identified candidate(s) not emitted \u2014 partitions 6, 7 and 8 are absent from this fixture entirely, and partition 5 is represented by 2 of its 5 identified candidates"
+  },
+  "candidate_count": 40,
+  "evidence_paths": "evidence_paths.json \u2014 materialize these before build_plan",
+  "mined": "2026-08-31",
+  "miner": "recover-decisions, run by the dev-lead in the main checkout",
+  "mining_budget": {
+    "max_candidates": 40,
+    "max_partitions": 8
+  },
+  "module_graph_note": "the python pack stubbed module-graph on this repository (ambiguous_package: 16 candidate packages), so the partitions are those candidate packages plus the three infrastructure surfaces, not a derived module graph",
+  "pack": "python",
+  "partition_order": [
+    {
+      "n": 1,
+      "path": "pyproject.toml"
+    },
+    {
+      "n": 2,
+      "path": "djangoproject/settings/"
+    },
+    {
+      "n": 3,
+      "path": "djangoproject/ root modules"
+    },
+    {
+      "n": 4,
+      "path": "accounts/"
+    },
+    {
+      "n": 5,
+      "path": "aggregator/"
+    },
+    {
+      "n": 6,
+      "path": "blog/"
+    },
+    {
+      "n": 7,
+      "path": "checklists/"
+    },
+    {
+      "n": 8,
+      "path": "contact/"
+    }
+  ],
+  "partition_order_basis": "fixed before any candidate was emitted: the dependency manifest, the settings package and the project's own root modules, then the application packages in the order bionic/arch/_meta/coverage.json reports them",
+  "pinned_sha": "d0b29cebd3e2345bae298ed7ca14834be037bd6a",
+  "redaction": "asserted before the write, on four legs with a positive control each: evidence grammar, evidence presence, excerpt smell (fenced block, source statement, constant assignment, provider key literal, long hex literal, password literal), and multi-line fields. Every candidate carries path:line-range evidence and no code excerpt; the repository's committed sandbox Stripe keys and Akismet key reached no cell",
+  "repository": "djangoproject-com",
+  "source": "crux/scripts/tests/arch-corpus/.cache/djangoproject-com/bionic/arch/_recovered/state.yml \u2014 the cache is main-checkout-only, which is why this fixture is committed",
+  "substituted_for": null,
+  "substitution_basis": "no substitution: the target repository's mine reported 40 candidates in `observed`, well over the 5-candidate floor that would have moved this measurement to `papercups`",
+  "substitution_reason": null,
+  "truncated_anchors": [
+    {
+      "anchor": "aggregator/models.py::FeedItem.guid",
+      "candidate_id": "171cfaddf277bc81",
+      "partition": 5,
+      "reason": "candidate cap"
+    },
+    {
+      "anchor": "aggregator/utils.py::push_credentials",
+      "candidate_id": "b9f61a36393a4f5a",
+      "partition": 5,
+      "reason": "candidate cap"
+    },
+    {
+      "anchor": "aggregator.feeds:BaseCommunityAggregatorFeed.items",
+      "candidate_id": "718e872f6cedf9be",
+      "partition": 5,
+      "reason": "candidate cap"
+    },
+    {
+      "anchor": "blog/models.py::ContentFormat",
+      "candidate_id": "9fb373e5775fc089",
+      "partition": 6,
+      "reason": "candidate cap"
+    },
+    {
+      "anchor": "blog/models.py::Entry.save",
+      "candidate_id": "fd8ec4209603f405",
+      "partition": 6,
+      "reason": "candidate cap"
+    },
+    {
+      "anchor": "blog/models.py::Entry.is_active",
+      "candidate_id": "ea1c86a81d50d651",
+      "partition": 6,
+      "reason": "candidate cap"
+    },
+    {
+      "anchor": "blog/models.py::LazyImageTreeprocessor",
+      "candidate_id": "ef404724ce45535d",
+      "partition": 6,
+      "reason": "candidate cap"
+    },
+    {
+      "anchor": "checklists/models.py::ReleaseChecklist",
+      "candidate_id": "c544c4ad3cf9c5ca",
+      "partition": 7,
+      "reason": "candidate cap"
+    },
+    {
+      "anchor": "checklists/models.py::SecurityIssue",
+      "candidate_id": "4c3364ec94cb9005",
+      "partition": 7,
+      "reason": "candidate cap"
+    },
+    {
+      "anchor": "contact/forms.py::BaseContactForm.clean_body",
+      "candidate_id": "600458482a47d373",
+      "partition": 8,
+      "reason": "candidate cap"
+    },
+    {
+      "anchor": "contact/forms.py::FoundationContactForm.recipient_list",
+      "candidate_id": "581bad36699b7835",
+      "partition": 8,
+      "reason": "candidate cap"
+    }
+  ],
+  "url": "https://github.com/django/djangoproject.com"
+}

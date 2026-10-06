@@ -1,0 +1,22 @@
+# One construct of each closed non-literal kind. Each renders one
+# `non-literal-manifest` line and never a guessed row; a literal call inside a
+# construct renders its row marked conditional. Schema: literal-subset/expected.yml.
+containers: [Package.swift]
+products:
+  - {name: Extra, kind: library, container: Package.swift, at: [23, 23]}
+targets:
+  - {name: Core, container: Package.swift, kind: library, conditional: false, at: [9, 9]}
+  - {name: App, container: Package.swift, kind: library, conditional: false, at: [11, 11]}
+  - {name: LinuxOnly, container: Package.swift, kind: library, conditional: true, at: [20, 20]}
+edges:
+  - ["App (Package.swift)", "Core (Package.swift)"]
+  - ["LinuxOnly (Package.swift)", "Core (Package.swift)"]
+dependencies: []
+residuals:
+  - {class: non-literal-manifest, path: Package.swift, lines: "7-7"}
+  - {class: non-literal-manifest, path: Package.swift, lines: "10-10"}
+  - {class: non-literal-manifest, path: Package.swift, lines: "13-13"}
+  - {class: non-literal-manifest, path: Package.swift, lines: "15-15"}
+  - {class: non-literal-manifest, path: Package.swift, lines: "19-21"}
+  - {class: non-literal-manifest, path: Package.swift, lines: "23-23"}
+  - {class: unresolved-reference, path: Package.swift, lines: "13-13"}

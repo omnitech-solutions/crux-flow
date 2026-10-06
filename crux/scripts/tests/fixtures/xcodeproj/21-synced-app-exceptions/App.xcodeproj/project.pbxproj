@@ -1,0 +1,73 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+				TGT_APP,
+				TGT_OTHER,
+			);
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				SYNC_ROOT,
+			);
+		};
+		SYNC_ROOT = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "AppSrc";
+			sourceTree = "<group>";
+			exceptions = (
+				EXC_APP,
+				EXC_OTHER,
+			);
+			explicitFolders = (
+				"Explicit",
+			);
+		};
+		TGT_APP = {
+			isa = PBXNativeTarget;
+			name = "App";
+			productType = "com.apple.product-type.application";
+			fileSystemSynchronizedGroups = (
+				SYNC_ROOT,
+			);
+			buildPhases = (
+			);
+			dependencies = (
+			);
+		};
+		TGT_OTHER = {
+			isa = PBXNativeTarget;
+			name = "Other";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+			);
+			dependencies = (
+			);
+		};
+		EXC_APP = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			target = TGT_APP;
+			membershipExceptions = (
+				"Excluded.swift",
+				"/Localized/Resources/Localized.swift",
+			);
+		};
+		EXC_OTHER = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			target = TGT_OTHER;
+			membershipExceptions = (
+				"Other/Added.swift",
+			);
+		};
+	};
+	rootObject = PRJ;
+}

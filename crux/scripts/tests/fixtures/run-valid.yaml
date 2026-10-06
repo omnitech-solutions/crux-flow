@@ -1,0 +1,104 @@
+format_version: "1"
+run_id: RUN-001
+book_id: PB-9001
+book_content_hash: sha256:1803c9b10ddcb583eba461c7e4d1cd94b938f0e5a9a6ee1aed48acb73306ba2b
+started_at: 2026-05-29T12:00:00Z
+completed_at: null
+status: in_progress
+current_prompt: 2
+prompts:
+  - n: 1
+    title: "Propose the ADR"
+    state: done
+    started: 2026-05-29T12:00:00Z
+    completed: 2026-05-29T12:30:00Z
+    result: |
+      Proposed and accepted ADR-9001 after a council pass.
+    artifacts: [docs/adrs/ADR-9001-sample.md]
+  - n: 2
+    title: "Council-review the ADR"
+    state: running
+    started: 2026-05-29T12:30:00Z
+    completed: null
+    result: ""
+    artifacts: []
+  - n: 3
+    title: "Address findings"
+    state: pending
+    started: null
+    completed: null
+    result: ""
+    artifacts: []
+  - n: 4
+    title: "Accept the ADR"
+    state: pending
+    started: null
+    completed: null
+    result: ""
+    artifacts: []
+  - n: 5
+    title: "Derive implementation plan"
+    state: pending
+    started: null
+    completed: null
+    result: ""
+    artifacts: []
+  - n: 6
+    title: "Implement"
+    state: pending
+    started: null
+    completed: null
+    result: ""
+    artifacts: []
+  - n: 7
+    title: "Quality gates"
+    state: pending
+    started: null
+    completed: null
+    result: ""
+    artifacts: []
+  - n: 8
+    title: "Internal review"
+    state: pending
+    started: null
+    completed: null
+    result: ""
+    artifacts: []
+  - n: 9
+    title: "External review"
+    state: pending
+    started: null
+    completed: null
+    result: ""
+    artifacts: []
+  - n: 10
+    title: "Tests/docs/conformance"
+    state: pending
+    started: null
+    completed: null
+    result: ""
+    artifacts: []
+  - n: 11
+    title: "Fix-loop until clean"
+    state: pending
+    started: null
+    completed: null
+    result: ""
+    artifacts: []
+  - n: 12
+    title: "Prep: changelog/docs/journal/PR"
+    state: pending
+    started: null
+    completed: null
+    result: ""
+    artifacts: []
+  - n: 13
+    title: "Summary + archive"
+    state: pending
+    started: null
+    completed: null
+    result: ""
+    artifacts: []
+notes: ""
+pr_draft: ""
+summary: ""

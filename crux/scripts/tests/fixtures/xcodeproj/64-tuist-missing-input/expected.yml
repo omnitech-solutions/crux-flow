@@ -1,0 +1,7 @@
+exit_code: 0
+residuals:
+  - class: missing-input
+    path: Project.swift
+    kind: Tuist
+    first_line: null
+    last_line: null

@@ -1,0 +1,209 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+				TGT_APP,
+				TGT_OTHER,
+				TGT_PHASED,
+				TGT_FOLDERS,
+				(
+					TGT_APP,
+				),
+			);
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				SYNC_ROOT,
+				SYNC_ROOT2,
+				G_CLASSIC,
+				G_CONF,
+				G_ITEM,
+			);
+		};
+		G_CLASSIC = {
+			isa = PBXGroup;
+			path = Classic;
+			sourceTree = "<group>";
+			children = (
+				F_MAIN,
+				F_S,
+			);
+		};
+		G_CONF = {
+			isa = PBXGroup;
+			path = Conf;
+			sourceTree = "<group>";
+			children = "ABCDEFGH";
+		};
+		G_ITEM = {
+			isa = PBXGroup;
+			path = Item;
+			sourceTree = "<group>";
+			children = (
+				F_ITEM,
+				{
+					a = b;
+				},
+			);
+		};
+		F_MAIN = {
+			isa = PBXFileReference;
+			path = Main.swift;
+			sourceTree = "<group>";
+		};
+		F_S = {
+			isa = PBXFileReference;
+			path = S.swift;
+			sourceTree = "<group>";
+		};
+		F_ITEM = {
+			isa = PBXFileReference;
+			path = Item.swift;
+			sourceTree = "<group>";
+		};
+		SYNC_ROOT = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AppSrc;
+			sourceTree = "<group>";
+			exceptions = (
+				EXC_APP,
+				EXC_OTHER,
+				EXC_BP,
+				(
+					EXC_APP,
+				),
+			);
+			explicitFolders = (
+				Explicit,
+				{
+					a = b;
+				},
+			);
+		};
+		SYNC_ROOT2 = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Src;
+			sourceTree = "<group>";
+			exceptions = "qrs";
+			explicitFolders = "D";
+		};
+		EXC_APP = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			target = TGT_APP;
+			membershipExceptions = (
+				"Excluded.swift",
+				(
+					"Owned.swift",
+				),
+			);
+		};
+		EXC_OTHER = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			target = TGT_OTHER;
+			membershipExceptions = "x.";
+		};
+		EXC_BP = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = SP_APP;
+			membershipExceptions = (
+				{
+					a = "Owned.swift";
+				},
+			);
+		};
+		TGT_APP = {
+			isa = PBXNativeTarget;
+			name = App;
+			productType = "com.apple.product-type.application";
+			fileSystemSynchronizedGroups = (
+				SYNC_ROOT,
+			);
+			buildPhases = (
+				SP_APP,
+				{
+					a = b;
+				},
+			);
+			dependencies = "abcdef";
+			packageProductDependencies = "PQ";
+		};
+		TGT_OTHER = {
+			isa = PBXNativeTarget;
+			name = Other;
+			productType = "com.apple.product-type.application";
+			fileSystemSynchronizedGroups = "SYNC_ROOT2";
+			buildPhases = "SP";
+		};
+		TGT_PHASED = {
+			isa = PBXNativeTarget;
+			name = Phased;
+			productType = "com.apple.product-type.framework";
+			buildPhases = (
+				SP_FILES,
+			);
+		};
+		TGT_FOLDERS = {
+			isa = PBXNativeTarget;
+			name = Folders;
+			productType = "com.apple.product-type.framework";
+			fileSystemSynchronizedGroups = (
+				SYNC_ROOT2,
+			);
+		};
+		SP_APP = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				BF_MAIN,
+				BF_ITEM,
+				(
+					BF_MAIN,
+				),
+			);
+		};
+		S = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				BF_S,
+			);
+		};
+		SP_FILES = {
+			isa = PBXSourcesBuildPhase;
+			files = "xyzw";
+		};
+		BF_MAIN = {
+			isa = PBXBuildFile;
+			fileRef = F_MAIN;
+		};
+		BF_ITEM = {
+			isa = PBXBuildFile;
+			fileRef = F_ITEM;
+		};
+		BF_S = {
+			isa = PBXBuildFile;
+			fileRef = F_S;
+		};
+		P = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Kit;
+			package = R;
+		};
+		R = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://example.com/kit.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.0.0;
+			};
+		};
+	};
+	rootObject = PRJ;
+}

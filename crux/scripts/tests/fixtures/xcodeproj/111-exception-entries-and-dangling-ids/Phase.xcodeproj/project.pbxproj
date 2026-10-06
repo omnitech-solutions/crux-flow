@@ -1,0 +1,60 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		"PRJ" = {
+			"isa" = "PBXProject";
+			"mainGroup" = "MG";
+			"targets" = (
+				"APP",
+			);
+		};
+		"MG" = {
+			"isa" = "PBXGroup";
+			"sourceTree" = "<group>";
+			"children" = (
+				"SR",
+			);
+		};
+		"SR" = {
+			"isa" = "PBXFileSystemSynchronizedRootGroup";
+			"sourceTree" = "<group>";
+			"path" = "Phase";
+			"exceptions" = (
+				"BPSET",
+			);
+		};
+		"BPSET" = {
+			"isa" = "PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet";
+			"buildPhase" = "SRC";
+			"membershipExceptions" = (
+				"$(X)/Lit.swift",
+				"/etc/Abs.swift",
+				"../../../Out.swift",
+				"Pods/P.swift",
+				"./Withheld.swift",
+				"/Localized/Res/Foo.swift",
+			);
+		};
+		"SRC" = {
+			"isa" = "PBXSourcesBuildPhase";
+			"files" = (
+			);
+		};
+		"APP" = {
+			"isa" = "PBXNativeTarget";
+			"name" = "PhaseApp";
+			"productType" = "com.apple.product-type.application";
+			"buildPhases" = (
+				"SRC",
+			);
+			"fileSystemSynchronizedGroups" = (
+				"SR",
+			);
+		};
+	};
+	rootObject = "PRJ";
+}

@@ -1,0 +1,92 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+				TGT_APP,
+				TGT_SYNC,
+			);
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				GRP_CLASSIC,
+				SYNC_ROOT,
+			);
+		};
+		GRP_CLASSIC = {
+			isa = PBXGroup;
+			path = "Classic";
+			sourceTree = "<group>";
+			children = (
+				FR_FILTERED,
+			);
+		};
+		FR_FILTERED = {
+			isa = PBXFileReference;
+			path = "Filtered.swift";
+			sourceTree = "<group>";
+		};
+		BF_FILTERED = {
+			isa = PBXBuildFile;
+			fileRef = FR_FILTERED;
+			platformFilters = (
+				"ios",
+			);
+		};
+		PHASE_SOURCES = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				BF_FILTERED,
+			);
+		};
+		TGT_APP = {
+			isa = PBXNativeTarget;
+			name = "App";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+				PHASE_SOURCES,
+			);
+			dependencies = (
+			);
+		};
+		SYNC_ROOT = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "SyncSrc";
+			sourceTree = "<group>";
+			exceptions = (
+				EXC_SYNC,
+			);
+		};
+		TGT_SYNC = {
+			isa = PBXNativeTarget;
+			name = "SyncTarget";
+			productType = "com.apple.product-type.application";
+			fileSystemSynchronizedGroups = (
+				SYNC_ROOT,
+			);
+			buildPhases = (
+			);
+			dependencies = (
+			);
+		};
+		EXC_SYNC = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			target = TGT_SYNC;
+			membershipExceptions = (
+				"FilteredSynced.swift",
+			);
+			platformFiltersByRelativePath = {
+				"FilteredSynced.swift" = (ios,);
+			};
+		};
+	};
+	rootObject = PRJ;
+}

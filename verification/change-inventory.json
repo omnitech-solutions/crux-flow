@@ -1,0 +1,38 @@
+{
+  "module_count": 26,
+  "module_lines": 3464,
+  "unchanged_modules": [
+    "crux/scripts/crux/flow/__init__.py",
+    "crux/scripts/crux/flow/activation.py",
+    "crux/scripts/crux/flow/api_calls.py",
+    "crux/scripts/crux/flow/authoring.py",
+    "crux/scripts/crux/flow/common.py",
+    "crux/scripts/crux/flow/continuation.py",
+    "crux/scripts/crux/flow/history.py",
+    "crux/scripts/crux/flow/materialize.py",
+    "crux/scripts/crux/flow/processes.py",
+    "crux/scripts/crux/flow/provenance.py",
+    "crux/scripts/crux/flow/upstream_api.py"
+  ],
+  "modified_modules": [
+    "crux/scripts/crux/flow/cli.py",
+    "crux/scripts/crux/flow/evidence.py",
+    "crux/scripts/crux/flow/hosts.py",
+    "crux/scripts/crux/flow/initialization.py",
+    "crux/scripts/crux/flow/lifecycle.py",
+    "crux/scripts/crux/flow/managed.py",
+    "crux/scripts/crux/flow/models.py",
+    "crux/scripts/crux/flow/packaging.py",
+    "crux/scripts/crux/flow/policy.py",
+    "crux/scripts/crux/flow/records.py",
+    "crux/scripts/crux/flow/setup.py",
+    "crux/scripts/crux/flow/testing.py",
+    "crux/scripts/crux/flow/upstream.py",
+    "crux/scripts/crux/flow/workflow.py"
+  ],
+  "added_modules": [
+    "crux/scripts/crux/flow/__main__.py"
+  ],
+  "test_file_count": 10,
+  "test_lines": 1273
+}

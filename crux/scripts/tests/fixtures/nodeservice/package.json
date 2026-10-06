@@ -1,0 +1,11 @@
+{
+  "name": "nodeservice",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "express": "^4.19.0",
+    "fastify": "^4.28.0",
+    "@nestjs/common": "^10.0.0",
+    "lodash": "^4.17.21"
+  }
+}

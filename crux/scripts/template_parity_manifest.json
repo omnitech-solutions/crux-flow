@@ -1,0 +1,453 @@
+{
+  "_doc": "Designated parity-bearing clauses between dogfood docs and their distributed template twins. Each clause stores ONLY markers (anchor + optional pattern), never the clause text \u2014 the compared value is read live from the canonical file, so this manifest cannot silently become a stale parallel copy of the clauses it guards (ADR-0050 \u00a71 markers-only discipline). Keep it small and curated: add an entry only for a clause that MUST stay identical across the twin pair. `pattern` (a Python regex) extracts the discriminating value(s) from the canonical section; every captured value must also appear in the twin section. Omit `pattern` to compare the whole normalized section body. Curated \u00a7-content clauses (per ADR-0056: the template twin is a derived artifact whose \u00a7-content mirror must not silently drift \u2014 the class that recurred across PB-0048/0049/0051). Add a clause here whenever a bionic/AGENTS.md \u00a7-edit MUST reach the AGENTS.md.tmpl twin; a naive full-section diff is deliberately avoided because the twin diverges by design (ADR tokens stripped, downstream-shaped).",
+  "clauses": [
+    {
+      "id": "log-op-heading-prefix",
+      "section": "\u00a76 docs/log.md format",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 6. `docs/log.md` format",
+      "pattern": "YYYY-MM-DD"
+    },
+    {
+      "id": "log-op-enum-invariant",
+      "section": "\u00a76 op-enum carries the `invariant` op",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 6. `docs/log.md` format",
+      "pattern": "\\| invariant \\|"
+    },
+    {
+      "id": "log-op-enum-observation",
+      "section": "\u00a76 op-enum carries the `observation` op",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 6. `docs/log.md` format",
+      "pattern": "\\| observation \\|"
+    },
+    {
+      "id": "log-op-enum-observation-regex",
+      "section": "\u00a76 both op-enum regexes carry the `observation` op, and keep the `| ` subject separator",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "#### Op-enum regex",
+      "pattern": "invariant\\|observation"
+    },
+    {
+      "id": "adrs-append-only-freeze",
+      "section": "\u00a74 adrs write rules: ADRs are append-only and a body is frozen once the record leaves Proposed",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### adrs (append-only history)",
+      "pattern": "ADRs are \\*\\*append-only\\*\\*|Once an ADR leaves `Proposed`, its body is frozen|only the status frontmatter mutates"
+    },
+    {
+      "id": "wikilink-promptbook-lifecycle-neutral",
+      "section": "\u00a79 promptbook citation is lifecycle-neutral",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "Slug, date, and wiki-link rules",
+      "pattern": "lifecycle-neutrally"
+    },
+    {
+      "id": "rule-citation-form",
+      "section": "\u00a79 the rule citation form `rule:<slug>`, the slug grammar, and the three token classes",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 9. Slug, date, and wiki-link rules",
+      "pattern": "\\*\\*Rule citations\\*\\*:[^\\n]*"
+    },
+    {
+      "id": "promptbook-book-link-resolver",
+      "section": "\u00a711 promptbook book-link resolution (SSOT)",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "Promptbook book-link resolution",
+      "pattern": "non-authoritative hint"
+    },
+    {
+      "id": "related-research-any-page",
+      "section": "\u00a711.A related_research resolves to any research page",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "Canonical ADR frontmatter schema",
+      "pattern": "research page references"
+    },
+    {
+      "id": "schema-history-current-row",
+      "section": "\u00a77 schema_version history marks \"5\" current",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "schema version history",
+      "pattern": "`\"5\"` \u2014 \\*\\*current"
+    },
+    {
+      "id": "bionic-yml-default-docs-dir",
+      "section": "\u00a714 .bionic.yml default docs_dir",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 14.",
+      "pattern": "docs_dir: bionic"
+    },
+    {
+      "id": "config-source-enum",
+      "section": "\u00a714.2 config source enum",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "How skills resolve it",
+      "pattern": "discovery:<dir>"
+    },
+    {
+      "id": "bundles-yml-shape-keyed-by-id",
+      "section": "\u00a77.A catalog/bundles.yml shape",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### `catalog/bundles.yml` shape",
+      "pattern": "keyed by bundle id"
+    },
+    {
+      "id": "blast-radius-evidence-no-renames",
+      "section": "\u00a711.C the patch blast radius draws its evidence with --no-renames",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### The blast radius",
+      "pattern": "--no-renames"
+    },
+    {
+      "id": "blast-radius-base-commit-pin-both-ends",
+      "section": "\u00a711.C the base_commit pin binds at the writer AND the gate",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### The blast radius",
+      "pattern": "base_commit_pin.divergence"
+    },
+    {
+      "id": "adr-brevity-principle",
+      "section": "\u00a711.D rule 7, the brevity principle",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 11.D.",
+      "pattern": "shortest ADR that fully states|one obligation and its necessary conditions|Brevity must not change the meaning|seven numbered rules"
+    },
+    {
+      "id": "manifest-adr-governs-rule-baseline",
+      "section": "\u00a77 `manifest.yml` schema \u2014 the rule-length advisory baseline key",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 7.",
+      "pattern": "governs_rule_baseline"
+    },
+    {
+      "id": "adr-body-budget-value",
+      "section": "\u00a711.D the ADR body budget value",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 11.D.",
+      "pattern": "120-line budget"
+    },
+    {
+      "id": "log-op-enum-backfill",
+      "section": "\u00a76 op-enum carries the `backfill` op",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 6. `docs/log.md` format",
+      "pattern": "\\| backfill"
+    },
+    {
+      "id": "log-op-enum-backfill-regex",
+      "section": "\u00a76 both op-enum regexes end the op group with `release`, so an op appended after it would fail this clause",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "#### Op-enum regex",
+      "pattern": "\\|release\\)"
+    },
+    {
+      "id": "governs-subfields-anchor",
+      "section": "\u00a711.A the governs entry's seven sub-fields (incl. `anchor` and `retires`)",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "Canonical ADR frontmatter schema",
+      "pattern": "seven sub-fields[^\\n]*"
+    },
+    {
+      "id": "observations-surveys-not-a-concern-surface",
+      "section": "\u00a717 the `_surveys/` batch holding area is no concern surface",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 17. The observations concern",
+      "pattern": "_surveys"
+    },
+    {
+      "id": "observations-batch-completion-precedes-visibility",
+      "section": "\u00a717 the batch publish order: completion precedes visibility",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 17. The observations concern",
+      "pattern": "completion precedes visibility"
+    },
+    {
+      "id": "observations-batch-signoff-only-batch-route",
+      "section": "\u00a717 the survey sign-off is the only batch route past `observed`",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 17. The observations concern",
+      "pattern": "the only batch route"
+    },
+    {
+      "id": "observations-defer-is-re-scaffoldable",
+      "section": "\u00a717 `defer` writes nothing, so a deferred candidate stays re-scaffoldable",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 17. The observations concern",
+      "pattern": "defer"
+    },
+    {
+      "id": "log-op-observation-survey-batch-subject",
+      "section": "\u00a76 the `observation` op's batch sign-off subject grammar",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "#### Op-enum regex",
+      "pattern": "survey batch"
+    },
+    {
+      "id": "manifest-observation-survey-stub-days",
+      "section": "\u00a77 the `observation.survey_stub_days` manifest key",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 7. `manifest.yml` schema",
+      "pattern": "survey_stub_days"
+    },
+    {
+      "id": "observations-single-record-route",
+      "section": "\u00a74 observations write rules: `transition-observation` is the only SINGLE-RECORD route past `observed`",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### observations (human-invoked commands write; humans ratify)",
+      "pattern": "single-record route"
+    },
+    {
+      "id": "log-op-enum-adr-review",
+      "section": "\u00a76 op-enum carries the `adr-review` op",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 6. `docs/log.md` format",
+      "pattern": "\\| adr-review \\|"
+    },
+    {
+      "id": "log-op-enum-adr-review-regex",
+      "section": "\u00a76 both op-enum regexes carry the `adr-review` op, inserted immediately before `backfill`",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "#### Op-enum regex",
+      "pattern": "adr-review\\|backfill"
+    },
+    {
+      "id": "objectives-frontmatter-keyset",
+      "section": "\u00a75.B the objectives frontmatter is a locked six-key schema",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 5.B. `docs/objectives.md` format",
+      "pattern": "exactly these six keys"
+    },
+    {
+      "id": "manifest-adr-review-due-days",
+      "section": "\u00a77 the `adr_review_due_days` manifest key",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 7. `manifest.yml` schema",
+      "pattern": "adr_review_due_days"
+    },
+    {
+      "id": "manifest-journal-friction-line-from",
+      "section": "\u00a77 the `journal.friction_line_from` manifest key",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 7. `manifest.yml` schema",
+      "pattern": "friction_line_from"
+    },
+    {
+      "id": "journal-friction-line-grammar",
+      "section": "\u00a74 journal write rules: the optional `Friction:` line grammar",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### journal (append-only narrative)",
+      "pattern": "(?m)^- [^\\n]*`Friction:`[^\\n]*$"
+    },
+    {
+      "id": "reviews-surface-report-shape",
+      "section": "\u00a74 adrs write rules: the Reviews-surface report shape \u2014 six H2 sections in order, the summary table's place, the one data-framing note, and the grandfather date",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### adrs (append-only history)",
+      "pattern": "exactly six H2 sections in the order Propose, Amend, Repair, Revoke, Keep, Coverage|one summary table between its title and|and exactly one data-framing note|a report dated on or before that date keeps the sections and the notes it was written with|The five-finding per-pass cap counts across Propose, Amend, Repair and Revoke combined|Keep, Coverage, the summary table and the Revoke dispositions count against no cap|Keep, Coverage and the Revoke dispositions define no finding|the summary table defines none, carrying in each row an id one of the four finding sections already defines|Keep and the Revoke dispositions carry no finding id at all|Coverage carries a finding id only where a lifecycle record references one|so the no-definition clause governs Coverage unchanged|that row id set equals the set of ids the four finding sections define|equal counts alone do not satisfy it|A disagreement between the two sets is refused rather than counted around"
+    },
+    {
+      "id": "log-op-adr-review-body-grammar",
+      "section": "\u00a76 the `adr-review` op body: the four finding sections in order, and that Keep and Coverage carry no count",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "#### Op-enum regex",
+      "pattern": "the finding definition counts across the four finding sections|\\(Propose, Amend, Repair, Revoke\\); Keep and Coverage define no finding, so neither carries a count"
+    },
+    {
+      "id": "manifest-journal-friction-line-from-semantics",
+      "section": "\u00a77 the `journal.friction_line_from` boundary semantics: what an ISO date marks, what a reader counts, and what `basis` says",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 7. `manifest.yml` schema",
+      "pattern": "(?m)Set to an ISO date, it marks the boundary[^\\n]*$"
+    },
+    {
+      "id": "manifest-journal-friction-line-from-init-writes-the-date",
+      "section": "\u00a77 the `journal.friction_line_from` key is written by `init-docs` as the initialization date, and a `--force` re-bootstrap carries the recorded date forward",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 7. `manifest.yml` schema",
+      "pattern": "records the initialization date here rather than `null`|carries the existing tree's recorded date forward rather than resetting it forward|init-docs writes the initialization date here, never null"
+    },
+    {
+      "id": "reviews-surface-write-set-five-paths",
+      "section": "\u00a74 adrs write rules: the Reviews-surface write set \u2014 five paths, six writes, the two op kinds, and both rule handles",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### adrs (append-only history)",
+      "pattern": "Its write set is closed and holds exactly five paths|the dated report under the reviews directory, the derived reviews index, the operational log, the current month's journal file, and the journal index|writes six times across those five, because the log takes two ops|one `adr-review` op written by the review itself|one `journal` op written by `log-work`|beside the journal entry and the journal index row|rule:review-write-set-five-paths|rule:review-proposes-and-enacts-nothing"
+    },
+    {
+      "id": "reviews-surface-lifecycle-table-and-grammar-discriminator",
+      "section": "\u00a74 adrs write rules: the Reviews-surface lifecycle-record table under `## Coverage`, the `report_grammar` frontmatter discriminator, and the filename-date binding the regenerator checks against frontmatter `date`",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### adrs (append-only history)",
+      "pattern": "Lifecycle records live in a five-column table under `## Coverage`|source report date, finding id, pass, event, locator|identified by its own header row rather than by its position|so it never merges with the per-goal coverage matrix|A report declares its grammar through the frontmatter key `report_grammar`|whose one recognised value is `lifecycle`|A report carrying no key reads under the frozen legacy counting rule|a report dated after 2026-09-08 carrying no key is refused|an unrecognised value is refused; neither is defaulted|That date is the report's filename date, which the regenerator checks against the frontmatter"
+    },
+    {
+      "id": "reviews-surface-legacy-row-standing-unknown",
+      "section": "\u00a74 adrs write rules: the reviews index splits raised from standing, and a legacy row carries the literal `unknown`",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### adrs (append-only history)",
+      "pattern": "The generated reviews index distinguishes findings raised from current standing|a legacy row carries the literal `unknown` as a positive value|never blank, never omitted, never `0`, and never recomputed from later records|A legacy row that raised nothing renders the bare literal `unknown` with no count|its `raised` cell reads `0 \\(legacy\\)`"
+    },
+    {
+      "id": "reviews-surface-assessment-table",
+      "section": "\u00a74 adrs write rules: the Reviews-surface assessment table under Coverage \u2014 seven columns, availability/alignment as two fields, the per-goal alignment rollup, and the measured_objectives measurement outcome",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### adrs (append-only history)",
+      "pattern": "The Coverage section additionally carries a seven-column assessment table|one row per measure part, identified by its own header row and never by its position|seven columns keeps it disjoint from the five-column summary table and the five-column lifecycle record table|so no two of the three tables are confusable and a mistyped header cannot silently reassign rows|are two fields, never one|six of the sixteen pairs are legal and the rest are refused|The per-goal matrix survives beside the assessment table and carries the derived alignment rollup|a goal no part attempted, including one that yields no parts, is `not-assessed`|carries one entry per COUNTED THING|`measured` and `attempted` both discharge the three-report rotation|`not-assessed` and `unknown` discharge nothing|A report carrying no `measured_objectives` key reads as the literal `unknown` for every goal|A report carrying a flat list of bare ids demotes to `attempted` and is never promoted|a finding whose confidence is `unresolved` is never routed to Revoke|Revocation requires positive evidence that continued observance produces a named cost against a named objective|dormancy, a missing run binding and unavailable evidence are absences and establish none|renders nothing from it, so it adds no row to the regenerative-outputs roster|the objective itself initiates a bounded investigation|every surface a pass read beyond its signal-flagged set is covered by a slip naming it|at most three investigations per pass and five surfaces counted once each per investigation|On the third consecutive `attempted` outcome recorded under this grammar|a demoted entry resets the count and starts no strike|carries one entry per COUNTED THING|every entry carries an identifier of the measure version it concerns|The strongest outcome wins within one counted thing and never across two|a part's count resets only when THAT part discriminates"
+    },
+    {
+      "id": "journal-composed-body-never-leaves-a-fence-open",
+      "section": "\u00a74 journal write rules: a composed body never leaves a fence open",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### journal (append-only narrative)",
+      "pattern": "(?m)^- \\*\\*A composed body never leaves a fence open\\*\\*[^\\n]*$"
+    },
+    {
+      "id": "assignment-states-outcome-evidence-constraint",
+      "section": "\u00a711 the assignment contract: the Outcome/Evidence/Constraint triad, the proportion clause, and the frozen-goal consequence",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### The assignment contract",
+      "pattern": "(?m)^- \\*\\*(?:Outcome|Evidence|Constraint)\\*\\* \u2014 [^\\n]*$|\\*\\*Ceremony scales with the change:\\*\\*|a task sized for the direct-fix rung \\(\u00a711\\.C\\) states all three in one sentence|records that in the run snapshot and never by editing the book"
+    },
+    {
+      "id": "delegation-carries-objectives-context",
+      "section": "\u00a711 the assignment contract: the objectives context is owned by \u00a75.B and restated nowhere here",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### The assignment contract",
+      "pattern": "An assignment travels beside the objectives context|\u00a75\\.B is the one statement of what that context is|this section names it and restates none of it"
+    },
+    {
+      "id": "assignment-survives-every-delegation-hop",
+      "section": "\u00a711 the assignment contract: the statements survive every hop, only the Outcome narrows, the reviewer is commissioned by the delegator, and the chain terminates at the review, the provenance of a statement, and the boundary against the tool-allowlist rule",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### The assignment contract",
+      "pattern": "\\*\\*The three statements survive every hop\\*\\*|a forked skill invocation included|Session history carries none of them|The Evidence and the Constraint pass whole|may drop neither|never from the party under review|cannot commission the review of that integration|The chain terminates at the review|never for the transcription that records it|owes the report, not the write|no stop point under the run-autonomy rules|The three statements are authored by the delegator|enters an assignment as quoted data, never as one of the three statements|the tool allowlist remains the sole \\*mechanical\\* enforcement of separation of duties"
+    },
+    {
+      "id": "completion-separates-verified-from-unobserved",
+      "section": "\u00a711 the assignment contract: the three dispositions, evidence classified by what it observed, the result token, re-derivation, and the durable record",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### The assignment contract",
+      "pattern": "one of three dispositions|\\*\\*verified\\*\\*|\\*\\*contradicted\\*\\*|\\*\\*unobserved\\*\\*|An Evidence item carrying no disposition is a finding|adds no artifact and no field|classified by what it observed, not by the tool that produced it|never raw output, an environment value, or a secret|re-derives each disposition|\\*\\*The statements land in a durable record\\*\\*|without the dispatch text or the session"
+    },
+    {
+      "id": "objectives-read-before-work",
+      "section": "\u00a75.B rule:objectives-read-before-work \u2014 every agent reads objectives before work of any size, resolving the tree rather than assuming `docs/`, and re-reads it when it changes",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 5.B. `docs/objectives.md` format",
+      "pattern": "\\*\\*Alignment before work and through delegation\\.\\*\\*|Every agent reads the resolved `<docs_dir>/objectives\\.md` before starting work, including small fixes, research, planning, and reviews|Resolve the tree through \u00a714; never assume the literal `docs/` directory exists|Re-read the file when it changes during the work"
+    },
+    {
+      "id": "orchestrators-read-objectives-at-startup-and-resume",
+      "section": "\u00a75.B rule:orchestrators-read-objectives-at-startup-and-resume \u2014 the commander and night gardener read at startup and on resume, the shell-less commander is handed the path, and the gardener's turn gate precedes every read",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 5.B. `docs/objectives.md` format",
+      "pattern": "Commander and night gardener read it at startup and on resume|A commander without shell access receives the resolved path from its caller|The gardener's turn gate runs before every other act, reads included|any missing-objectives notice waits for output the gate permits"
+    },
+    {
+      "id": "objectives-shape-the-work-and-authorize-none",
+      "section": "\u00a75.B rule:objectives-shape-the-work-and-authorize-none \u2014 the mission and active goals shape the work under the maturity ladder, a sentence suffices for a small task with no artifact and no approval gate, and objectives authorize nothing further",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 5.B. `docs/objectives.md` format",
+      "pattern": "Use the Mission and relevant active goals to assess the task's purpose, tradeoffs, and completion evidence|`exploring` goals remain hypotheses|Do not treat dropped goals as requirements|A sentence suffices for a small task; no extra artifact or approval gate is required|Do not invent a goal association when none is supported|a conflict with an approved plan is a contradicted premise under \u00a711|Objectives alone authorize no additional work"
+    },
+    {
+      "id": "objectives-context-travels-with-every-delegation",
+      "section": "\u00a75.B rule:objectives-context-travels-with-every-delegation \u2014 every delegation carries the resolved path plus the mission or an instruction to read it, with known tensions, and session history supplies none of it",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 5.B. `docs/objectives.md` format",
+      "pattern": "including a forked skill invocation, carries the resolved objectives path|Include known tensions and require recipients to preserve this context in further delegation|Do not assume session history or a role's installed prompt supplies it"
+    },
+    {
+      "id": "objectives-populate-gate-never-invents-a-goal",
+      "section": "\u00a75.B rule:objectives-populate-gate-never-invents-a-goal \u2014 every reader checks the file first, a missing or placeholder file routes to the owner, and no mission or goal is invented to unblock a step",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 5.B. `docs/objectives.md` format",
+      "pattern": "\\*\\*Populate gate\\.\\*\\*|the skill asks the owner to populate it|in an unattended session, write one line naming the gap in the output and skip the dependent step|Never invent a mission or a goal to unblock a step|Apply the populate gate above when objectives are unavailable"
+    },
+    {
+      "id": "log-op-enum-release",
+      "section": "\u00a76 op-enum carries the `release` op",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 6. `docs/log.md` format",
+      "pattern": "\\| release"
+    },
+    {
+      "id": "log-op-and-journal-category-are-two-enums",
+      "section": "\u00a76 the op enum and the \u00a74 journal-category enum are named as two separate lists, and `release` is named as a member of both",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "#### Op-enum regex",
+      "pattern": "A log op and a journal category are two enums|records a skill \\*operation\\*, enumerated above|records a work \\*category\\*, enumerated in \u00a74|Adding a name to one enum leaves the other unchanged"
+    },
+    {
+      "id": "guide-journal-category-list",
+      "section": "USER_GUIDE \u00a7Journaling work \u2014 the journal category list, member for member",
+      "canonical": "USER_GUIDE.md",
+      "twin": "crux/templates/USER_GUIDE.md",
+      "anchor": "### Journaling work",
+      "pattern": "decision \\| implementation \\| bug \\| learning \\| blocker \\| refactor \\| meeting \\| review \\| misc \\| release"
+    },
+    {
+      "id": "log-op-release-timestamp-carries-its-zone",
+      "section": "\u00a76 the `release` op body carries an explicit timezone, the heading date follows it, and a retrospective record names when it was recorded",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "#### Op-enum regex",
+      "pattern": "the publication time carrying an explicit timezone|The heading date is the publication date in that same timezone|a winter release reads MST and a summer one MDT|also names when it was recorded"
+    }
+  ]
+}

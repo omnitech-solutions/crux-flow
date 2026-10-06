@@ -1,0 +1,43 @@
+# ADR-0129:153 and ADR-0130 clause 7: a present
+# `repositoryURL` that is not a string -- a list or a dictionary, each
+# holding a credential-bearing URL -- names no location. Each read site
+# (the project's `packageReferences` row and the target's remote product)
+# reports one `unsupported-project-form` with a fixed detail at the
+# reference's own span, and the project's dependency row and the target's
+# remote-product row both render location `—`. The two reports on one
+# reference are the same bullet, which the residual block renders once, so
+# the count below is one per reference; `RepositoryLocationShapeTests` pins
+# one per read site before that merge. No Python repr, and no part of the
+# value, reaches the spine.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `App` | `ListKit` | remote product | — | upToNextMajorVersion 1.0.0 |"
+    - "| `App` | `DictKit` | remote product | — | exactVersion 2.0.0 |"
+    - "| `project` | `` | remote package | — | upToNextMajorVersion 1.0.0 |"
+    - "| `project` | `` | remote package | — | exactVersion 2.0.0 |"
+
+absent:
+  module-graph:
+    - "tok"
+    - "['"
+    - "{'"
+    - "h/x.git"
+    - "https"
+
+residuals:
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: package repository location is not a string
+    count: 2
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: package repository location is not a string
+    first_line: 25
+    last_line: 34
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: package repository location is not a string
+    first_line: 35
+    last_line: 44

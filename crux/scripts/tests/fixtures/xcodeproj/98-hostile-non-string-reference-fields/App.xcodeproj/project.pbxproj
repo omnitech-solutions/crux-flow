@@ -1,0 +1,104 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+				TGT_A,
+			);
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				GRP_APP,
+				GRP_ODD,
+			);
+		};
+		GRP_APP = {
+			isa = PBXGroup;
+			path = "App";
+			sourceTree = "<group>";
+			children = (
+				FR_MAIN,
+				FR_WEIRD,
+				FR_TREE,
+			);
+		};
+		GRP_ODD = {
+			isa = PBXGroup;
+			path = {
+				dir = "Odd";
+			};
+			sourceTree = "<group>";
+			children = (
+				FR_ODD,
+			);
+		};
+		FR_MAIN = {
+			isa = PBXFileReference;
+			path = "Main.swift";
+			sourceTree = "<group>";
+		};
+		FR_WEIRD = {
+			isa = PBXFileReference;
+			path = (
+				"Weird.swift",
+			);
+			sourceTree = "<group>";
+		};
+		FR_TREE = {
+			isa = PBXFileReference;
+			path = "Tree.swift";
+			sourceTree = (
+				"<group>",
+			);
+		};
+		FR_ODD = {
+			isa = PBXFileReference;
+			path = "Odd.swift";
+			sourceTree = "<group>";
+		};
+		BF_MAIN = {
+			isa = PBXBuildFile;
+			fileRef = FR_MAIN;
+		};
+		BF_WEIRD = {
+			isa = PBXBuildFile;
+			fileRef = FR_WEIRD;
+		};
+		BF_TREE = {
+			isa = PBXBuildFile;
+			fileRef = FR_TREE;
+		};
+		BF_ODD = {
+			isa = PBXBuildFile;
+			fileRef = FR_ODD;
+		};
+		PH_SOURCES = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				BF_MAIN,
+				BF_WEIRD,
+				BF_TREE,
+				BF_ODD,
+			);
+		};
+		TGT_A = {
+			isa = PBXNativeTarget;
+			name = "App";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+				PH_SOURCES,
+			);
+			dependencies = (
+			);
+		};
+	};
+	rootObject = PRJ;
+}

@@ -1,0 +1,133 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		"PRJ" = {
+			"isa" = "PBXProject";
+			"mainGroup" = "MG";
+			"targets" = (
+				"APP",
+				"T1",
+				"T2",
+				"T3",
+				"T4",
+				"NOSUCHTARGET",
+			);
+			"packageReferences" = (
+				"NOSUCHREF",
+			);
+		};
+		"MG" = {
+			"isa" = "PBXGroup";
+			"sourceTree" = "<group>";
+			"children" = (
+				"F",
+				"SR",
+			);
+		};
+		"F" = {
+			"isa" = "PBXFileReference";
+			"path" = "Deps/Main.swift";
+			"sourceTree" = "<group>";
+		};
+		"BF" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "F";
+		};
+		"SRC" = {
+			"isa" = "PBXSourcesBuildPhase";
+			"files" = (
+				"BF",
+			);
+		};
+		"SR" = {
+			"isa" = "PBXFileSystemSynchronizedRootGroup";
+			"sourceTree" = "<group>";
+			"path" = "DepsSynced";
+			"exceptions" = (
+				"NOSUCHSET",
+				"F",
+			);
+		};
+		"APP" = {
+			"isa" = "PBXNativeTarget";
+			"name" = "DepsApp";
+			"productType" = "com.apple.product-type.application";
+			"buildPhases" = (
+				"SRC",
+				"NOSUCHPHASE",
+			);
+			"fileSystemSynchronizedGroups" = (
+				"SR",
+			);
+		};
+		"T1" = {
+			"isa" = "PBXNativeTarget";
+			"name" = "DanglingProxy";
+			"productType" = "com.apple.product-type.tool";
+			"dependencies" = (
+				"D1",
+			);
+		};
+		"D1" = {
+			"isa" = "PBXTargetDependency";
+			"target" = "APP";
+			"targetProxy" = "NOSUCHPROXY";
+		};
+		"T2" = {
+			"isa" = "PBXNativeTarget";
+			"name" = "ListTarget";
+			"productType" = "com.apple.product-type.tool";
+			"dependencies" = (
+				"D2",
+			);
+		};
+		"D2" = {
+			"isa" = "PBXTargetDependency";
+			"target" = (
+				"APP",
+			);
+		};
+		"T3" = {
+			"isa" = "PBXNativeTarget";
+			"name" = "ListRemote";
+			"productType" = "com.apple.product-type.tool";
+			"dependencies" = (
+				"D3",
+			);
+		};
+		"D3" = {
+			"isa" = "PBXTargetDependency";
+			"targetProxy" = "P3";
+		};
+		"P3" = {
+			"isa" = "PBXContainerItemProxy";
+			"containerPortal" = "PRJ";
+			"remoteGlobalIDString" = {
+				"APP" = "x";
+			};
+		};
+		"T4" = {
+			"isa" = "PBXNativeTarget";
+			"name" = "Control";
+			"productType" = "com.apple.product-type.tool";
+			"dependencies" = (
+				"D4",
+			);
+		};
+		"D4" = {
+			"isa" = "PBXTargetDependency";
+			"target" = "APP";
+			"targetProxy" = "P4";
+		};
+		"P4" = {
+			"isa" = "PBXContainerItemProxy";
+			"containerPortal" = "PRJ";
+			"remoteGlobalIDString" = "APP";
+		};
+	};
+	rootObject = "PRJ";
+}

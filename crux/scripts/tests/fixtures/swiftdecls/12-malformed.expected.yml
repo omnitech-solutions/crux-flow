@@ -1,0 +1,28 @@
+# A malformed member: `run()` never closes, so `Broken`'s body ends in a MISSING
+# `}` and `AfterBroken` parses inside it. The reader walks the whole subtree,
+# renders `AfterBroken` unqualified because its parent is unconfirmed, and names
+# each error with its location and effect: the stray `= (1 +` in `run()`'s body,
+# and the MISSING `}` the grammar inserts at end of file, attributed to line 9.
+# Schema: 01-actor.expected.yml.
+types:
+  - {name: Broken, kind: struct, access: public, at: [1, 1], conditional: false}
+  - {name: AfterBroken, kind: struct, access: public, at: [7, 7], conditional: false}
+stored_properties:
+  - {owner: Broken, name: value, type: Int, access: public, at: [2, 2]}
+  - {owner: AfterBroken, name: other, type: Int, access: public, at: [8, 8]}
+relationships: []
+interfaces:
+  - {name: Broken, kind: struct, access: public, at: [1, 1], attributes: [], conditional: false}
+  - {name: Broken.value, kind: let, access: public, at: [2, 2], attributes: [], conditional: false}
+  - {name: "Broken.run()", kind: func, access: public, at: [3, 3], attributes: [], conditional: false}
+  - {name: AfterBroken, kind: struct, access: public, at: [7, 7], attributes: [], conditional: false}
+  - {name: AfterBroken.other, kind: let, access: public, at: [8, 8], attributes: [], conditional: false}
+requirements: []
+mains: []
+residuals:
+  - {concern: data-model, class: parse-error, lines: "4-4", detail: "location body; effect enclosing func run"}
+  - {concern: data-model, class: parse-error, lines: "7-7", detail: "location member; effect nesting unconfirmed"}
+  - {concern: data-model, class: parse-error, lines: "9-9", detail: "location member; effect enclosing struct Broken"}
+  - {concern: api-surface, class: parse-error, lines: "4-4", detail: "location body; effect enclosing func run"}
+  - {concern: api-surface, class: parse-error, lines: "7-7", detail: "location member; effect nesting unconfirmed"}
+  - {concern: api-surface, class: parse-error, lines: "9-9", detail: "location member; effect enclosing struct Broken"}

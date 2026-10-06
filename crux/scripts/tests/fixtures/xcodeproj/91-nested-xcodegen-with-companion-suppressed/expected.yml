@@ -1,0 +1,9 @@
+# ADR-0130 clause 13: the companion case -- a qualifying NESTED XcodeGen
+# manifest under `ios/` WITH a companion `App.xcodeproj` beside it renders
+# NO `missing-input` line. A check that skipped every nested directory
+# would also pass this absence. 90-nested-xcodegen-missing-input is the
+# positive control: it shows the nested directory is checked.
+exit_code: 0
+absent:
+  module-graph:
+    - "missing-input"

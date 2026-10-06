@@ -1,0 +1,34 @@
+# An exception entry that names an ordinary directory adds every `.swift` file
+# the Swift walk reaches under it. That walk prunes what every Swift walk
+# prunes (ADR-0129 clause 8): `App/Sub/Y.swift` renders for `Other`; nothing
+# under `Sub/Pods`, `Sub/.build` or `Sub/build` renders, and no residual does.
+materialize:
+  - path: App/Sub/Pods/X.swift
+    kind: repeated
+    head: "public struct SubPodsType {}\n"
+    count: 1
+  - path: App/Sub/.build/Z.swift
+    kind: repeated
+    head: "public struct SubDotBuildType {}\n"
+    count: 1
+  - path: App/Sub/build/W.swift
+    kind: repeated
+    head: "public struct SubBuildType {}\n"
+    count: 1
+
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `App/Sub/Y.swift` | `Other` | added by an exception set |"
+
+absent:
+  module-graph:
+    - "App/Sub/Pods"
+    - "App/Sub/.build"
+    - "App/Sub/build"
+    - "unresolved-reference"
+  data-model:
+    - "SubPodsType"
+    - "SubDotBuildType"
+    - "SubBuildType"

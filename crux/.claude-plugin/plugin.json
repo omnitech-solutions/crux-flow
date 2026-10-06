@@ -1,0 +1,6 @@
+{
+  "name": "crux",
+  "description": "Claude Code plugin that maintains a docs/ tree across seven concerns: code docs, research wiki, ADRs, briefs, work journal, promptbooks, invariants.",
+  "version": "3.25.1",
+  "homepage": "https://bionic-coding.com/crux/"
+}

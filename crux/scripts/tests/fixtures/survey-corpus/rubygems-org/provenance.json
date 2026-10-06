@@ -1,0 +1,29 @@
+{
+  "budget_consumed": {
+    "candidates_emitted": 40,
+    "candidates_identified": 44,
+    "partitions_represented": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "partitions_scanned": 8,
+    "stop_reason": "candidate cap of 40 reached; 4 identified candidate(s) not emitted"
+  },
+  "candidate_count": 40,
+  "evidence_paths": "evidence_paths.json \u2014 materialize these before build_plan",
+  "mined": "2026-08-31",
+  "miner": "recover-decisions, run by the dev-lead in the main checkout",
+  "mining_budget": {
+    "max_candidates": 40,
+    "max_partitions": 8
+  },
+  "pack": "ruby",
+  "pinned_sha": "2abc82667d02ef7ae3a1433d621c1f7463985c6d",
+  "redaction": "asserted before the write: every candidate carries path:line-range evidence and no code excerpt",
+  "repository": "rubygems-org",
+  "source": "crux/scripts/tests/arch-corpus/.cache/rubygems-org/bionic/arch/_recovered/state.yml \u2014 the cache is main-checkout-only, which is why this fixture is committed",
+  "url": "https://github.com/rubygems/rubygems.org"
+}

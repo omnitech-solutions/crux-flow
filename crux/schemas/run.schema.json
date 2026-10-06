@@ -1,0 +1,529 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "crux run snapshot (format_version 1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "run_id",
+    "book_id",
+    "book_content_hash",
+    "started_at",
+    "completed_at",
+    "status",
+    "current_prompt",
+    "prompts"
+  ],
+  "properties": {
+    "format_version": {
+      "const": "1"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^RUN-\\d{3}$"
+    },
+    "book_id": {
+      "type": "string",
+      "pattern": "^(?:(?!(?:PB|ADR|RUN|BRIEF)-)[A-Z][A-Z0-9]{1,9}-)?PB-\\d{4}$"
+    },
+    "book_content_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "started_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "completed_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "in_progress",
+        "completed",
+        "abandoned"
+      ]
+    },
+    "current_prompt": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "base_commit": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "abandonment": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "at",
+        "reason"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "deliberate",
+            "superseded"
+          ]
+        },
+        "at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "prompts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "n",
+          "title",
+          "state",
+          "started",
+          "completed",
+          "result",
+          "artifacts"
+        ],
+        "properties": {
+          "n": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "done",
+              "skipped",
+              "blocked"
+            ]
+          },
+          "started": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "completed": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "result": {
+            "type": "string"
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "blocked_confirmed": {
+            "const": true,
+            "$comment": "RETIRED AND IGNORED \u2014 readmitted, and pinned to the one value any writer ever produced. The per-prompt archive-eligibility flag is gone: eligibility is a run-level property (see the run status enum and the abandonment record). Nothing reads or writes this key. It stays listed because `additionalProperties: false` would otherwise REJECT a .yaml snapshot written before the retirement, and such snapshots are reachable in trees that ran an earlier crux. That is the same call already made on the legacy .md read path, where the retired field is ignored rather than reported: those bodies are frozen and cannot be cleanly retro-fixed, so a finding nobody may act on is worse than silence. `const: true` scopes the readmission to that reachable history and no wider: a retired field admitted at any value is an escape hatch, not a compatibility lane. Do not widen it, and do not read the key."
+          }
+        }
+      }
+    },
+    "flow": {
+      "type": "object",
+      "required": [
+        "schema_version"
+      ],
+      "properties": {
+        "schema_version": {
+          "enum": [
+            "1",
+            "2"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "schema_version": {
+                "const": "1"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "schema_version",
+              "goal",
+              "status",
+              "started_at",
+              "effective_policy",
+              "primary",
+              "supporting",
+              "verification",
+              "outcome_order",
+              "findings",
+              "remaining_strategy"
+            ],
+            "properties": {
+              "schema_version": {
+                "const": "1"
+              },
+              "goal": {
+                "type": "string",
+                "minLength": 1
+              },
+              "repo_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "change_kind": {
+                "type": "string",
+                "enum": [
+                  "additive",
+                  "replacement",
+                  "migration",
+                  "repair"
+                ]
+              },
+              "replaces": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "ACTIVE",
+                  "COMPLETED",
+                  "BLOCKED",
+                  "BUDGET_EXHAUSTED",
+                  "CANCELLED"
+                ]
+              },
+              "started_at": {
+                "type": "number"
+              },
+              "completed_at": {
+                "type": "number"
+              },
+              "effective_policy": {
+                "type": "object"
+              },
+              "policy_transitions": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "phase": {
+                "type": "string"
+              },
+              "remaining_strategy": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "active_invocation": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "attempts": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "invocation_counts": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "delegate": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "review": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "review-repair": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "council": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "delegate",
+                  "review",
+                  "review-repair",
+                  "council"
+                ]
+              },
+              "last_substantive_result": {
+                "type": [
+                  "object",
+                  "string",
+                  "null"
+                ]
+              },
+              "current_unit": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "supporting_exception": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "next_action": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "expected_write_set": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "base_commit": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "result_commit": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "book_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "deferred": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "outcome_order": {
+                "type": "object"
+              },
+              "primary": {
+                "type": "object"
+              },
+              "supporting": {
+                "type": "object"
+              },
+              "verification": {
+                "type": "object"
+              },
+              "findings": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "checkpoints": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "terminal_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "schema_version": {
+                "const": "2"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "schema_version",
+              "repo",
+              "book",
+              "run",
+              "plugin_root",
+              "effective_policy",
+              "policy_digest",
+              "source",
+              "started_epoch_ms",
+              "contracts",
+              "events",
+              "checks",
+              "reviews",
+              "findings",
+              "stop",
+              "next_action",
+              "phase",
+              "change_kind",
+              "replaces",
+              "previous_run",
+              "revision"
+            ],
+            "properties": {
+              "schema_version": {
+                "const": "2"
+              },
+              "repo": {
+                "type": "string",
+                "minLength": 1
+              },
+              "book": {
+                "type": "string",
+                "minLength": 1
+              },
+              "run": {
+                "type": "string",
+                "minLength": 1
+              },
+              "plugin_root": {
+                "type": "string",
+                "minLength": 1
+              },
+              "effective_policy": {
+                "type": "object"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "source": {
+                "type": "object"
+              },
+              "started_epoch_ms": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "contracts": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object"
+                }
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "checks": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "reviews": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "findings": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "stop": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "next_action": {
+                "type": "string"
+              },
+              "phase": {
+                "type": "string"
+              },
+              "change_kind": {
+                "type": "string",
+                "enum": [
+                  "additive",
+                  "replacement",
+                  "migration",
+                  "repair"
+                ]
+              },
+              "replaces": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "previous_run": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "notes": {
+      "type": "string"
+    },
+    "pr_draft": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    }
+  }
+}

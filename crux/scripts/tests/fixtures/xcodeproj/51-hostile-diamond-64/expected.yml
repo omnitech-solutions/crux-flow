@@ -1,0 +1,28 @@
+# ADR-0130 clause 17 hostile form: a 64-level group diamond -- at each
+# level, two groups (`GRP_A<n>`/`GRP_B<n>`) both list the SAME next-level
+# shared group `GRP_SHARED<n>` as a child. The reader's group-descent walk
+# (an explicit stack, never Python recursion) marks a revisited object id
+# in `unresolved_ids` and never re-descends it
+# (crux/scripts/crux/arch/packs/swift_xcode.py) -- "linear visits": each of
+# the 193 group objects is visited exactly once, never 2^64 times. Each
+# level's shared group is ALSO named directly as a Sources-phase build
+# file's `fileRef` (`BF_SHARED<n>`) -- hostile, since a group id stands in
+# for a file id, but syntactically legal. The 64 bullets below render from
+# descent, at each level's SECOND `children` reference to the shared group
+# (`GRP_B<n>` re-naming `GRP_SHARED<n>`): one bullet per join, 64 levels,
+# 64 bullets. `classic_memberships` skips an id descent already marked, so
+# the Sources-phase route never renders a second bullet for the same id.
+# Swift entities elsewhere (Model.swift, found by source walk, never by
+# Xcode membership) still render regardless.
+exit_code: 0
+
+rows:
+  data-model:
+    - "| `Model` | struct | public |"
+  module-graph:
+    - "| `TargetA` | `App.xcodeproj` | app | application | \u2014 |"
+
+residuals:
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    count: 64

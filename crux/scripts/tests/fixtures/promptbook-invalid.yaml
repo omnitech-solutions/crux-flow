@@ -1,0 +1,26 @@
+format_version: "1"
+id: PB-9002
+title: Invalid cycle book missing modules
+status: active
+created_at: 2026-05-29
+total_prompts: 1
+current_run: null
+current_prompt: null
+forked_from: null
+tags: [cycle, fixture, invalid]
+goal: |
+  This book declares the `cycle` tag but omits the `modules` object, so the
+  schema's `if tags contains "cycle" then required:[modules]` applicator must
+  reject it.
+strategy: |
+  One prompt; the missing `modules` is the only intended defect.
+prompts:
+  - n: 1
+    title: A lone prompt
+    purpose: |
+      Just enough to satisfy minItems.
+    prompt: |
+      Do the thing.
+    expected_output: |
+      The thing is done.
+    module_tag: dev-1

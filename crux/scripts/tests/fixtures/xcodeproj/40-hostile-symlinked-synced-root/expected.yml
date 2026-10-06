@@ -1,0 +1,30 @@
+# ADR-0130 clause 3 hostile form: a folder-synced root materialized as a
+# directory symlink whose target stays inside the checkout. No directory
+# symlink is descended: the root renders no membership row and one
+# `unresolved-reference` residual. `LinkedShared` (the materialize-time
+# symlink) points at `RealShared`, committed here as a real directory --
+# so a positive control (removing the symlink guard) would render
+# `RealShared/One.swift` as a member and turn this test red. Swift entities
+# elsewhere in the tree still render.
+materialize:
+  - path: LinkedShared
+    kind: symlink
+    target: RealShared
+
+exit_code: 0
+
+rows:
+  data-model:
+    - "| `Model` | struct | public |"
+
+residuals:
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: null
+    first_line: null
+    last_line: null
+
+absent:
+  module-graph:
+    - "RealShared/One.swift"
+    - "LinkedShared/One.swift"

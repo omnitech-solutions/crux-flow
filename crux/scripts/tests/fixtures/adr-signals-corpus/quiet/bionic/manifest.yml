@@ -1,0 +1,11 @@
+schema_version: "5"
+concerns_enabled:
+  - adrs
+  - journal
+  - promptbooks
+adr:
+  next_number: 3
+  governs_from: 1
+  governs_exempt: []
+promptbook:
+  next_number: 2

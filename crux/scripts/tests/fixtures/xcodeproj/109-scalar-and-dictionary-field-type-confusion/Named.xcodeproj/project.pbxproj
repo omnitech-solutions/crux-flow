@@ -1,0 +1,64 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG;
+			targets = (
+				TGT_LIST,
+				TGT_DICT,
+			);
+		};
+		MG = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				F_MAIN,
+			);
+		};
+		F_MAIN = {
+			isa = PBXFileReference;
+			path = Named/Main.swift;
+			sourceTree = "<group>";
+		};
+		BF_MAIN = {
+			isa = PBXBuildFile;
+			fileRef = F_MAIN;
+		};
+		PH_SRC = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				BF_MAIN,
+			);
+		};
+		TGT_LIST = {
+			isa = PBXNativeTarget;
+			name = (
+				App,
+			);
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+				PH_SRC,
+			);
+		};
+		TGT_DICT = {
+			isa = PBXNativeTarget;
+			name = {
+				App = Tool;
+			};
+			productType = "com.apple.product-type.tool";
+			dependencies = (
+				DEP,
+			);
+		};
+		DEP = {
+			isa = PBXTargetDependency;
+			target = TGT_LIST;
+		};
+	};
+	rootObject = PRJ;
+}

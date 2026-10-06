@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "identity": {
+    "distribution": "crux-flow",
+    "marketplace": "crux-flow",
+    "managed_prefix": "crux-flow-",
+    "version": "0.2.0",
+    "policy_revision": "2",
+    "projection_version": "2",
+    "upstream_repository": "https://github.com/bionic-coding/crux.git",
+    "upstream_commit": "732c355a5bc3130f6cd3763214f7c908b302a3e8",
+    "upstream_version": "3.25.1"
+  },
+  "aliases": {
+    "rapid": "aggressive"
+  },
+  "modes": {
+    "aggressive": {
+      "elapsed_minutes": 20,
+      "delegates": 0,
+      "reviewers": 1,
+      "repair_cycles": 1,
+      "council_rounds": 0,
+      "model_profile": "economical",
+      "verification": "focused-and-required",
+      "documentation": "affected",
+      "executor": "parent",
+      "interaction": {
+        "progress": "milestones",
+        "narrate_intent": false,
+        "ask_before_routine_decisions": false,
+        "repeat_known_context": false,
+        "report_speculation": false,
+        "partial_completion_returns_control": false
+      }
+    },
+    "balanced": {
+      "elapsed_minutes": 60,
+      "delegates": 2,
+      "reviewers": 2,
+      "repair_cycles": 2,
+      "council_rounds": 1,
+      "model_profile": "balanced",
+      "verification": "affected-integration-and-required",
+      "documentation": "affected-and-rationale",
+      "executor": "parent-integrates",
+      "interaction": {
+        "progress": "milestones",
+        "narrate_intent": false,
+        "ask_before_routine_decisions": false,
+        "repeat_known_context": false,
+        "report_speculation": false,
+        "partial_completion_returns_control": false
+      }
+    },
+    "thorough": {
+      "elapsed_minutes": 120,
+      "delegates": 4,
+      "reviewers": 3,
+      "repair_cycles": 3,
+      "council_rounds": 2,
+      "model_profile": "strong",
+      "verification": "risk-integration-and-required",
+      "documentation": "expanded-affected-rationale",
+      "executor": "parent-integrates",
+      "interaction": {
+        "progress": "detailed-checkpoints",
+        "narrate_intent": false,
+        "ask_before_routine_decisions": false,
+        "repeat_known_context": false,
+        "report_speculation": false,
+        "partial_completion_returns_control": false
+      }
+    },
+    "upstream": {
+      "elapsed_minutes": null,
+      "delegates": null,
+      "reviewers": null,
+      "repair_cycles": null,
+      "council_rounds": null,
+      "model_profile": "upstream",
+      "verification": "upstream",
+      "documentation": "upstream",
+      "executor": "upstream"
+    }
+  }
+}

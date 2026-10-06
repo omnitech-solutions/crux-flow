@@ -1,0 +1,30 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG;
+			targets = (
+				TG,
+			);
+		};
+		MG = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+			);
+		};
+		TG = {
+			isa = PBXNativeTarget;
+			name = "GoodTarget";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+			);
+		};
+	};
+	rootObject = PRJ;
+}

@@ -1,0 +1,81 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+				TGT_UNIQUE,
+				TGT_AMBIGUOUS,
+				TGT_UNMATCHED,
+			);
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				SYNC_MODULES,
+			);
+		};
+		SYNC_MODULES = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Modules";
+			sourceTree = "<group>";
+			explicitFolders = (
+			);
+		};
+		TGT_UNIQUE = {
+			isa = PBXNativeTarget;
+			name = "AppUnique";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+			);
+			dependencies = (
+			);
+			packageProductDependencies = (
+				PD_FOO,
+			);
+		};
+		PD_FOO = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Foo;
+		};
+		TGT_AMBIGUOUS = {
+			isa = PBXNativeTarget;
+			name = "AppAmbiguous";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+			);
+			dependencies = (
+			);
+			packageProductDependencies = (
+				PD_BAR,
+			);
+		};
+		PD_BAR = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Bar;
+		};
+		TGT_UNMATCHED = {
+			isa = PBXNativeTarget;
+			name = "AppUnmatched";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+			);
+			dependencies = (
+			);
+			packageProductDependencies = (
+				PD_BAZ,
+			);
+		};
+		PD_BAZ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Baz;
+		};
+	};
+	rootObject = PRJ;
+}

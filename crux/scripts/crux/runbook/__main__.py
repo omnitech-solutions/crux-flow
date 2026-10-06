@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "httpx>=0.27",
+# ]
+# ///
+"""CLI entry point for `python -m crux.runbook`."""
+
+import sys
+from pathlib import Path
+
+# Defensive: make the bundled package importable when this file is run as a
+# plain script (`uv run …/scripts/crux/runbook/__main__.py`) rather than as
+# `python -m crux.runbook`. The package root is `scripts/` — two levels up —
+# the *sibling* of the entry scripts (ADR-0035 §2). Survives -P /
+# PYTHONSAFEPATH.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+# Absolute import (not `from .runbook import main`) so this file also works
+# when executed as a plain script, where `__package__` is unset and relative
+# imports fail. Under `python -m crux.runbook` both forms resolve to the same
+# module.
+from crux.runbook.runbook import main
+
+if __name__ == "__main__":
+    main()

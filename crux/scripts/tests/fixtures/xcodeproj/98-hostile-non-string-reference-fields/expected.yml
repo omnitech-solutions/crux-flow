@@ -1,0 +1,32 @@
+# ADR-0130 clauses 2, 3, 5 and 14, hostile form: a `path` or `sourceTree`
+# field that the OpenStep grammar accepts but that holds a list or a
+# dictionary in place of a string. The grammar parses it, so it is not
+# `malformed`. Its location is not known, so the reference is never
+# resolved: in a Sources phase it renders one `unresolved-reference`
+# (clause 3's rule for a location the reader cannot resolve), the target
+# row still renders (clause 5), and the other members of the same phase
+# keep their rows. A group whose `path` is a dictionary leaves its child
+# unresolved, never rebased onto another group (clause 2).
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `App` | `App.xcodeproj` | app | application | — |"
+    - "| `App/Main.swift` | `App` | classic Sources build phase | — |"
+  data-model:
+    - "| `Weird` | struct | public |"
+    - "| `Odd` | struct | public |"
+
+absent:
+  module-graph:
+    - "project-unreadable"
+    - "| `App/Weird.swift` |"
+    - "| `App/Tree.swift` |"
+    - "| `Odd/Odd.swift` |"
+    - "| `Odd.swift` |"
+
+residuals:
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: "a file reference in 'App's Sources phase did not resolve"
+    count: 3

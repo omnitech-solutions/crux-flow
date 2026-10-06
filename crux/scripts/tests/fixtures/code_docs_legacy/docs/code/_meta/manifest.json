@@ -1,0 +1,29 @@
+{
+  "extractor_version": "1",
+  "pages": [
+    {
+      "doc_path": "elixir/App/Foo.md",
+      "extractor_version": "1",
+      "sha256": "7e10d9ea55d9f9509cc3f5b7eac04f10ed2e96f1837a7baad3bde74bacf09d63",
+      "source_path": "lib/app/foo.ex"
+    },
+    {
+      "doc_path": "elixir/App/Nested/Bar.md",
+      "extractor_version": "1",
+      "sha256": "41117ed221ee93bc420bda5af5d5dd0af7e656c38291498321d4b468440b913e",
+      "source_path": "lib/nested/dir/bar.ex"
+    },
+    {
+      "doc_path": "fallback/scripts/a.py.md",
+      "extractor_version": "1",
+      "sha256": "47e1a54a83ecf795537408cde25cc510b411ef63eac900b31cda59cd03cf0f07",
+      "source_path": "scripts/a.py"
+    },
+    {
+      "doc_path": "fallback/scripts/b.sh.md",
+      "extractor_version": "1",
+      "sha256": "8d929ac1a426a856479125d96465e81b781513f9d5d0c2cb7f4f9431c1591282",
+      "source_path": "scripts/b.sh"
+    }
+  ]
+}

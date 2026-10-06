@@ -1,0 +1,35 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG;
+			targets = "TQ";
+			packageReferences = "RX";
+		};
+		MG = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+			);
+		};
+		T = {
+			isa = PBXNativeTarget;
+			name = Listed;
+			productType = "com.apple.product-type.application";
+		};
+		R = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://example.com/listless.git";
+			requirement = {
+				kind = exactVersion;
+				version = 2.0.0;
+			};
+		};
+	};
+	rootObject = PRJ;
+}

@@ -1,0 +1,91 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+				TGT,
+			);
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				GRP_SOURCES,
+				FR_XCCONFIG,
+			);
+		};
+		GRP_SOURCES = {
+			isa = PBXGroup;
+			path = "Sources";
+			sourceTree = "<group>";
+			children = (
+				FR_INCLUDED,
+				FR_EXCLUDED,
+			);
+		};
+		FR_INCLUDED = {
+			isa = PBXFileReference;
+			path = "Included.swift";
+			sourceTree = "<group>";
+		};
+		FR_EXCLUDED = {
+			isa = PBXFileReference;
+			path = "Excluded.swift";
+			sourceTree = "<group>";
+		};
+		FR_XCCONFIG = {
+			isa = PBXFileReference;
+			path = "Shared.xcconfig";
+			sourceTree = "<group>";
+		};
+		BF_INCLUDED = {
+			isa = PBXBuildFile;
+			fileRef = FR_INCLUDED;
+		};
+		BF_EXCLUDED = {
+			isa = PBXBuildFile;
+			fileRef = FR_EXCLUDED;
+		};
+		PHASE = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				BF_INCLUDED,
+				BF_EXCLUDED,
+			);
+		};
+		CFG_DEBUG = {
+			isa = XCBuildConfiguration;
+			name = "Debug";
+			baseConfigurationReference = FR_XCCONFIG;
+			buildSettings = {
+				"SWIFT_VERSION[sdk=iphoneos*]" = "5.9";
+				EXCLUDED_SOURCE_FILE_NAMES = "Excluded.swift";
+			};
+		};
+		CFGLIST = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CFG_DEBUG,
+			);
+			defaultConfigurationName = Debug;
+		};
+		TGT = {
+			isa = PBXNativeTarget;
+			name = "App";
+			productType = "com.apple.product-type.application";
+			buildConfigurationList = CFGLIST;
+			buildPhases = (
+				PHASE,
+			);
+			dependencies = (
+			);
+		};
+	};
+	rootObject = PRJ;
+}

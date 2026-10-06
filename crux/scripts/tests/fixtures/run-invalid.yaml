@@ -1,0 +1,27 @@
+format_version: "1"
+run_id: RUN-001
+book_id: PB-9001
+book_content_hash: sha256:16c31ac3506928e2c53fa64b40b52fe7d86800220eaa3284f4641aa54485ac72
+started_at: 2026-05-29T12:00:00Z
+completed_at: null
+status: in_progress
+current_prompt: 2
+prompts:
+  - n: 1
+    title: Propose the ADR
+    state: done
+    started: 2026-05-29T12:00:00Z
+    completed: 2026-05-29T12:30:00Z
+    result: |
+      Proposed ADR-9001 and accepted it after a council pass.
+    artifacts: [docs/adrs/ADR-9001-sample.md]
+  - n: 2
+    title: Implement dev loop 1
+    state: in_progress
+    started: 2026-05-29T12:30:00Z
+    completed: null
+    result: ""
+    artifacts: []
+notes: ""
+pr_draft: ""
+summary: ""

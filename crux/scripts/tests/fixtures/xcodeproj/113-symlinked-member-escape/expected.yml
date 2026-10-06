@@ -1,0 +1,108 @@
+# ADR-0130 clause 3: "a symlinked component that
+# escapes also renders `path-escape`".
+#
+# `Out` and `Synced/Out` are materialized as directory symlinks that resolve
+# outside the checkout (to the temporary directory holding it), and
+# `Leak.swift` as a file symlink that does. The classic member `Out/X.swift`,
+# which two build files name, renders one `path-escape` at its file
+# reference's span, with the lexical-escape detail, and so does the classic
+# member `Leak.swift`, whose own last component is the link. The file,
+# directory and `/Localized/` exception entries under `Synced/Out` each
+# render `path-escape` at their own item line. Nothing outside the checkout
+# is opened (the harness's audit hook), and no row renders through either
+# link.
+#
+# `In` and `Synced/In` are symlinks that stay inside the checkout, to the
+# committed directory `Real`, and `LeakIn.swift` a file symlink to
+# `Real/X.swift`. None is descended or read, and each reference keeps the
+# `unresolved-reference` line it rendered before the fix. The Swift walk's
+# own `parse-error` line for each symlinked `.swift` file is not asserted.
+materialize:
+  - path: Out
+    kind: symlink
+    target: ..
+  - path: In
+    kind: symlink
+    target: Real
+  - path: Synced/Out
+    kind: symlink
+    target: ../..
+  - path: Synced/In
+    kind: symlink
+    target: ../Real
+  - path: Leak.swift
+    kind: symlink
+    target: ../Leak.swift
+  - path: LeakIn.swift
+    kind: symlink
+    target: Real/X.swift
+
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `Synced/Own.swift` | `App` | folder-synced root Synced | — |"
+
+absent:
+  module-graph:
+    - "names Out/X.swift"
+    - "names Leak.swift"
+    - "| `Out/"
+    - "| `In/"
+    - "| `Real/"
+    - "| `Synced/Out/"
+    - "| `Synced/In/"
+
+residuals:
+  - class: path-escape
+    path: App.xcodeproj/project.pbxproj
+    kind: a project file reference escapes the checkout after path normalisation
+    count: 2
+  - class: path-escape
+    path: App.xcodeproj/project.pbxproj
+    kind: a project file reference escapes the checkout after path normalisation
+    first_line: 26
+    last_line: 30
+  - class: path-escape
+    path: App.xcodeproj/project.pbxproj
+    kind: a project file reference escapes the checkout after path normalisation
+    first_line: 36
+    last_line: 40
+  - class: path-escape
+    path: App.xcodeproj/project.pbxproj
+    kind: an exception entry on Synced escapes the checkout
+    count: 3
+  - class: path-escape
+    path: App.xcodeproj/project.pbxproj
+    kind: an exception entry on Synced escapes the checkout
+    first_line: 88
+    last_line: 88
+  - class: path-escape
+    path: App.xcodeproj/project.pbxproj
+    kind: an exception entry on Synced escapes the checkout
+    first_line: 89
+    last_line: 89
+  - class: path-escape
+    path: App.xcodeproj/project.pbxproj
+    kind: an exception entry on Synced escapes the checkout
+    first_line: 90
+    last_line: 90
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: a file reference in 'App's Sources phase names In/X.swift, which no directory listing matches byte for byte as a regular file
+    first_line: 71
+    last_line: 71
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: a file reference in 'App's Sources phase names LeakIn.swift, which no directory listing matches byte for byte as a regular file
+    first_line: 73
+    last_line: 73
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: an exception entry on Synced resolves to no file
+    count: 2
+  - class: unresolved-reference
+    path: App.xcodeproj/project.pbxproj
+    kind: a /Localized/ exception entry on Synced resolves to no file
+    first_line: 93
+    last_line: 93

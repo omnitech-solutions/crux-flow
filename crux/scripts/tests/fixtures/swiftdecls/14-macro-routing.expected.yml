@@ -1,0 +1,19 @@
+# The closed macro table routes by name, never by attachment site: `@Observable`
+# to data-model; `@Suite`, `@Test` and declaration-scope `#Preview` to
+# api-surface. A body-scope `#expect` and the unnamed `@available` render
+# nothing. One line per file and macro covers every occurrence. Schema:
+# 01-actor.expected.yml.
+types:
+  - {name: Meter, kind: class, access: internal, at: [4, 5], conditional: false}
+  - {name: MeterTests, kind: struct, access: internal, at: [9, 10], conditional: false}
+stored_properties:
+  - {owner: Meter, name: reading, type: null, access: internal, at: [6, 6]}
+relationships: []
+interfaces: []
+requirements: []
+mains: []
+residuals:
+  - {concern: data-model, class: macro-not-expanded, lines: "4-5", detail: "attached macro @Observable is not expanded; code it generates does not render"}
+  - {concern: api-surface, class: macro-not-expanded, lines: "9-10", detail: "attached macro @Suite is not expanded; code it generates does not render"}
+  - {concern: api-surface, class: macro-not-expanded, lines: "11-12, 16-17", detail: "attached macro @Test is not expanded; code it generates does not render"}
+  - {concern: api-surface, class: macro-not-expanded, lines: "23-25", detail: "freestanding macro #Preview is not expanded; code it generates does not render"}

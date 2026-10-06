@@ -1,0 +1,161 @@
+# ADR-0130 clauses 2 and 14 hostile form: scalar and
+# dictionary fields holding a type the reader does not read them as. The
+# grammar parses every one, so none is `malformed`, and no content makes the
+# deriver exit 2.
+#
+# `Named.xcodeproj`: a list and a dictionary target `name`. The membership
+# merge used the name as a dictionary key, so the derive raised
+# `TypeError: unhashable type` and exited 2. Each name renders `—`,
+# qualified by its object id (see below), and one `unsupported-project-form`
+# at its own line; the classic member, the target dependency and both target
+# rows still render.
+#
+# `Grouped.xcodeproj`: a list `mainGroup` and no `objectVersion`. The list
+# collapsed the project to `project-unreadable`/`malformed`. It now renders
+# one `unresolved-reference` at its own line and nothing is descended: the
+# target row renders, its Sources entry and its synced lookup each render
+# their existing line, and no membership row renders. The missing
+# `objectVersion` renders its own detail, not `objectVersion 'None'`.
+#
+# `Dir.xcodeproj`: a list `projectDirPath` is never resolved, as for a
+# build-setting reference: nothing is descended and no mainGroup line
+# follows; the Sources entry renders its existing line.
+#
+# `Synced.xcodeproj`: a list `explicitFileTypes`, `platformFiltersByRelativePath`,
+# exception-set `target`, `fileRef`, `productName` and `productType`, and a
+# string `buildSettings`. Each collapsed the project or invented output: the
+# string's `[` made an invented conditioned setting, and the list
+# `explicitFileTypes` withheld the real member `Synced/Own.swift`. A
+# dictionary field of another type renders one `unsupported-project-form`
+# and applies nothing; a non-string id renders what a dangling id renders; a
+# non-string `productType` is unmapped.
+#
+# Both `Named` targets have no readable name and so share the display `—`.
+# A target's identity is its container and its object id, so each renders
+# `— (object <id>)`: two target rows, the membership row names `TGT_LIST`,
+# and the Mermaid graph draws the one dependency between two distinct nodes.
+# Declared cause of this move, ADR-0130 clause 10 (one row per file, target
+# and route; ADR-0130:148): target identity moved from display name to
+# (container, object id); two targets sharing a display now render distinct
+# `— (object <id>)` displays.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `— (object TGT_LIST)` | `Named.xcodeproj` | app | application | — |"
+    - "| `— (object TGT_DICT)` | `Named.xcodeproj` | executable | tool | — |"
+    - "| `Named/Main.swift` | `— (object TGT_LIST)` | classic Sources build phase | — |"
+    - "  Named_xcodeproj_____object_TGT_DICT_[\"— (object TGT_DICT) (Named.xcodeproj)\"] --> Named_xcodeproj_____object_TGT_LIST_[\"— (object TGT_LIST) (Named.xcodeproj)\"]\n"
+    - "| `Grouped` | `Grouped.xcodeproj` | library | framework | — |"
+    - "| `DirTool` | `Dir.xcodeproj` | executable | tool | — |"
+    - "| `Synced` | `Synced.xcodeproj` | unmapped | — | — |"
+    - "| `Synced/Own.swift` | `Synced` | folder-synced root Synced | — |"
+    - "| `Synced/Ex.swift` | `Synced` | excluded by an exception set | — |"
+    - "| `Synced` | `—` | remote product |"
+
+absent:
+  module-graph:
+    - "— (Named.xcodeproj)"
+    - "project-unreadable"
+    - "| `Grouped/G.swift`"
+    - "| `Dir/Main.swift`"
+    - "| `Classic/C.swift`"
+    - "is conditioned"
+    - "retyped by explicitFileTypes"
+    - "carries a platformFiltersByRelativePath condition"
+    - "['App']"
+    - "{'App'"
+    - "objectVersion 'None'"
+    - "| `Kit` |"
+
+residuals:
+  - class: unsupported-project-form
+    path: Named.xcodeproj/project.pbxproj
+    kind: a target's name field is not a string and is not read
+    first_line: 40
+    last_line: 40
+  - class: unsupported-project-form
+    path: Named.xcodeproj/project.pbxproj
+    kind: a target's name field is not a string and is not read
+    first_line: 50
+    last_line: 50
+  - class: unsupported-project-form
+    path: Grouped.xcodeproj/project.pbxproj
+    kind: objectVersion is absent or not a string, which is outside the tested set
+    first_line: 7
+    last_line: 15
+  - class: unresolved-reference
+    path: Grouped.xcodeproj/project.pbxproj
+    kind: the project's mainGroup names no group object; no group is descended
+    first_line: 9
+    last_line: 9
+  - class: unresolved-reference
+    path: Grouped.xcodeproj/project.pbxproj
+    kind: the project's mainGroup names no group object; no group is descended
+    count: 1
+  - class: unresolved-reference
+    path: Dir.xcodeproj/project.pbxproj
+    kind: the project's mainGroup names no group object; no group is descended
+    count: 0
+  - class: unresolved-reference
+    path: Named.xcodeproj/project.pbxproj
+    kind: the project's mainGroup names no group object; no group is descended
+    count: 0
+  - class: unresolved-reference
+    path: Synced.xcodeproj/project.pbxproj
+    kind: the project's mainGroup names no group object; no group is descended
+    count: 0
+  - class: unsupported-project-form
+    path: Named.xcodeproj/project.pbxproj
+    kind: a target's name field is not a string and is not read
+    count: 2
+  - class: unresolved-reference
+    path: Grouped.xcodeproj/project.pbxproj
+    kind: a file reference in 'Grouped's Sources phase did not resolve
+    first_line: 41
+    last_line: 41
+  - class: unresolved-reference
+    path: Grouped.xcodeproj/project.pbxproj
+    kind: target 'Grouped' names a folder-synced root that descent did not resolve
+    first_line: 52
+    last_line: 52
+  - class: unresolved-reference
+    path: Dir.xcodeproj/project.pbxproj
+    kind: a file reference in 'DirTool's Sources phase did not resolve
+    first_line: 37
+    last_line: 37
+  - class: unsupported-project-form
+    path: Synced.xcodeproj/project.pbxproj
+    kind: a folder-synced root's explicitFileTypes field is not a dictionary and is not applied
+    first_line: 32
+    last_line: 32
+  - class: unresolved-reference
+    path: Synced.xcodeproj/project.pbxproj
+    kind: an exception set on Synced names no native target
+    first_line: 38
+    last_line: 46
+  - class: unsupported-project-form
+    path: Synced.xcodeproj/project.pbxproj
+    kind: an exception set's platformFiltersByRelativePath field is not a dictionary and is not applied
+    first_line: 52
+    last_line: 52
+  - class: unresolved-reference
+    path: Synced.xcodeproj/project.pbxproj
+    kind: a dangling file reference in 'Synced's Sources phase
+    first_line: 79
+    last_line: 79
+  - class: unsupported-project-form
+    path: Synced.xcodeproj/project.pbxproj
+    kind: a build configuration's buildSettings field is not a dictionary and is not read
+    first_line: 84
+    last_line: 84
+  - class: unsupported-project-form
+    path: Synced.xcodeproj/project.pbxproj
+    kind: a package product dependency's productName field is not a string and is not read
+    first_line: 90
+    last_line: 90
+  - class: unsupported-project-form
+    path: Synced.xcodeproj/project.pbxproj
+    kind: target 'Synced' names an unmapped product type
+    first_line: 102
+    last_line: 117

@@ -1,0 +1,13 @@
+schema_version: "5"
+concerns_enabled:
+  - adrs
+  - journal
+  - promptbooks
+adr:
+  next_number: 4
+  governs_from: 1
+  governs_exempt: [ADR-0003]
+journal:
+  friction_line_from: 2026-02-14
+promptbook:
+  next_number: 2

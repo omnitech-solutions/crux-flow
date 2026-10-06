@@ -1,0 +1,82 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+				TGT_APPK,
+				TGT_EXTK,
+				TGT_TSTK,
+				TGT_LIBK,
+				TGT_EXEK,
+				TGT_WEIRD,
+			);
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+			);
+		};
+		TGT_APPK = {
+			isa = PBXNativeTarget;
+			name = "AppKind";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+			);
+			dependencies = (
+			);
+		};
+		TGT_EXTK = {
+			isa = PBXNativeTarget;
+			name = "ExtKind";
+			productType = "com.apple.product-type.app-extension";
+			buildPhases = (
+			);
+			dependencies = (
+			);
+		};
+		TGT_TSTK = {
+			isa = PBXNativeTarget;
+			name = "TestKind";
+			productType = "com.apple.product-type.bundle.unit-test";
+			buildPhases = (
+			);
+			dependencies = (
+			);
+		};
+		TGT_LIBK = {
+			isa = PBXNativeTarget;
+			name = "LibKind";
+			productType = "com.apple.product-type.framework";
+			buildPhases = (
+			);
+			dependencies = (
+			);
+		};
+		TGT_EXEK = {
+			isa = PBXNativeTarget;
+			name = "ExeKind";
+			productType = "com.apple.product-type.tool";
+			buildPhases = (
+			);
+			dependencies = (
+			);
+		};
+		TGT_WEIRD = {
+			isa = PBXNativeTarget;
+			name = "Weird";
+			productType = "com.apple.product-type.mystery-custom-type";
+			buildPhases = (
+			);
+			dependencies = (
+			);
+		};
+	};
+	rootObject = PRJ;
+}

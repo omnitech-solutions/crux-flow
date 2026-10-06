@@ -1,0 +1,20 @@
+# ADR-0130 clause 17 form: the pinned product-type families (app, extension,
+# test, library, executable) and one unmapped product type, which renders
+# `kind` = unmapped and an `unsupported-project-form` residual.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `AppKind` | `App.xcodeproj` | app | application | — |"
+    - "| `ExtKind` | `App.xcodeproj` | extension | app-extension | — |"
+    - "| `TestKind` | `App.xcodeproj` | test | unit-test | — |"
+    - "| `LibKind` | `App.xcodeproj` | library | framework | — |"
+    - "| `ExeKind` | `App.xcodeproj` | executable | tool | — |"
+    - "| `Weird` | `App.xcodeproj` | unmapped | mystery-custom-type | — |"
+
+residuals:
+  - class: unsupported-project-form
+    path: App.xcodeproj/project.pbxproj
+    kind: null
+    first_line: null
+    last_line: null

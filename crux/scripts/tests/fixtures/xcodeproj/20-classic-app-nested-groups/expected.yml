@@ -1,0 +1,23 @@
+# ADR-0130 clause 17 form: classic app project -- nested <group> paths three
+# deep, a name-only group holding a SOURCE_ROOT ref, a PBXVariantGroup, a
+# file in a group but in no Sources phase (no row), a BUILT_PRODUCTS_DIR
+# product (no row), and an app target with a @main file whose owning cell
+# renders "App (App.xcodeproj)".
+exit_code: 0
+
+rows:
+  module-graph:
+    - "| `App` | `App.xcodeproj` | app | application | — |"
+    - "| `Sources/Models/Deep/AppMain.swift` | `App` | classic Sources build phase | — |"
+    - "| `Extra/SourceRootFile.swift` | `App` | classic Sources build phase | — |"
+    - "| `en.lproj/Config.swift` | `App` | classic Sources build phase | — |"
+    - "| `fr.lproj/Config.swift` | `App` | classic Sources build phase | — |"
+  api-surface:
+    - "| `AppMain` | struct | `App (App.xcodeproj)` |"
+
+absent:
+  module-graph:
+    - "| `Orphan.swift`"
+    - "| `App.app`"
+    - "unresolved-reference"
+    - "unsupported-project-form"

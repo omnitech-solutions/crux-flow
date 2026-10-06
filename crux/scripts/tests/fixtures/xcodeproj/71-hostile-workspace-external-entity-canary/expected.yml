@@ -1,0 +1,41 @@
+# ADR-0130 clause 17 hostile form: this fixture proves the
+# WORKSPACE READER classifies an XML external-entity declaration as an
+# `entity-declaration` residual and derives cleanly (exit 0) end-to-end
+# through `derive-arch.py` -- it does NOT itself prove the canary is
+# "never opened". The canary sits inside `App.xcworkspace/`, which is
+# inside this fixture's own root; the harness's `open` audit hook treats
+# the whole fixture root as an ALLOWED prefix (the derive legitimately
+# opens files under it), so an open of `canary.txt` would be silent here
+# even if the reader followed the external entity. The `absent:
+# CANARY-SECRET-CONTENT-71` checks below are a cheap belt-and-braces
+# check that the canary's CONTENT never leaks into a rendered concern
+# body -- they discriminate nothing about whether the file was OPENED,
+# since no residual template ever embeds file content regardless.
+#
+# The real "never opened" proof is at the reader level:
+# `test_swift_xcinputs.py::WorkspaceReaderTests::
+# test_external_entity_canary_never_opened` installs an audit hook with
+# NO allowed-prefix carve-out around `swift_xcinputs.read_workspace`
+# directly, and its paired positive control,
+# `test_external_entity_canary_positive_control_would_open`, proves the
+# canary is reachable at all: an unguarded `xml.parsers.expat` parse of
+# the identical payload DOES have its open of the canary observed by the
+# same hook, so the guarded reader's silence is a real refusal, not an
+# artifact of the canary being unreachable.
+exit_code: 0
+residuals:
+  - class: project-unreadable
+    path: App.xcworkspace/contents.xcworkspacedata
+    kind: entity-declaration
+    first_line: null
+    last_line: null
+
+absent:
+  module-graph:
+    - "CANARY-SECRET-CONTENT-71"
+  api-surface:
+    - "CANARY-SECRET-CONTENT-71"
+  data-model:
+    - "CANARY-SECRET-CONTENT-71"
+  decision-index:
+    - "CANARY-SECRET-CONTENT-71"

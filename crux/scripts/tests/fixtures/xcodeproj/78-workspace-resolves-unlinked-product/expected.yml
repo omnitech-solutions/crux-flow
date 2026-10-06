@@ -1,0 +1,13 @@
+# ADR-0130 clause 7 / item 4 seam fix: "App" names an unlinked package
+# product "Foo" that is reachable ONLY through the enclosing standalone
+# workspace's package reference -- not under any group/synced root/local
+# reference of the project itself. Resolves to one edge, no residual.
+exit_code: 0
+
+rows:
+  module-graph:
+    - "Foo (External/Foo/Package.swift)"
+
+absent:
+  module-graph:
+    - "unresolved-reference"

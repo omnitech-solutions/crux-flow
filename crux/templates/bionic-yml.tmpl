@@ -1,0 +1,25 @@
+# .bionic.yml — per-project layout source of truth (config_version 1)
+config_version: "1"        # REQUIRED. String, like every other crux version field.
+docs_dir: bionic           # OPTIONAL. Repo-root-relative path to the documentation tree.
+                           # Default: "bionic"; init-docs writes this key explicitly for
+                           # every tree it creates.
+artifact_prefix: ""        # OPTIONAL. ^[A-Z][A-Z0-9]{1,9}$ or blank. Blank/absent = bare ids.
+
+# `.bionic.yml` is the layout source of truth and SUPERSEDES the legacy `.crux`
+# file. It lives at the repo root (found before the durable layer is located)
+# and is named for the destination methodology, not the tool — so the durable
+# home still makes sense if crux is ever replaced.
+#
+# Resolution precedence: `.bionic.yml` > legacy `.crux` > content-validated
+# bare-directory discovery > default `bionic`.
+# This file is OPTIONAL for a tree crux did not create. Absent it (and with no
+# `.crux`): an established tree with a valid crux manifest keeps resolving — a
+# legacy `docs/` tree wins when it is the only one; two valid trees refuse
+# loudly until one is migrated; with no valid manifest anywhere, the tree
+# location defaults to `bionic`. Malformed or invalid values fail loud
+# (exit 1). init-docs writes this file for every tree it creates (merging,
+# never clobbering, when a config already exists).
+# Designed to be committed so the team shares one config — works identically untracked.
+# NEVER put secrets/tokens/keys here — this file is meant to be shared. Secrets live in ~/.crux/ (the user-home directory).
+# Full contract: <docs_dir>/AGENTS.md §14; resolved via the plugin's bionic-config CLI
+# (e.g. `python3 "${CRUX_PLUGIN_ROOT}/scripts/bionic-config.py"`).

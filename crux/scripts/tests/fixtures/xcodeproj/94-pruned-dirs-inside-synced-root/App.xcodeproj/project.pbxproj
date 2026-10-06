@@ -1,0 +1,41 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+				TGT_APP,
+			);
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				SYNC_APP,
+			);
+		};
+		SYNC_APP = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "App";
+			sourceTree = "<group>";
+		};
+		TGT_APP = {
+			isa = PBXNativeTarget;
+			name = "App";
+			productType = "com.apple.product-type.application";
+			fileSystemSynchronizedGroups = (
+				SYNC_APP,
+			);
+			buildPhases = (
+			);
+			dependencies = (
+			);
+		};
+	};
+	rootObject = PRJ;
+}

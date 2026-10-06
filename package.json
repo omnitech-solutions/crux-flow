@@ -1,0 +1,12 @@
+{
+  "name": "@omnitech/crux-flow",
+  "private": true,
+  "scripts": {
+    "setup": "uv run --script ./crux-flow setup",
+    "crux": "uv run --script ./crux-flow",
+    "build": "uv run --script ./crux-flow package",
+    "test": "uv run --group test python -m pytest",
+    "verify": "uv run --group test python tools/verify.py --core",
+    "verify:full": "uv run --group upstream-test python tools/verify.py --full"
+  }
+}

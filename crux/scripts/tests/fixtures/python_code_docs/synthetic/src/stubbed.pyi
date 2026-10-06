@@ -1,0 +1,3 @@
+def area(w: float, h: float) -> float: ...
+
+VERSION: str

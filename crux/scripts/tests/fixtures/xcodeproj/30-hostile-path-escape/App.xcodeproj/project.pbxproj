@@ -1,0 +1,41 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+			);
+			projectDirPath = "/AbsoluteProjectDir";
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				FR_TRAVERSE,
+				FR_ABS,
+				FR_SRCROOT,
+			);
+		};
+		FR_TRAVERSE = {
+			isa = PBXFileReference;
+			path = "../../../Escape.swift";
+			sourceTree = "<group>";
+		};
+		FR_ABS = {
+			isa = PBXFileReference;
+			path = "/Abs/AbsoluteEscape.swift";
+			sourceTree = "<absolute>";
+		};
+		FR_SRCROOT = {
+			isa = PBXFileReference;
+			path = "Something.swift";
+			sourceTree = "SOURCE_ROOT";
+		};
+	};
+	rootObject = PRJ;
+}

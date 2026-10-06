@@ -1,0 +1,877 @@
+# The arch stack-pack corpus: real open-source repositories, pinned by commit.
+#
+# WHY this file exists. Every language stack pack (python, ruby, node, elixir)
+# is validated today against synthetic fixtures of 9-15 files. This manifest
+# names real repositories so the packs can be measured against real code, and
+# so a pack change that moves a real repository's spine has to be re-blessed
+# explicitly (see `golden/` and `../test_arch_corpus.py`).
+#
+# The clones are NOT vendored. `fetch.py` shallow-clones each entry at its
+# pinned SHA into the gitignored `.cache/<name>/`. The manifest, the fetch
+# script, the goldens and the test are the committed artifacts.
+#
+# Fields, required unless noted:
+#   name     directory name under `.cache/` and `golden/`; [a-z0-9-]+
+#   pack     the stack pack this entry is meant to exercise
+#   url      https://github.com/<owner>/<repo> (no other host is accepted).
+#            Required UNLESS `source: self`, which must not carry it.
+#   sha      full 40-hex commit SHA; the fetch is fail-closed on a mismatch.
+#            Required UNLESS `source: self`, which must not carry it.
+#   source   OPTIONAL. Absent for a fetched clone. `self` derives THIS
+#            repository in place — no clone, no `.cache/<name>/` — and then
+#            REQUIRES `arch_stack:` (see W5a below).
+#   arch_stack  REQUIRED when `source: self`, otherwise absent. The pack name
+#            `resolve_stack` is forced to answer, overriding this repository's
+#            own `.bionic.yml` pin (`arch_stack: crux`) for the derive.
+#   license  SPDX id as GitHub reports it, or the package manifest's own field
+#   why      what this repository is meant to exercise
+#   expect   the expectation record; its shape is below, and `fetch.py`
+#            validates it before any network call, exactly as it validates
+#            `name`, `url` and `sha`
+#
+# ── THE BACKTICK CONVENTION ─────────────────────────────────────────────────
+#
+# A backticked, `/`-leading token in a `why:` or `because:` is a claim that
+# the entry's golden renders that exact path; a route path the golden does
+# NOT render is written without backticks. Two guards in `../test_arch_corpus.py`
+# enforce it, and neither reaches every claim in this file:
+#
+#   1. `test_backticked_route_paths_are_rendered_in_the_golden` checks a
+#      backticked `/`-leading token against `golden/<name>/api-surface.md`'s
+#      path column. It skips two shapes on purpose: a token holding a glob
+#      (`*`) or a template hole (`${...}`), because that is a pattern rather
+#      than a literal path (see `fastapi-fullstack`'s api-surface note); and a
+#      trailing-ellipsis abbreviation (`...`), because that is a shortened
+#      reference rather than a claimed path.
+#   2. Its sibling, `test_backticked_source_files_exist_in_the_pinned_checkout`,
+#      checks a backticked token carrying a source-file extension against the
+#      pinned checkout itself (`.cache/<name>/<path>`) rather than the golden —
+#      a claim that the file IS THERE, not that it renders. A `no `/`NO `
+#      immediately before the token exempts a denial (see `rubygems-org`'s
+#      retracted `structure.sql` aside, which states a path is ABSENT).
+#
+# Both guards skip a `source: self` entry, and by that field rather than by
+# name: guard 1 has no `golden/<name>/` path column to check against, and
+# guard 2 has no `.cache/<name>/` checkout to resolve a filename in. Each guard
+# asserts in the same test that the ten FETCHED entries still took the full
+# path, so the exemption cannot silently widen past the one entry.
+#
+# Neither guard reaches a claim that names no path at all. There is no cheap
+# guard for that class, and none is attempted.
+#
+# `pack` records INTENT, not a prediction. Every entry is now detected as the
+# pack it is filed under; the two mis-detections the baseline recorded (see
+# `baseline-2026-08-29.md`) are both closed.
+#
+# ADR-0096 clause 6's depth-two marker scan closed `sequelize-express-example`,
+# whose `package.json` is one directory down. `wagtail-bakerydemo` was never a
+# depth problem: it is a Django application with a root `package.json`, a root
+# `requirements.txt`, and no `pyproject.toml` or `setup.py`, so the python
+# pack's markers fired NOWHERE, `_undominated` saw a single contender, and
+# `resolve_stack` answered `node` silently — no multi-match, so nothing to
+# record as ambiguous. The ADR names the two acceptable answers, a new marker or
+# an honest `ambiguous_stack`; dev loop 3 took the first, adding
+# `requirements.txt` to `packs.python._PYTHON_MARKERS`. Both markers now fire at
+# depth 0 and `python beats node` at equal depth resolves it from a measured
+# pair rather than a guess.
+#
+# The scope of that fix, stated honestly: it does not make "no silent wrong
+# pick" universally true — a Go service carrying a `package.json` still resolves
+# silently to node, because no pack claims Go. It makes no repository in THIS
+# corpus a counterexample, which is the scope clause 8 defines.
+#
+# SHAs were resolved from each repository's default-branch HEAD on 2026-08-29.
+#
+# ── THE EXPECTATION RECORD (ADR-0096 clause 8) ──────────────────────────────
+#
+# Every entry also carries an `expect` block, and it is the acceptance gate.
+# **No criterion here appeals to what a repository "genuinely has."** Each one
+# states what the extractor CURRENTLY PRODUCES, and where that is a debt rather
+# than the repository's truth, `because:` is where the debt is named. Editing an
+# expectation is a reviewed edit exactly as re-blessing a golden is; an
+# expectation edited to match a regression passes the gate exactly as a careless
+# re-bless does, and nothing mechanical catches either.
+#
+#   expect:
+#     pack: <the pack `detect_stack` resolves>   — INTENT lives in `pack:` above
+#           `stub` is a legal value here and means no pack resolved at all; its
+#           three non-universal concerns then take `unsupported_stack`. No entry
+#           records it any more — clause 6's depth-two scan resolved the one
+#           that did.
+#     packages: [<the package set the resolved pack's package detection reports>]
+#           EVERY candidate, not the single one (clause 6). One entry lists
+#           sixteen; a repository with more than one and no per-package graph
+#           takes `ambiguous_package` on its module-graph.
+#     concerns:
+#       <concern>:
+#         populated: {min_entities: N}   # a floor, not an equality
+#         # or
+#         stubbed: {reason: <one of the six StubReason members>}
+#         because: >-                    # REQUIRED on stubbed, optional on
+#           ...                          # populated (see below)
+#
+# `packages` is the set the RESOLVED pack's package detection reports. Package
+# detection is landed for the python pack and the swift pack; every other pack
+# reports the empty list — that is a statement about the pack, not about the
+# repository. The swift pack reports its containers by repo-relative marker
+# path: every `Package.swift` and every `*.xcodeproj` holding `project.pbxproj`.
+#
+# `facts:` (optional, ADR-0129 clause 9(a)) names a hashed expectations file,
+# `{path: expectations/<name>.yml, sha256: <64 hex>}`. The file lists facts
+# written before the pack was implemented, each `must-render`,
+# `limitation-expected` or `out-of-scope`. `test_arch_facts.py` holds the digest
+# to the file's bytes and checks every fact against the entry's committed
+# goldens, so editing a facts file is this reviewed edit plus a recorded
+# amendment. Floors on an entry with `facts:` count in the pack's own units:
+# model types, interface-shaped rows and in-tree dependency pairs.
+#
+# `because:` is required on every `stubbed` expectation and must name one of two
+# things: a surface the repository does not have, or an open follow-on probe.
+# That requirement is what lets postcondition (a) hold while the GraphQL debt
+# remains follow-on work — the debt is declared rather than hidden inside a
+# passing gate. The Django ORM debt was discharged in dev loop 2; the Mongoose
+# debt was discharged in dev loop 3 (both are no longer carried anywhere in
+# this file).
+#
+# `because:` is ALSO allowed on a `populated` expectation, and means something
+# narrower there: the concern extracts, and `min_entities` is known to understate
+# the repository's surface. Nine api-surface entries use it today — the GraphQL
+# debt on nestjs-prisma-starter, the mount-composed floor count on
+# express-boilerplate (U-N2 landed mount-prefix composition, so all 14 routes
+# now render under their real `/v1/*` mounts — `/v1/auth/...`, `/v1/users`,
+# `/v1/users/:userId`, `/v1/docs` — and the `because:` stays only because 14 is
+# still a floor, not a claim about the whole surface), the runtime-composed
+# declarations dropped and named on sequelize-express-example, the ruby pack's
+# declared route under-count on both Rails applications, the `forward` /
+# macro-defined / `param:`-restructured declarations the elixir pack names on
+# both Phoenix applications, and the python pack's two: the framework-registered
+# routes no FastAPI decorator declares, and the four third-party urlconfs the
+# Django site includes from packages that are not in this repository. Two
+# non-api-surface entries also use it, both on sequelize-express-example.
+
+schema_version: 1
+resolved_at: "2026-08-29"
+
+repos:
+  # ── python ────────────────────────────────────────────────────────────────
+  - name: fastapi-fullstack
+    pack: python
+    url: https://github.com/fastapi/full-stack-fastapi-template
+    sha: 486f054cc8d1aead59ec96cc0a16933d06c10e0d
+    license: MIT
+    why: >-
+      The canonical FastAPI application template (45k stars). Backend under
+      `backend/`, frontend under `frontend/` — the multi-directory layout most
+      real FastAPI apps have, and no committed openapi.json.
+    expect:
+      pack: python
+      packages: [app]
+      concerns:
+        data-model:
+          populated: {min_entities: 12}
+          because: >-
+            Twelve columns across the two `table=True` classes, beside the same
+            five-migration Alembic timeline the pack already rendered. Most of
+            those columns are declared on `UserBase` and `ItemBase` rather than
+            on `User` and `Item`, so the count holds only while base-class
+            composition does; composition is resolved within one module, and a
+            base imported from elsewhere would contribute nothing.
+            This concern now renders a residual, its first. The pinned tree
+            carries `backend/app/api/deps.py`, whose line 36 reads
+            `except InvalidTokenError, ValidationError:` — a Python 2 handler
+            CPython 3.13's parser refuses. The three data-model scans name that
+            path in the residuals and hash it into `inputs_found` without
+            parsing it, so a later edit to it drifts this concern instead of
+            passing unseen. The 12 does not move: the file declares
+            `Annotated`/`Depends` helpers and no `table=True` class, so it
+            contributed no column before the refusal and contributes none now.
+            CPython 3.14 parses that line (PEP 758), so on 3.14 there is no
+            residual and the path leaves `inputs_found`. The 3.14 golden
+            overlay records exactly that difference, and the 12 holds on both.
+        api-surface:
+          populated: {min_entities: 23}
+          because: >-
+            The 23 rows are the routes the source DECLARES, and they are a floor
+            in two directions. FastAPI registers /docs, /redoc and its own
+            openapi.json at import time, and no decorator declares them. And
+            every path here opens with `${settings.API_V1_STR}` — the mount
+            prefix `app.include_router(api_router, prefix=settings.API_V1_STR)`
+            names, which is a settings attribute a parse cannot evaluate. It
+            renders verbatim and the golden's residual names it; guessing the
+            conventional /api/v1 is what produced the node baseline's nine
+            confidently wrong paths. (None of those four paths is backticked
+            here — see this file's header, "THE BACKTICK CONVENTION".)
+            A second residual sits beside that one. The route scan reaches
+            `backend/app/api/deps.py`, whose line 36 reads
+            `except InvalidTokenError, ValidationError:`, and CPython 3.13's
+            parser refuses it; the scan names the path and hashes it into
+            `inputs_found` rather than skipping it silently. The 23 does not
+            move: the file declares dependency helpers and no route decorator,
+            so it registered no row before the refusal and registers none now.
+            On CPython 3.14 the line parses (PEP 758), so that second residual
+            is absent there; the 3.14 golden overlay records it, and the 23
+            holds on both.
+        module-graph:
+          populated: {min_entities: 36}
+          because: >-
+            36 resolved edges over the 25 modules of `backend/app`, reached by
+            the manifest-anchored tier of package detection: `backend/pyproject.toml`
+            declares `name = "app"` and `backend/app/__init__.py` exists, so the
+            repository names its own package one directory down and there is one
+            candidate BY DECLARATION. The anchor is the declaration and not the
+            depth. A blanket depth-2 package union was measured on this same
+            repository and answers TWO candidates — `backend/app` AND
+            `backend/tests` — which is `ambiguous_package`, so the wider search
+            fails to fix the repository it was aimed at. The count is a floor in
+            one direction: only edges whose target resolves inside `app` are
+            drawn, so an import of `sqlmodel` or `fastapi` contributes nothing,
+            and the graph describes the application's internal shape rather than
+            its dependency set.
+        decision-index:
+          stubbed: {reason: precondition_missing}
+          because: >-
+            A surface the repository does not have. It carries no crux
+            documentation tree, so there is no ADR index to project. True of all
+            ten corpus repositories.
+
+  - name: djangoproject-com
+    pack: python
+    url: https://github.com/django/djangoproject.com
+    sha: d0b29cebd3e2345bae298ed7ca14834be037bd6a
+    license: BSD-3-Clause
+    why: >-
+      The Django project's own website: a real, maintained Django application
+      with ~15 apps, Django ORM models, and django declared in pyproject.toml
+      (which is what the python pack's detection markers look for).
+    expect:
+      pack: python
+      # Sixteen candidates, and the whole set is the record. Package detection
+      # reports every candidate under ADR-0096 clause 6; before it, this
+      # repository and `fastapi-fullstack` both answered None and were
+      # indistinguishable, though one has no candidate and this one has sixteen.
+      packages: [_sphinx_13448_workaround, accounts, aggregator, blog, checklists,
+                 contact, dashboard, djangoproject, docs, foundation, fundraising,
+                 legacy, members, releases, svntogit, tracdb]
+      concerns:
+        data-model:
+          populated: {min_entities: 340}
+          because: >-
+            340 field declarations across 55 tables, which discharges the
+            Django-ORM debt ADR-0096 clause 8 named. It is a floor rather than
+            the schema: Django's implicit `id` primary key is added by the ORM
+            and declared by no model, so it appears on no row, and a model whose
+            base class is imported from another module renders only the fields
+            it declares itself.
+        api-surface:
+          populated: {min_entities: 109}
+          because: >-
+            109 rows composed across the 16 `urlpatterns` modules, and a floor.
+            Four `include(...)` targets name urlconfs that live in installed
+            third-party packages rather than in this repository — the auth,
+            registration, `django_push` and debug-toolbar trees — so every route
+            below those four mounts is absent, and the golden's residual names
+            all four.
+        module-graph:
+          stubbed: {reason: ambiguous_package}
+          because: >-
+            An open follow-on probe: a per-package module graph. This is sixteen
+            Django apps side by side at the repository root rather than one
+            package, and clause 6's two answers are a graph per package or an
+            honest `ambiguous_package` naming them. This unit took the second —
+            the record above lists all sixteen and the stub line names them, so
+            nothing is picked silently. The first answer stays open work.
+        decision-index:
+          stubbed: {reason: precondition_missing}
+          because: >-
+            A surface the repository does not have — no crux documentation tree,
+            so no ADR index to project.
+
+  - name: wagtail-bakerydemo
+    pack: python
+    url: https://github.com/wagtail/bakerydemo
+    sha: c8f8255593c0efcfab5fef2fb19d60895227748a
+    license: BSD-3-Clause
+    why: >-
+      Wagtail's official demo site — a small Django app with requirements.txt
+      and no pyproject.toml/setup.py. Chosen to probe marker-file detection on
+      a Django layout that predates PEP 621.
+    expect:
+      # Filed under `pack: python` and now DETECTED as python. The mis-detection
+      # this entry recorded — a root `package.json` winning the node pack over a
+      # Django application — was closed by adding `requirements.txt` to the
+      # python pack's root markers. Both markers now fire at depth 0, and
+      # `python beats node` at equal depth resolves it without a guess.
+      pack: python
+      packages: [bakerydemo]
+      concerns:
+        data-model:
+          populated: {min_entities: 11}
+          because: >-
+            11 column rows across the 7 Django models the ORM reader resolves.
+            A floor, not a census: Wagtail models inherit most of their fields
+            from `Page` and other library base classes, and field inheritance is
+            resolved WITHIN one module, so a model whose base is imported
+            renders only the fields it declares itself. Django's implicit `id`
+            primary key is likewise absent — the ORM adds it rather than the
+            model. Both are named residuals in the rendered file.
+        api-surface:
+          populated: {min_entities: 9}
+          because: >-
+            9 `urlpatterns` elements from `bakerydemo/urls.py`. A floor for two
+            measured reasons, both named in the file's residuals: the `method`
+            column is `—` throughout, because a Django URLconf declares a path
+            and a view rather than a verb; and 4 of the mounts name a target
+            this repository does not declare (`wagtail_urls`,
+            `wagtailadmin_urls`, `wagtaildocs_urls`, `debug_toolbar.urls`), so
+            the routes behind them are absent. The real HTTP surface of a
+            Wagtail site is mostly those library URLconfs.
+        module-graph:
+          populated: {min_entities: 33}
+          because: >-
+            33 intra-package import edges over the 107 modules of `bakerydemo`.
+            A floor: only edges INTO the repository's own package are graphed
+            (resolve-or-drop), so every import of `wagtail`, `django` or any
+            other distribution is dropped rather than rendered, and 83 of the
+            107 modules are isolated — most of them migrations, which import
+            library machinery and not each other.
+        decision-index:
+          stubbed: {reason: precondition_missing}
+          because: >-
+            A surface the repository does not have — no crux documentation tree,
+            so no ADR index to project.
+
+  - name: crux-repo
+    pack: python
+    source: self
+    arch_stack: python
+    license: MIT
+    why: >-
+      This checkout's own Python sources — pinned via `source: self` and
+      `arch_stack: python` rather than a `url`/`sha`, since ADR-0096 clause 12
+      keeps the `crux` pack's own corpus repository as this repository
+      itself. This entry measures the PYTHON pack against it directly, no
+      clone step. The root `pyproject.toml` names package `crux`, but the
+      importable package it describes lives at `crux/scripts/crux/`, two
+      directories below the manifest — no candidate is anchored at any depth
+      the manifest-anchored tier scans, so package detection answers the
+      empty set rather than a guess.
+
+      THIS ENTRY HAS NO GOLDEN, AND THE COST IS ACCEPTED RATHER THAN
+      OVERLOOKED. Every other entry is frozen at a SHA, so its four spine
+      files can be byte-compared; this checkout is not frozen at anything,
+      so a golden here would go red on every future edit under
+      `crux/scripts/`. Worse, it would rot unseen: `CorpusGoldenTests` skips
+      whole when the third-party cache is absent, which is the normal state
+      on a machine that has not run `fetch.py`. So the gate for this entry is
+      the expectation record below — the resolved pack, `packages`, the
+      per-concern verdicts, the `min_entities` floors and the stub reasons,
+      checked against a live derive by `test_arch_pack_acceptance.py`'s
+      never-skipped `ClauseEightSelfHostedTests`. THE ACCEPTED COST: no
+      byte-level regression detection for this entry. A change that keeps
+      every verdict and clears every floor while moving the rendered bytes
+      passes here, and would not pass anywhere else in this corpus.
+
+      The numbers below were MEASURED, by running
+      `derive_corpus.py --only crux-repo` and reading what the python pack
+      produced — not predicted from the sources and not back-filled from a
+      failing run. Clause 8 names the failure mode this avoids: an
+      expectation edited to match a regression passes the gate exactly as a
+      careless re-bless does.
+    expect:
+      pack: python
+      packages: []
+      concerns:
+        data-model:
+          populated: {min_entities: 9}
+          because: >-
+            9 is the recorded entity count; the rendered table carries 13
+            rows across three sections (2 SQLAlchemy models, 1 Django model,
+            a 4-revision Alembic timeline), because the entity count and the
+            row total are two different units and this record states the
+            smaller. The source is this repository's OWN test fixtures —
+            synthetic SQLAlchemy/Django models written to exercise the python
+            pack's probes — not a deployed application's schema.
+        api-surface:
+          populated: {min_entities: 16}
+          because: >-
+            16 rows from a static `ast` parse of Flask, FastAPI and Django
+            sources scattered across this repository's own test fixtures. A
+            floor for the reason every other api-surface entry names: a route
+            registered by `add_api_route`, `add_url_rule`, a loop, or an
+            application factory is not declared anywhere a static parse can
+            read.
+        module-graph:
+          stubbed: {reason: precondition_missing}
+          because: >-
+            an open follow-on probe. The root `pyproject.toml` names package
+            `crux`, but the importable package it describes lives two
+            directories down at `crux/scripts/crux/`, so the
+            manifest-anchored tier of package detection (ADR-0096 clause 6)
+            finds no candidate at any scanned depth, and `packages: []`
+            records exactly that. No resolved package means no module graph:
+            the concern needs one to graph edges into, and none resolved.
+        decision-index:
+          stubbed: {reason: precondition_missing}
+          because: >-
+            a surface the repository does not have — from THIS DERIVE's point
+            of view. `derive_corpus.py` builds every corpus entry, this one
+            included, against a scratch `docs_dir` (`.crux-arch-scratch/`)
+            created fresh and removed after, never against this repository's
+            real `bionic/` tree, so the scratch tree it actually reads
+            carries no ADR index. That is the same mechanism that keeps the
+            other ten entries' decision-index stubbed, and here it also keeps
+            this derive off the `crux` pack's own `StaleProjectionInput`
+            refusal lane, which would otherwise fire against a real, already
+            up-to-date `bionic/arch/`.
+
+  # ── node ──────────────────────────────────────────────────────────────────
+  - name: express-boilerplate
+    pack: node
+    url: https://github.com/hagopj13/node-express-boilerplate
+    sha: 179ae84efec61b14206d0305d941daed6c6d07f9
+    license: MIT
+    why: >-
+      A widely-forked Express + Mongoose REST boilerplate (7.6k stars) with
+      `src/routes/v1/*.route.js` and Mongoose models — Express routing the
+      pack's route scan must find, and the Mongoose schemas the dev-loop-3
+      probe reads.
+    expect:
+      pack: node
+      packages: []
+      concerns:
+        data-model:
+          populated: {min_entities: 13}
+          because: >-
+            13, not the 10 fields `src/models/user.model.js` and
+            `src/models/token.model.js` alone declare (User: name, email,
+            password, role, isEmailVerified; Token: token, user, type,
+            expires, blacklisted — `Token.user` carrying fk `User`). The
+            extractor scans every JS/TS source, not just `src/models/`, and
+            `tests/unit/models/plugins/paginate.plugin.test.js` declares two
+            more Mongoose schemas (`Project`, `Task`, 3 fields between them)
+            used only to exercise the pagination plugin under test — the same
+            whole-repository scope every other node data-model probe already
+            has (Prisma/TypeORM/Sequelize hash every scanned source too).
+            `toJSON.plugin.test.js` calls `mongoose.Schema()` with no
+            definition object several times under the identifier `schema`;
+            those contribute zero rows and one named residual (the model name
+            does not resolve via `mongoose.model(...)`, because the test binds
+            through `connection.model(...)` instead).
+        api-surface:
+          populated: {min_entities: 14}
+          because: >-
+            14 routes, up from the 9 the pattern-matching reader found, and the
+            five it gained are the whole of `src/routes/v1/user.route.js` —
+            written in the chained `router.route(p).get(h).post(h)` form, where
+            the path sits on `.route()` and the verb on a call whose receiver is
+            the previous call. A pattern anchored on `<ident>.<verb>(` sees no
+            path argument there and dropped every one of them. 13 of the 14
+            handler cells now name a controller function, up from 0: the handler
+            is the LAST argument, and every route in this application puts
+            `validate(...)` or `auth()` middleware between the path and it. The
+            one remaining dash is `src/routes/v1/docs.route.js`, whose handler is
+            an inline `swaggerUi.setup(...)` call and names nothing recoverable.
+            All 14 paths are now composed through their mounts and render under
+            `/v1/*` — `/v1/auth/register`, `/v1/users/:userId`, `/v1/docs` —
+            rather than relative to their own router file. Two mount levels
+            compose here: `app.use('/v1', routes)` in `src/app.js`, and the
+            `defaultRoutes`/`devRoutes` tables in `src/routes/v1/index.js`, each
+            a static array of object literals whose `path` is a literal and whose
+            `route` is an identifier bound to a `require`. Every segment has a
+            static value in the AST, so no segment is guessed; this entry keeps
+            `because:` because the count is still a floor, not a claim about the
+            application's whole surface. One residual rides on the second mount
+            level: `devRoutes.forEach` sits inside
+            `if (config.env === 'development')`, and this reader composes the
+            mount unconditionally, so `/v1/docs` renders as if it were always
+            served — the same dev-only-scope residual the `live-beats` entry
+            names for its `forward "/mailbox"`.
+        module-graph:
+          populated: {min_entities: 107}
+        decision-index:
+          stubbed: {reason: precondition_missing}
+          because: >-
+            A surface the repository does not have — no crux documentation tree,
+            so no ADR index to project.
+
+  - name: nestjs-prisma-starter
+    pack: node
+    url: https://github.com/notiz-dev/nestjs-prisma-starter
+    sha: 225e5a906865df237a681c1ad228a3ecf2909326
+    license: MIT
+    why: >-
+      NestJS + Prisma (2.5k stars). Exercises two node probes at once: the
+      NestJS `@Controller`/`@Get` route scan and the `prisma/schema.prisma`
+      data-model parser.
+    expect:
+      pack: node
+      packages: []
+      concerns:
+        data-model:
+          populated: {min_entities: 15}
+        api-surface:
+          populated: {min_entities: 2}
+          because: >-
+            The GraphQL debt ADR-0096 clause 8 names. The 2 routes are the two
+            `@Get` handlers on `src/app.controller.ts`; this starter's HTTP
+            surface is a GraphQL endpoint served from the resolvers under
+            `src/*/*.resolver.ts` against `src/schema.graphql`, and no node
+            api-surface probe reads either. Recorded as a floor because 2 is
+            what the extractor produces today.
+        module-graph:
+          populated: {min_entities: 90}
+        decision-index:
+          stubbed: {reason: precondition_missing}
+          because: >-
+            A surface the repository does not have — no crux documentation tree,
+            so no ADR index to project.
+
+  - name: sequelize-express-example
+    pack: node
+    url: https://github.com/sequelize/express-example
+    sha: 7304dc6ff4b842b06301d962bd0bcb07454042b8
+    license: MIT
+    why: >-
+      Sequelize's own Express example. The application lives in
+      `express-main-example/`, so the repository root carries no package.json —
+      the smallest honest case of a real app the root-marker detector misses.
+    expect:
+      # Filed under `pack: node`, and now DETECTED as node. This entry was the
+      # first of the two recorded mis-detection findings, and ADR-0096 clause
+      # 6's depth-two marker scan closed it: `express-main-example/package.json`
+      # is one directory down, which root-only detection could not see.
+      pack: node
+      packages: []
+      concerns:
+        data-model:
+          populated: {min_entities: 7}
+          because: >-
+            Seven column rows across the three Sequelize models (`instrument`,
+            `orchestra`, `user`). `min_entities` counts rows rather than models,
+            which is the unit the data-model renderer emits.
+        api-surface:
+          populated: {min_entities: 1}
+          because: >-
+            ONE route, down from six, and the drop is the correction rather than
+            a regression. Five of the six rendered an unresolved template
+            literal as though its source text were a path — the measured
+            `/api/${routeName}/:id` defect. Those five declarations sit inside a
+            `for` loop over `Object.entries(routes)`, so their paths exist only
+            once the application runs, and the reader never runs it. They are now
+            dropped and named in the rendered residual with their file and line,
+            which is the honest form of the same information: the count states
+            what is known rather than padding itself with five paths that are
+            wrong. The one remaining route is the literal `app.get('/', ...)`
+            landing page, whose handler is an inline arrow and renders `—`.
+        module-graph:
+          populated: {min_entities: 17}
+          because: >-
+            Seventeen import edges over thirteen modules, every one of them
+            under `express-main-example/`. The graph is built from the
+            repository ROOT even though the marker that resolved the pack is one
+            directory down: clause 6 moved where detection LOOKS and not where
+            extraction runs, and this repository is the case that shows the
+            difference does not matter when the root has nothing else in it.
+        decision-index:
+          stubbed: {reason: precondition_missing}
+          because: >-
+            A surface the repository does not have — no crux documentation tree,
+            so no ADR index to project.
+
+  # ── ruby ──────────────────────────────────────────────────────────────────
+  - name: rubygems-org
+    pack: ruby
+    url: https://github.com/rubygems/rubygems.org
+    sha: 2abc82667d02ef7ae3a1433d621c1f7463985c6d
+    license: MIT
+    why: >-
+      The RubyGems registry: a large production Rails application with a
+      404-line `config/routes.rb`, a `db/schema.rb` and NO `db/structure.sql`,
+      and a full Zeitwerk `app/` tree. (This line read "a db/structure.sql (not
+      schema.rb)" until U-R3 checked the pinned SHA and found the opposite. The
+      retracted filename is left un-backticked on purpose — see this file's
+      header, "THE BACKTICK CONVENTION". ADR-0067 does not carry the error, so
+      no erratum is owed.)
+    expect:
+      pack: ruby
+      packages: []
+      concerns:
+        data-model:
+          populated: {min_entities: 463}
+        api-surface:
+          populated: {min_entities: 218}
+          because: >-
+            Two counting bases exist here and every figure below names the one
+            it belongs to. A RENDERED ROW is a printed table row; a DISTINCT
+            TRIPLE is a distinct `(method, path, controller)`. The renderer does
+            not deduplicate, so the two totals differ, and no sum below mixes
+            them.
+
+            Measured from the two goldens. The pre-cycle golden held 381
+            rendered rows, 355 distinct triples, 26 duplicate rows. This golden
+            holds 218 rendered rows, 216 distinct triples, 2 duplicate rows, and
+            `min_entities: 218` is the rendered count. Between them the distinct
+            set moved by 263 removed, 124 added, 92 unchanged, which closes:
+            355 - 263 + 124 = 216. Those five numbers are the whole measured
+            diff; nothing else in this note is stated as a delta between the two
+            goldens, because nothing else can be separated out of them — the
+            cycle changed three things at once and their effects overlap row by
+            row.
+
+            What the removals are. The replaced reader was a line scan that
+            OVER-counted, in two ways. It could not read an option list it did
+            not see on the declaration's own line — a `%i[...]` word array, or
+            an `only:` written on the next line — so it applied no filter and
+            printed the full REST set for a resource that declares a few
+            actions. Separately it read `only: []` as an empty filter and an
+            empty filter as "no filter", so a declaration exposing ZERO REST
+            actions also printed the full set. Five declarations are in that
+            second class, and their phantom rows are countable from
+            `config/routes.rb` itself rather than from the golden diff:
+            `resources :rubygems, param: :name, only: []` (L14) at 8 rows,
+            `resource :activity, only: []` (L100) at 7, `resource
+            :webauthn_verification, only: []` twice (L246 and L327) at 7 each,
+            and `resources :users, only: [] do get 'avatar', on: :member end`
+            (L336) at 8 phantom rows beside the one route it really declares,
+            `/users/:id/avatar`. That is 8 + 7 + 7 + 7 + 8 = 37 phantom rendered
+            rows. The rendered total did not fall by 37 on account of them: for
+            `rubygems` and `users` a sibling declaration of the same resource
+            (L80 and L281) re-supplies some of those rows once its own option
+            list is read correctly, which is why the two classes cannot be
+            separated in the diff.
+
+            The 2 surviving duplicate rows are an already-known residual, not a
+            new defect. Each is a pair of DISTINCT declarations whose `path:` or
+            `param:` rename this reader does not apply, so two real routes
+            collapse onto one row. `get "/news" => 'news#show'` (L199) and
+            `resource :news, path: 'releases', only: [:show]` (L200) both print
+            `/news`, where the second really serves /releases. `resources
+            :api_key_roles, param: :token` (L187) and its
+            `only: %i[show], constraints: { format: :json }` twin (L192) both
+            print `/profile/oidc/api_key_roles/:id`, where both are really
+            `:token`.
+
+            What the count still under-states is named in the file it renders:
+            `root`, `mount`ed engines, `path:`/`param:`/`controller:` renames,
+            and a `scope` whose path is a symbol or a `path:` keyword.
+            `arch-inputs/routes.txt` is the input that closes all of them, and
+            this repository is a shallow clone at a pinned SHA that cannot gain
+            one.
+        module-graph:
+          populated: {min_entities: 619}
+        decision-index:
+          stubbed: {reason: precondition_missing}
+          because: >-
+            A surface the repository does not have — no crux documentation tree,
+            so no ADR index to project.
+
+  - name: codetriage
+    pack: ruby
+    url: https://github.com/codetriage/codetriage
+    sha: 528c7c64fcf852ca41cd54ab11b06209db710a41
+    license: MIT
+    why: >-
+      A mid-size, long-lived Rails application with a conventional
+      `config/routes.rb`, and the corpus's only `db/structure.sql` — beside a
+      `db/schema.rb`, which is what makes it useful here. Both files present is
+      the case that shows why U-R3 removed the `structure.sql` probe rather than
+      writing a SQL reader: `db/schema.rb` wins the chain on this repository too,
+      so a DDL reader would never run against real code in this corpus.
+    expect:
+      pack: ruby
+      packages: []
+      concerns:
+        data-model:
+          populated: {min_entities: 122}
+        api-surface:
+          populated: {min_entities: 42}
+          because: >-
+            42 is what the tree-sitter Ruby parse of `config/routes.rb`
+            produces. It moves by exactly one row from the line scan's 41, and
+            the one row is the whole story: this application declares a single
+            `collection do get :list end` inside `resources :repos`, which the
+            line scan named a residual and the parse resolves to
+            `GET /repos/list`. Nothing else moved — no row was dropped, no path
+            recomposed — because this file uses none of the constructs that move
+            rubygems-org: no `%i[...]` action list, no multi-line `only:`, and no
+            nested `resources`. The two ruby entries are a deliberate pair: the
+            same reader change takes 163 rendered rows off one golden (381 down
+            to 218) and puts one rendered row onto the other (41 up to 42), and
+            only measuring both shows that.
+        module-graph:
+          populated: {min_entities: 96}
+        decision-index:
+          stubbed: {reason: precondition_missing}
+          because: >-
+            A surface the repository does not have — no crux documentation tree,
+            so no ADR index to project.
+
+  # ── elixir ────────────────────────────────────────────────────────────────
+  - name: live-beats
+    pack: elixir
+    url: https://github.com/fly-apps/live_beats
+    sha: ac9780472e7019af274110a1cf71250a8d40c986
+    license: MIT
+    why: >-
+      Fly.io's Phoenix LiveView reference application: a single-app Phoenix
+      layout with `lib/live_beats_web/router.ex`, Ecto schemas and migrations.
+    expect:
+      pack: elixir
+      packages: []
+      concerns:
+        data-model:
+          populated: {min_entities: 50}
+        api-surface:
+          populated: {min_entities: 8}
+          because: >-
+            The eight declarations in `lib/live_beats_web/router.ex`, read
+            through the tree-sitter Elixir grammar the concern now declares.
+            The count understates this application's surface by two residuals
+            the rendered file names: a `forward "/mailbox"` under a dev-only
+            scope, and `live_dashboard "/dashboard"`, a macro-defined route no
+            probe expands. 8 is what the extractor produces today.
+        module-graph:
+          populated: {min_entities: 137}
+        decision-index:
+          stubbed: {reason: precondition_missing}
+          because: >-
+            A surface the repository does not have — no crux documentation tree,
+            so no ADR index to project.
+
+  - name: papercups
+    pack: elixir
+    url: https://github.com/papercups-io/papercups
+    sha: 6a6f5adc7f0cef5813b2c2f1c0659922defaf976
+    license: MIT
+    why: >-
+      A production Phoenix API application (6.1k stars) with a large router,
+      many Ecto schemas, and a JS/TS assets tree — the polyglot case where
+      elixir must win detection over node.
+    expect:
+      pack: elixir
+      packages: []
+      concerns:
+        data-model:
+          populated: {min_entities: 131}
+        api-surface:
+          populated: {min_entities: 261}
+          because: >-
+            261 rows from `lib/chat_api_web/router.ex`, whose every declaration
+            is written in the parenthesized call spelling — the one form the
+            previous line-oriented reader matched none of. The count
+            understates this application's surface by two residuals the
+            rendered file names: two `forward` declarations, and one
+            `resources` carrying `param:`, whose path restructuring is not
+            expanded. 261 is what the extractor produces today.
+        module-graph:
+          populated: {min_entities: 958}
+        decision-index:
+          stubbed: {reason: precondition_missing}
+          because: >-
+            A surface the repository does not have — no crux documentation tree,
+            so no ADR index to project.
+
+  # ── swift ─────────────────────────────────────────────────────────────────
+  # The package half of the Swift acceptance gate. The app half (below,
+  # NetNewsWire) lands with the Xcode project reader per ADR-0130 clause 18.
+  - name: swift-argument-parser
+    pack: swift
+    url: https://github.com/apple/swift-argument-parser
+    sha: cdc5f0c6e836de848699ae11f6480f2d99ac5ef1
+    license: Apache-2.0
+    why: >-
+      Apple's command-line argument parser: one literal `Package.swift` with
+      21 targets across library, executable, test and command-plugin kinds, 26
+      inter-target dependencies, public protocols with requirements, and ten
+      `@main` declarations. Two executable targets are appended under
+      `#if os(macOS)`, the manifest's one non-literal construct.
+    expect:
+      pack: swift
+      packages: [Package.swift]
+      facts:
+        path: expectations/swift-argument-parser.yml
+        sha256: 78e94ed254d6ca492a57a9c07ebfc9257273cac6d4d5ceb9326b776915febf9d
+      concerns:
+        data-model:
+          populated: {min_entities: 11}
+          because: >-
+            11 is the facts file's must-render model types. The rendered table
+            holds every struct, enum, class and actor the walk reaches, test
+            sources included, so the count far exceeds the floor.
+        api-surface:
+          populated: {min_entities: 27}
+          because: >-
+            27 is the facts file's must-render public symbols, protocol
+            requirements and `@main` declarations: 14 + 3 + 10. The rendered
+            interface table holds every public, package or open declaration and
+            every protocol.
+        module-graph:
+          populated: {min_entities: 24}
+          because: >-
+            24 is the distinct in-tree pairs the facts file's must-render
+            target dependencies name. The two targets appended under
+            `#if os(macOS)` draw their edges too, as conditional rows covered by
+            the manifest's `non-literal-manifest` line, so the graph exceeds
+            the floor.
+        decision-index:
+          stubbed: {reason: precondition_missing}
+          because: >-
+            A surface the repository does not have — no crux documentation tree,
+            so no ADR index to project.
+
+  - name: netnewswire
+    pack: swift
+    url: https://github.com/Ranchero-Software/NetNewsWire
+    sha: b4361413fc1850110f9f42652f0f84e7a51e9d64
+    license: MIT
+    why: >-
+      The pinned Apple app half of the Swift acceptance gate (ADR-0130 clause
+      18): a real, maintained multi-platform RSS reader, one `NetNewsWire.xcodeproj`
+      at the repository root plus 17 `Modules/*/Package.swift` local packages it
+      draws dependency edges to. Classic Sources-phase membership, folder-synced
+      membership with exception sets, remote and local package-product
+      dependencies, and `@main` declarations owned by more than one target are
+      all exercised by this one checkout, per this entry's facts file.
+    expect:
+      pack: swift
+      packages: [Modules/Account/Package.swift, Modules/ActivityLog/Package.swift,
+                 Modules/Articles/Package.swift, Modules/ArticlesDatabase/Package.swift,
+                 Modules/CloudKitSync/Package.swift, Modules/ErrorLog/Package.swift,
+                 Modules/FeedFinder/Package.swift, Modules/HTMLMetadata/Package.swift,
+                 Modules/Images/Package.swift, Modules/NewsBlur/Package.swift,
+                 Modules/RSCore/Package.swift, Modules/RSDatabase/Package.swift,
+                 Modules/RSParser/Package.swift, Modules/RSTree/Package.swift,
+                 Modules/RSWeb/Package.swift, Modules/Secrets/Package.swift,
+                 Modules/SyncDatabase/Package.swift, NetNewsWire.xcodeproj]
+      facts:
+        path: expectations/netnewswire.yml
+        sha256: e27a3b177c7b4043e4d7dde7fb5baf1d9cca05add3792e33623e6c5f0bffe3fd
+      concerns:
+        data-model:
+          populated: {min_entities: 15}
+          because: >-
+            15 is ADR-0129 clause 6's unit (model types) as a floor over the
+            facts file's must-render data-model facts; the rendered table
+            carries every struct, enum, class and actor the walk reaches
+            across the app targets and every local package, so the count far
+            exceeds the floor.
+        api-surface:
+          populated: {min_entities: 35}
+          because: >-
+            35 is ADR-0129 clause 6's unit (interface-shaped rows) as a floor
+            over the facts file's must-render api-surface facts: public
+            symbols, protocol requirements and `@main` declarations across
+            the app targets and every local package.
+        module-graph:
+          populated: {min_entities: 45}
+          because: >-
+            45 is ADR-0129 clause 6's unit (in-tree dependency pairs) as a
+            floor over the facts file's must-render module-graph facts:
+            targets, target dependencies and package dependencies, including
+            the local-package edges the Xcode project draws to `Modules/*`.
+        decision-index:
+          stubbed: {reason: precondition_missing}
+          because: >-
+            A surface the repository does not have. It carries no crux
+            documentation tree, so there is no ADR index to project. True of
+            every corpus repository.

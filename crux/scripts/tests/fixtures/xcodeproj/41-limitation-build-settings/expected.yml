@@ -1,0 +1,36 @@
+# ADR-0130 clause 12 limitation form: a conditioned build setting
+# (`SWIFT_VERSION[sdk=iphoneos*]`) and an `EXCLUDED_SOURCE_FILE_NAMES`
+# entry naming a real Sources-phase member each render one
+# `conditional-setting` line, and neither changes membership:
+# `Excluded.swift` still renders as a member even though the setting names
+# it. `baseConfigurationReference` names a real `Shared.xcconfig`
+# (committed here), and the reader never follows that reference. The
+# module-graph walk reads the file as an ordinary `.xcconfig` input, and
+# its one unconditioned setting renders nothing. No setting VALUE appears
+# in any residual line.
+exit_code: 0
+
+rows:
+  data-model:
+    - "| `Model` | struct | public |"
+    - "| `Excluded` | struct | public |"
+  module-graph:
+    - "| `Sources/Excluded.swift` | `App` | classic Sources build phase | — |"
+    - "| `Sources/Included.swift` | `App` | classic Sources build phase | — |"
+
+residuals:
+  - class: conditional-setting
+    path: App.xcodeproj/project.pbxproj
+    kind: "build setting 'SWIFT_VERSION[sdk=iphoneos*]' is conditioned and never applied"
+    first_line: null
+    last_line: null
+  - class: conditional-setting
+    path: App.xcodeproj/project.pbxproj
+    kind: "build setting 'EXCLUDED_SOURCE_FILE_NAMES' is conditioned and never applied"
+    first_line: null
+    last_line: null
+
+absent:
+  module-graph:
+    - "5.9"
+    - "Not read"

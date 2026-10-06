@@ -1,0 +1,22 @@
+# ADR-0130 clause 16 postcondition (item 1): the "without" member carries
+# the identical Swift source and the same qualifying XcodeGen project.yml,
+# but no companion Xcode project -- module-graph renders the missing-input
+# line and api-surface's @main owner cell renders the dash.
+exit_code: 0
+
+rows:
+  api-surface:
+    - "| `AppMain` |"
+
+absent:
+  module-graph:
+    - "| `App` | `App.xcodeproj` |"
+  api-surface:
+    - "`App (App.xcodeproj)`"
+
+residuals:
+  - class: missing-input
+    path: project.yml
+    kind: XcodeGen
+    first_line: null
+    last_line: null

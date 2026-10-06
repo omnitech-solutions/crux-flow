@@ -1,0 +1,8 @@
+exit_code: 0
+absent:
+  module-graph:
+    - "path-escape"
+    - "entity-declaration"
+    - "too-deep"
+    - "unresolved-reference"
+    - "| `App.xcworkspace` |"

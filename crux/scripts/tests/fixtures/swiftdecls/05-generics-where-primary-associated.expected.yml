@@ -1,0 +1,18 @@
+# Generics, `where` clauses and a primary associated type. Schema: 01-actor.expected.yml.
+# Generic clauses never appear in a key.
+types:
+  - {name: Cache, kind: struct, access: public, at: [6, 6], conditional: false}
+stored_properties:
+  - {owner: Cache, name: storage, type: "[Key: Value]", access: public, at: [7, 7]}
+relationships: []
+interfaces:
+  - {name: Store, kind: protocol, access: public, at: [1, 1], attributes: [], conditional: false}
+  - {name: Cache, kind: struct, access: public, at: [6, 6], attributes: [], conditional: false}
+  - {name: Cache.storage, kind: var, access: public, at: [7, 7], attributes: [], conditional: false}
+  - {name: "Cache.value(for:as:)", kind: func, access: public, at: [9, 9], attributes: [], conditional: false}
+  - {name: "makeStore(_:)", kind: func, access: public, at: [14, 14], attributes: [], conditional: false}
+requirements:
+  - {protocol: Store, name: Element, kind: associatedtype, at: [2, 2]}
+  - {protocol: Store, name: "get(_:)", kind: func, at: [3, 3]}
+mains: []
+residuals: []

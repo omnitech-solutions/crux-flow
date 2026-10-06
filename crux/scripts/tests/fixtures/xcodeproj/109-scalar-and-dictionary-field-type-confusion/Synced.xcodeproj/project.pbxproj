@@ -1,0 +1,120 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG;
+			packageReferences = (
+				RPKG,
+			);
+			targets = (
+				TGT_S,
+			);
+		};
+		MG = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				SR,
+				G_C,
+			);
+		};
+		SR = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				EX_T,
+				EX_PF,
+			);
+			explicitFileTypes = (
+				Own.swift,
+			);
+			path = Synced;
+			sourceTree = "<group>";
+		};
+		EX_T = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Ex.swift,
+			);
+			target = (
+				TGT_S,
+			);
+		};
+		EX_PF = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Ex.swift,
+			);
+			platformFiltersByRelativePath = (
+				Ex.swift,
+			);
+			target = TGT_S;
+		};
+		G_C = {
+			isa = PBXGroup;
+			path = Classic;
+			sourceTree = "<group>";
+			children = (
+				F_C,
+			);
+		};
+		F_C = {
+			isa = PBXFileReference;
+			path = C.swift;
+			sourceTree = "<group>";
+		};
+		BF_C = {
+			isa = PBXBuildFile;
+			fileRef = (
+				F_C,
+			);
+		};
+		PH_SRC = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				BF_C,
+			);
+		};
+		CFG = {
+			isa = XCBuildConfiguration;
+			buildSettings = "A[B";
+			name = Debug;
+		};
+		PPD = {
+			isa = XCSwiftPackageProductDependency;
+			package = RPKG;
+			productName = (
+				Kit,
+			);
+		};
+		RPKG = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://example.com/kit.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.0.0;
+			};
+		};
+		TGT_S = {
+			isa = PBXNativeTarget;
+			name = Synced;
+			productType = (
+				"com.apple.product-type.application",
+			);
+			buildPhases = (
+				PH_SRC,
+			);
+			fileSystemSynchronizedGroups = (
+				SR,
+			);
+			packageProductDependencies = (
+				PPD,
+			);
+		};
+	};
+	rootObject = PRJ;
+}

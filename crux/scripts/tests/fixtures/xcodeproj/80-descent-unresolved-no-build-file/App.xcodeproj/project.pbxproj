@@ -1,0 +1,67 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		PRJ = {
+			isa = PBXProject;
+			mainGroup = MG_ROOT;
+			targets = (
+				TGT_A,
+			);
+		};
+		MG_ROOT = {
+			isa = PBXGroup;
+			sourceTree = "<group>";
+			children = (
+				GRP_DIAMOND_A,
+				GRP_DIAMOND_B,
+				GRP_CYCLE,
+				DANGLING_REF,
+			);
+		};
+		GRP_DIAMOND_A = {
+			isa = PBXGroup;
+			path = "DiamondA";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED,
+			);
+		};
+		GRP_DIAMOND_B = {
+			isa = PBXGroup;
+			path = "DiamondB";
+			sourceTree = "<group>";
+			children = (
+				GRP_SHARED,
+			);
+		};
+		GRP_SHARED = {
+			isa = PBXGroup;
+			path = "Shared";
+			sourceTree = "<group>";
+			children = (
+			);
+		};
+		GRP_CYCLE = {
+			isa = PBXGroup;
+			path = "Cycle";
+			sourceTree = "<group>";
+			children = (
+				GRP_CYCLE,
+			);
+		};
+		TGT_A = {
+			isa = PBXNativeTarget;
+			name = "TargetA";
+			productType = "com.apple.product-type.application";
+			buildPhases = (
+			);
+			dependencies = (
+			);
+		};
+	};
+	rootObject = PRJ;
+}
