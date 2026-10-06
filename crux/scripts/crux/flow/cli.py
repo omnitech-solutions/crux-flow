@@ -30,14 +30,16 @@ def parser() -> argparse.ArgumentParser:
     cmd=sub.add_parser('package'); cmd.add_argument('--output',type=Path)
     for name in ('install','upgrade'):
         cmd=sub.add_parser(name); cmd.add_argument('--host',choices=(*hosts.HOSTS,'all'),default='all'); cmd.add_argument('--scope',choices=('user','project'),default='user'); cmd.add_argument('--source',type=Path,required=True)
-        cmd.add_argument('--host-home',type=Path); cmd.add_argument('--allow-side-by-side',action='store_true'); _mutation(cmd)
+        cmd.add_argument('--host-home',type=Path); _mutation(cmd)
     for name in ('uninstall','rollback'):
-        cmd=sub.add_parser(name); cmd.add_argument('--host',choices=hosts.HOSTS,required=True); cmd.add_argument('--scope',choices=('user','project'),default='user'); _mutation(cmd)
-    cmd=sub.add_parser('init-docs'); cmd.add_argument('--host',choices=hosts.HOSTS,required=True); cmd.add_argument('--scope',choices=('user','project'),default='user'); _mutation(cmd)
+        cmd=sub.add_parser(name); cmd.add_argument('--host',choices=(*hosts.HOSTS,'all'),default='all'); cmd.add_argument('--scope',choices=('user','project'),default='user'); _mutation(cmd)
+    cmd=sub.add_parser('init'); cmd.add_argument('--host',choices=(*hosts.HOSTS,'all'),default='all'); cmd.add_argument('--mode',choices=('aggressive','balanced','thorough','upstream')); cmd.add_argument('--no-docs',action='store_true'); _mutation(cmd)
+    cmd=sub.add_parser('deinit'); cmd.add_argument('--host',choices=(*hosts.HOSTS,'all'),default='all'); _mutation(cmd)
+    cmd=sub.add_parser('init-docs'); cmd.add_argument('--host',choices=(*hosts.HOSTS,'all'),default='all'); cmd.add_argument('--scope',choices=('user','project'),default=None); _mutation(cmd)
     mode=sub.add_parser('mode'); modes=mode.add_subparsers(dest='action',required=True); modes.add_parser('list')
-    cmd=modes.add_parser('show'); cmd.add_argument('--resolved',action='store_true'); cmd.add_argument('--host',choices=hosts.HOSTS,default='codex'); cmd.add_argument('--json',action='store_true')
+    cmd=modes.add_parser('show'); cmd.add_argument('--resolved',action='store_true'); cmd.add_argument('--host',choices=(*hosts.HOSTS,'all'),default='all'); cmd.add_argument('--json',action='store_true')
     cmd=modes.add_parser('set'); cmd.add_argument('mode',choices=('aggressive','rapid','balanced','thorough','upstream')); cmd.add_argument('--scope',choices=('project','user','run'),default='project'); cmd.add_argument('--file',type=Path); cmd.add_argument('--reason'); cmd.add_argument('--budget-minutes',type=int); _mutation(cmd)
-    cmd=modes.add_parser('materialize'); cmd.add_argument('--host',choices=hosts.HOSTS,required=True); cmd.add_argument('--scope',choices=('project','user'),default='project'); _mutation(cmd)
+    cmd=modes.add_parser('materialize'); cmd.add_argument('--host',choices=(*hosts.HOSTS,'all'),default='all'); cmd.add_argument('--scope',choices=('project','user'),default='project'); _mutation(cmd)
     runs=sub.add_parser('run'); rs=runs.add_subparsers(dest='action',required=True)
     cmd=rs.add_parser('start'); cmd.add_argument('--host',choices=hosts.HOSTS,default='codex'); cmd.add_argument('--spec',type=Path,required=True); cmd.add_argument('--mode',choices=('aggressive','rapid','balanced','thorough','upstream')); cmd.add_argument('--previous-run',type=Path); cmd.add_argument('--owner-approved',action='store_true'); cmd.add_argument('--reason')
     for name in ('status','resume','history','advance','check','checkpoint','attempt','finding','resolve-finding','review','repair-review','transition','stop','supersede','drive','call-api','council'):
@@ -58,8 +60,8 @@ def parser() -> argparse.ArgumentParser:
         if name=='call-api': cmd.add_argument('--role',required=True)
         if name=='council': cmd.add_argument('--invocation',required=True); cmd.add_argument('--justification',required=True)
     model=sub.add_parser('models'); ms=model.add_subparsers(dest='action',required=True)
-    cmd=ms.add_parser('list'); cmd.add_argument('--host',choices=(*hosts.HOSTS,'api'),default='codex'); cmd.add_argument('--json',action='store_true')
-    cmd=ms.add_parser('resolve'); cmd.add_argument('--host',choices=(*hosts.HOSTS,'api'),default='codex'); cmd.add_argument('--mode'); cmd.add_argument('--role'); cmd.add_argument('--json',action='store_true')
+    cmd=ms.add_parser('list'); cmd.add_argument('--host',choices=(*hosts.HOSTS,'api','all'),default='all'); cmd.add_argument('--json',action='store_true')
+    cmd=ms.add_parser('resolve'); cmd.add_argument('--host',choices=(*hosts.HOSTS,'api','all'),default='all'); cmd.add_argument('--mode'); cmd.add_argument('--role'); cmd.add_argument('--json',action='store_true')
     cmd=ms.add_parser('refresh'); cmd.add_argument('--host',choices=('openrouter','codex','claude'),default='openrouter'); cmd.add_argument('--output',type=Path,required=True); cmd.add_argument('--changes',type=Path); cmd.add_argument('--scope',choices=('source','user','project'),default='project'); cmd.add_argument('--require',action='append',default=[])
     cmd=ms.add_parser('apply'); cmd.add_argument('--proposal',type=Path,required=True); cmd.add_argument('--unattended-policy',type=Path); _mutation(cmd)
     cmd=ms.add_parser('rollback'); cmd.add_argument('--scope',choices=('source','user','project'),default='project'); cmd.add_argument('--transaction',required=True); _mutation(cmd)
@@ -96,12 +98,37 @@ def _approve(plan,args,confirm=None) -> bool:
 
 
 def _selected(host: str,executables: dict[str,str] | None) -> tuple[dict[str,str],dict[str,str]]:
-    available=executables if executables is not None else {h:p for h in hosts.HOSTS if (p:=shutil.which(h))}
+    available=hosts.detect(executables)
     chosen=hosts.HOSTS if host=='all' else [host]
     found={h:available[h] for h in chosen if h in available}
     missing={h:'not installed' for h in chosen if h not in available}
     if host!='all' and missing: raise FlowError('requested host executable is absent')
     return found,missing
+
+
+def _across(args,func,found,skipped,runner,confirm,*,done: set[str],root_for) -> tuple[dict,int]:
+    """One displayed plan, then each detected host independently; one host failing never blocks another."""
+    kwargs={'repo':args.repo,'home':args.home,'scope':args.scope,'runner':runner}
+    plans={}; results={h:{'status':'skipped-not-installed','reason':r} for h,r in skipped.items()}
+    for host in found:
+        if lifecycle_owned(root_for(host),host,args.scope) is None: results[host]={'status':'skipped','reason':'no Flow installation in this scope'}; continue
+        try: plans[host]=func(**kwargs,host=host,authorized=False,dry_run=True)
+        except (FlowError,OSError) as exc: results[host]={'status':'failed','reason':str(exc) if isinstance(exc,FlowError) else 'host could not be planned'}
+    public={'operation':args.command,'scope':args.scope,'hosts':plans}
+    if args.dry_run: return {'state':'planned',**public,'skipped':results},0
+    if plans and not _approve(public,args,confirm): raise FlowError('operation cancelled')
+    for host,plan in plans.items():
+        try:
+            outcome=func(**kwargs,host=host,authorized=True,expected_plan_digest=identity(plan))
+            results[host]={'status':'completed' if outcome['state'] in done else 'failed',**outcome}
+        except (FlowError,OSError) as exc: results[host]={'status':'failed','reason':str(exc) if isinstance(exc,FlowError) else 'host operation failed; inspect the scoped transaction journal'}
+    bad=any(r['status']=='failed' for r in results.values())
+    return {'status':'partial' if bad else 'completed','hosts':dict(sorted(results.items(),key=lambda kv:hosts.HOSTS.index(kv[0])))},2 if bad else 0
+
+
+def lifecycle_owned(root,host,scope):
+    from . import lifecycle
+    return lifecycle._owned_receipt(root,host,scope)
 
 
 def _run(args,plugin,runner,executables):
@@ -143,7 +170,7 @@ def main(argv: list[str] | None=None,*,plugin: Path=PLUGIN,runner=execute,execut
     try:
         from . import lifecycle,materialize,models,packaging
         if args.command in {'status','doctor'}:
-            available=executables if executables is not None else {h:p for h in hosts.HOSTS if (p:=shutil.which(h))}
+            available=hosts.detect(executables)
             chosen=hosts.HOSTS if args.host=='all' else [args.host]
             reports={h:lifecycle.status(repo=args.repo,home=args.home,host=h,executable=available.get(h),runner=runner) if h in available else
                      {'host':h,'present':False,'installed':False,'statically_valid':False,'runtime_loaded':'unobserved'} for h in chosen}
@@ -161,7 +188,7 @@ def main(argv: list[str] | None=None,*,plugin: Path=PLUGIN,runner=execute,execut
             selected,skipped=_selected(args.host,executables); plans={}; outcomes={}
             for h,exe in selected.items():
                 if h=='codex' and args.scope=='project' and args.host=='all': skipped[h]='native registration is user-scoped; use separate project role materialization'; continue
-                plan=lifecycle.plan_install(plugin,args.source,repo=args.repo,home=args.home,host=h,scope=args.scope,executable=exe,runner=runner,host_home=args.host_home,allow_side_by_side=args.allow_side_by_side)
+                plan=lifecycle.plan_install(plugin,args.source,repo=args.repo,home=args.home,host=h,scope=args.scope,executable=exe,runner=runner,host_home=args.host_home)
                 if args.command=='upgrade':
                     from .upstream import semver
                     if plan.previous is None: raise FlowError('upgrade requires an owned installed release')
@@ -176,27 +203,75 @@ def main(argv: list[str] | None=None,*,plugin: Path=PLUGIN,runner=execute,execut
             else:
                 if not plans: raise FlowError('no requested compatible host installation route')
                 if not _approve(public,args,confirm): raise FlowError('operation cancelled')
-                for h,p in plans.items():
-                    try: outcomes[h]=lifecycle.apply_install(p,runner=runner,expected_digest=p.public()['plan_digest'])
-                    except (FlowError,OSError): outcomes[h]={'state':'failed','action':'inspect scoped transaction journal; later independent hosts remain eligible'}
+                for index,(h,p) in enumerate(plans.items()):
+                    try:
+                        if index: p=lifecycle.replan(p,plugin,runner=runner)
+                        outcomes[h]=lifecycle.apply_install(p,runner=runner,expected_digest=p.public()['plan_digest'])
+                    except (FlowError,OSError) as exc: outcomes[h]={'state':'failed','reason':str(exc) if isinstance(exc,FlowError) else type(exc).__name__,'action':'inspect scoped transaction journal; later independent hosts remain eligible'}
                 result={'hosts':outcomes,'skipped':skipped,'plan':public}
                 if any(r['state'] not in {'installed','no-op'} for r in outcomes.values()): code=2
         elif args.command in {'uninstall','rollback'}:
+            from . import initialization
             func=lifecycle.uninstall if args.command=='uninstall' else lifecycle.rollback_install
-            kwargs={'repo':args.repo,'home':args.home,'host':args.host,'scope':args.scope,'runner':runner}
-            plan=func(**kwargs,authorized=False,dry_run=True)
-            if args.dry_run: result=plan
+            root_for=lambda h: args.repo if args.scope=='project' else args.home
+            if args.command=='uninstall' and args.scope=='project' and (args.host=='all' or args.host in initialization.NATIVE):
+                found,skipped=_selected(args.host,executables) if args.host=='all' else ({args.host:(executables or {}).get(args.host,'')},{})
+                result=initialization.deinit_repository(plugin,repo=args.repo,home=args.home,selected=found,skipped=skipped,runner=runner,dry_run=args.dry_run,approve=lambda p:_approve(p,args,confirm))
+                if result['status']=='partial': code=2
+            elif args.host=='all':
+                found,skipped=_selected('all',executables)
+                result,code=_across(args,func,found,skipped,runner,confirm,done={'uninstalled','rolled-back'},root_for=root_for)
             else:
-                if not _approve(plan,args,confirm): raise FlowError('operation cancelled')
-                result=func(**kwargs,authorized=True,expected_plan_digest=identity(plan))
-                if result['state'] not in {'uninstalled','rolled-back'}: code=2
+                kwargs={'repo':args.repo,'home':args.home,'host':args.host,'scope':args.scope,'runner':runner}
+                plan=func(**kwargs,authorized=False,dry_run=True)
+                if args.dry_run: result=plan
+                else:
+                    if not _approve(plan,args,confirm): raise FlowError('operation cancelled')
+                    result=func(**kwargs,authorized=True,expected_plan_digest=identity(plan))
+                    if result['state'] not in {'uninstalled','rolled-back'}: code=2
+        elif args.command=='init':
+            from . import initialization
+            found,skipped=_selected(args.host,executables)
+            result=initialization.init_repository(plugin,repo=args.repo,home=args.home,selected=found,skipped=skipped,runner=runner,dry_run=args.dry_run,
+                                                  approve=lambda p:_approve(p,args,confirm),docs=not args.no_docs,mode=args.mode)
+            if result['status'] in {'partial','failed'}: code=2
+        elif args.command=='deinit':
+            from . import initialization
+            found,skipped=_selected(args.host,executables) if args.host=='all' else ({args.host:(executables or {}).get(args.host,'')},{})
+            result=initialization.deinit_repository(plugin,repo=args.repo,home=args.home,selected=found,skipped=skipped,runner=runner,dry_run=args.dry_run,approve=lambda p:_approve(p,args,confirm))
+            if result['status']=='partial': code=2
         elif args.command=='init-docs':
-            from .initialization import initialize
-            result=initialize(plugin,repo=args.repo,home=args.home,host=args.host,scope=args.scope,runner=runner,dry_run=args.dry_run,approve=lambda p:_approve(p,args,confirm))
+            from .initialization import initialize,initialize_any
+            if args.host=='all':
+                found,_=_selected('all',executables)
+                result=initialize_any(plugin,repo=args.repo,home=args.home,selected=found,runner=runner,dry_run=args.dry_run,approve=lambda p:_approve(p,args,confirm))
+            else:
+                result=initialize(plugin,repo=args.repo,home=args.home,host=args.host,scope=args.scope or 'user',runner=runner,dry_run=args.dry_run,approve=lambda p:_approve(p,args,confirm))
             if result['state']=='failed': code=2
         elif args.command=='mode':
             if args.action=='list': result={'default':'aggressive',**policy.load_definition(plugin)}
+            elif args.action=='show' and args.host=='all':
+                result={'hosts':{h:policy.resolve(plugin,args.repo,args.home,h) for h in (hosts.detect(executables) or hosts.HOSTS)}}
             elif args.action=='show': result=policy.resolve(plugin,args.repo,args.home,args.host)
+            elif args.action=='materialize' and args.host=='all':
+                found,skipped=_selected('all',executables); plans={}; results={h:{'status':'skipped-not-installed','reason':r} for h,r in skipped.items()}
+                for h in found:
+                    try:
+                        effective=policy.resolve(plugin,args.repo,args.home,h)
+                        root,updates,report=materialize.updates(plugin,effective,repo=args.repo,home=args.home,scope=args.scope)
+                        plans[h]=(effective,managed.plan(root,updates,owner='mode-projection'),report)
+                    except (FlowError,OSError) as exc: results[h]={'status':'failed','reason':str(exc) if isinstance(exc,FlowError) else 'host could not be planned'}
+                public={'operation':'materialize','hosts':{h:p[1].public() for h,p in plans.items()}}
+                if args.dry_run: result={'state':'planned',**public,'skipped':results}
+                else:
+                    if plans and not _approve(public,args,confirm): raise FlowError('operation cancelled')
+                    for h,(effective,plan,report) in plans.items():
+                        try:
+                            if policy.resolve(plugin,args.repo,args.home,h)!=effective: raise FlowError('preferences changed after materialization was approved')
+                            results[h]={**managed.apply(plan),**report,'status':'configured' if plan.changes else 'already-correct'}
+                        except (FlowError,OSError) as exc: results[h]={'status':'failed','reason':str(exc) if isinstance(exc,FlowError) else 'materialization failed; inspect the scoped transaction journal'}
+                    bad=any(r['status']=='failed' for r in results.values()); code=2 if bad else 0
+                    result={'status':'partial' if bad else 'completed','hosts':dict(sorted(results.items(),key=lambda kv:hosts.HOSTS.index(kv[0])))}
             elif args.action=='materialize':
                 effective=policy.resolve(plugin,args.repo,args.home,args.host)
                 root,updates,report=materialize.updates(plugin,effective,repo=args.repo,home=args.home,scope=args.scope)
@@ -236,9 +311,11 @@ def main(argv: list[str] | None=None,*,plugin: Path=PLUGIN,runner=execute,execut
                 code = 2
         elif args.command=='models':
             if args.action in {'list','resolve'}:
-                selected=policy.resolve(plugin,args.repo,args.home,'codex' if args.host=='api' else args.host,{'mode':args.mode} if getattr(args,'mode',None) else None)
-                result=selected['api'] if args.host=='api' else {'roles':selected['roles'],'warnings':selected['warnings'],'mode':selected['mode'],'runtime_loaded':'unobserved'}
-                if getattr(args,'role',None): result=result['roles'][args.role]
+                def view(h):
+                    selected=policy.resolve(plugin,args.repo,args.home,'codex' if h=='api' else h,{'mode':args.mode} if getattr(args,'mode',None) else None)
+                    value=selected['api'] if h=='api' else {'roles':selected['roles'],'warnings':selected['warnings'],'mode':selected['mode'],'runtime_loaded':'unobserved'}
+                    return value['roles'][args.role] if getattr(args,'role',None) and h!='api' else value
+                result={'hosts':{h:view(h) for h in (hosts.detect(executables) or hosts.HOSTS)}} if args.host=='all' else view(args.host)
             elif args.action=='refresh':
                 found=models.discover(args.host,executable=(executables or {}).get(args.host),runner=runner,fetch=fetch)
                 proposal=models.propose(plugin,args.repo,args.home,scope=args.scope,changes=_read(args.changes),discovery=found,required_capabilities=args.require) if args.changes else found

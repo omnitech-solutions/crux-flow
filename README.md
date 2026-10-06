@@ -21,11 +21,13 @@ The equivalent without pnpm is:
 uv run --script ./crux-flow setup
 ```
 
-Setup shows one plan and installs supported detected hosts. Select a host with
-`--host claude`, `--host codex`, `--host opencode` or `--host omp`; preview with
-`--dry-run`. It never installs host executables, changes credentials or replaces
-foreign files. Restart the host after installation. In your project, invoke the
-Flow skill with the change you need. No separate default-mode setup is required.
+Setup shows one plan and installs every supported detected host (`--host` is an
+optional filter; preview with `--dry-run`). It never installs host executables,
+changes credentials or replaces foreign files, and it leaves Flow inert while an
+upstream Crux plugin is enabled. Restart the host after installation, then in each
+project run `crux-flow init`: it detects your hosts and selects Flow for that
+repository through each host's official project setting, leaving other repositories
+on upstream. In your project, invoke the Flow skill with the change you need. No separate default-mode setup is required.
 
 ## Build and verify
 

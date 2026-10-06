@@ -24,18 +24,60 @@ uv run --script ./crux-flow setup
 Setup displays one plan, installs the detected supported coding hosts and retains
 short `crux-flow` and `crux-local` commands under `~/.local/bin`. It skips missing
 optional hosts. It refuses an unrelated command at the same path, local edits to
-managed files, and ambiguous active upstream/fork installations. It does not install
-host executables or change your shell startup files. Add `~/.local/bin` to PATH if
+managed files, and ambiguous duplicate Flow installations. It does not install
+host executables or change your shell startup files. When an upstream Crux plugin is
+enabled for you, Flow is installed but kept inert at user scope, so every repository
+that has not run `crux-flow init` stays on exactly one workflow plugin: upstream. Add `~/.local/bin` to PATH if
 the report says it is absent. Restart the coding host to load generated roles.
 
-Use `--host claude`, `--host codex`, `--host opencode` or `--host omp` to select one.
-For a preview, use `pnpm run setup --dry-run`. The word `run` matters: `pnpm setup`
+Every lifecycle command acts on all detected hosts by default. `--host claude`,
+`--host codex`, `--host opencode` or `--host omp` is an optional filter for
+troubleshooting. For a preview, use `pnpm run setup --dry-run`. The word `run` matters: `pnpm setup`
 is pnpm's own command, not this repository's installer.
 
 Aggressive is already the default. In a consumer repository, ask the enabled Flow
 skill to implement the change. A read-only question does not start a run. Native
 skill selection remains host-driven; the declared triggers are not a deterministic
 parser. The explicit `flow` skill is the reliable entrypoint when routing is unclear.
+
+## Activate Flow in a repository
+
+```sh
+cd my-project
+crux-flow init
+```
+
+`init` is the normal onboarding command. It detects the installed hosts, creates a
+small `.crux-flow.yml` when absent (`--mode` selects `aggressive`, `balanced`,
+`thorough` or `upstream`), configures each host through its official seam, projects
+the Flow roles, initializes the Bionic documentation tree when absent (`--no-docs`
+skips it; it is one native model turn and needs the same approval), and verifies
+each host independently:
+
+```text
+Claude      configured
+Codex       configured
+OpenCode    skipped-not-installed
+OMP         skipped-not-installed
+```
+
+| Host | What `init` changes in the repository |
+|---|---|
+| Claude | `.claude/settings.json` `enabledPlugins`: Flow on, upstream `crux` off |
+| Codex | `.codex/config.toml` `[plugins."..."] enabled`: Flow on, upstream `crux` off. Codex applies project configuration only in a trusted repository; `init` reports `trusted_project` and an `attention` note when it is not |
+| OpenCode, OMP | project `.opencode/` or `.omp/` agents, skills and (OMP) `modelRoles` aliases; these hosts have no plugin mechanism |
+
+Plugin identities come from the host's own inventory, not from constants. Upstream
+Crux stays installed; only this repository's setting changes, other repositories keep
+their workflow, and unrelated plugins and settings are preserved. A second `init` is a
+no-op. A Flow-owned setting that was edited since `init` is reported and never
+overwritten. `crux-flow deinit` (or `crux-flow uninstall --scope project`) restores only
+what Flow recorded and never deletes your documentation tree.
+
+Plugin activation selects *which product* owns the repository. The mode
+(`aggressive`/`balanced`/`thorough`/`upstream`) is execution policy *inside* Flow:
+`mode: upstream` runs the preserved upstream semantics in Flow and does not re-enable
+the separately installed plugin. Start a new host session to load the change.
 
 ## Build and install the release
 
@@ -56,10 +98,10 @@ marketplace registration at its nested `engine/` directory. Its ZIP is also acce
 by the lifecycle CLI:
 
 ```sh
-crux-flow --repo "$PWD" install --host codex --scope user --source /tmp/my-crux-flow-release/crux-flow-0.2.0.zip
-crux-flow --repo "$PWD" install --host claude --scope user --source /tmp/my-crux-flow-release/crux-flow-0.2.0.zip
-crux-flow --repo "$PWD" install --host opencode --scope project --source /tmp/my-crux-flow-release/crux-flow-0.2.0.zip
-crux-flow --repo "$PWD" install --host omp --scope project --source /tmp/my-crux-flow-release/crux-flow-0.2.0.zip
+crux-flow --repo "$PWD" install --host codex --scope user --source /tmp/my-crux-flow-release/crux-flow.zip
+crux-flow --repo "$PWD" install --host claude --scope user --source /tmp/my-crux-flow-release/crux-flow.zip
+crux-flow --repo "$PWD" install --host opencode --scope project --source /tmp/my-crux-flow-release/crux-flow.zip
+crux-flow --repo "$PWD" install --host omp --scope project --source /tmp/my-crux-flow-release/crux-flow.zip
 ```
 
 `--dry-run` previews mutations; `--yes` approves the displayed operation but does
@@ -223,10 +265,11 @@ status, installation, validation or coding tasks.
 
 ```sh
 crux-flow status --json
-crux-flow doctor --host codex --strict --json
-crux-flow upgrade --host codex --source /path/to/tested-new-release.zip
-crux-flow rollback --host codex --scope user
-crux-flow uninstall --host codex --scope user
+crux-flow doctor --strict --json
+crux-flow upgrade --source /path/to/tested-new-release.zip
+crux-flow rollback --scope user
+crux-flow uninstall --scope user
+crux-flow doctor --host codex          # optional filter
 crux-flow transactions inspect --scope project --transaction TRANSACTION_ID
 crux-flow transactions recover --scope project --transaction TRANSACTION_ID
 ```

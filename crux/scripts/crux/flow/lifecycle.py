@@ -10,7 +10,7 @@ import uuid
 from typing import Iterator
 
 from .common import FlowError, canonical, decode, digest, identity, mapping
-from . import hosts, managed, materialize, packaging, policy, provenance
+from . import hosts, managed, materialize, packaging, policy, provenance, repository
 from .processes import execute
 
 STORE='.local/share/crux-flow/releases'
@@ -37,18 +37,31 @@ def _controls(repo: Path,home: Path) -> dict:
             for name in [policy.CONFIG,'.crux-flow/model-bindings.json']}
 
 
-def _native_state(host: str,exe: str,repo: Path,home: Path,runner,host_home: Path | None=None) -> dict:
-    report={'installed':False,'enabled':False,'statically_valid':False,'runtime_loaded':'unobserved','upstream_active':False,'install_path':None}
-    directory=hosts.paths(host,'user',repo=repo,home=home,host_home=host_home)['base']
-    if not directory.exists(): return report
-    result=runner([exe,'plugin','list','--json'],cwd=repo,env=hosts.environment(host,home,host_home=host_home),timeout=12,limit=500_000)
+def inventory(host: str,exe: str,*,cwd: Path,home: Path,runner,host_home: Path | None=None) -> list[dict]:
+    """Installed plugins as the host reports them from `cwd` (so project-scoped settings apply)."""
+    result=runner([exe,'plugin','list','--json'],cwd=cwd,env=hosts.environment(host,home,host_home=host_home),timeout=12,limit=500_000)
     if result.status!='ok': raise FlowError('native plugin inventory could not be inspected')
     parsed=decode(result.stdout)
     items=parsed if host=='claude' else mapping(parsed).get('installed',[])
     if not isinstance(items,list): raise FlowError('invalid native plugin inventory')
-    for raw in items:
-        row=mapping(raw); identifier=row.get('id',row.get('pluginId'))
-        if identifier=='crux@crux' and row.get('enabled'): report['upstream_active']=True
+    return [mapping(raw) for raw in items if mapping(raw).get('installed',True) is not False]
+
+
+def _identifier(row: dict) -> str | None:
+    value=row.get('id',row.get('pluginId'))
+    return value if isinstance(value,str) else None
+
+
+def _native_state(host: str,exe: str,repo: Path,home: Path,runner,host_home: Path | None=None,*,cwd: Path | None=None) -> dict:
+    report={'installed':False,'enabled':False,'statically_valid':False,'runtime_loaded':'unobserved','upstream_active':False,'upstream_ids':[],'install_path':None}
+    directory=hosts.paths(host,'user',repo=repo,home=home,host_home=host_home)['base']
+    if not directory.exists(): return report
+    items=inventory(host,exe,cwd=cwd or repo,home=home,runner=runner,host_home=host_home)
+    for row in items:
+        identifier=_identifier(row)
+        if identifier is not None and identifier.partition('@')[0]=='crux':
+            report['upstream_ids'].append(identifier)
+            if row.get('enabled') is True: report['upstream_active']=True
         if identifier!='crux-flow@crux-flow': continue
         report['installed']=True; report['enabled']=row.get('enabled') is True
         selected=row.get('installPath',row.get('installedPath',mapping(row.get('source',{})).get('path')))
@@ -76,6 +89,23 @@ def _commands(host: str,exe: str,scope: str,release: Path,*,replace_existing: bo
     return commands
 
 
+def _defer(host: str,exe: str,*,scope: str,repo: Path,home: Path,runner,host_home: Path | None=None) -> list[dict]:
+    """Keep a user-scope Flow installation inert so each repository opts in through its own project setting.
+
+    Only used while an upstream Crux plugin is enabled for the user: repositories that never run
+    `crux-flow init` must keep seeing exactly one workflow plugin."""
+    if scope!='user' or host not in repository.FILES: return []
+    if host=='claude':
+        result=runner([exe,'plugin','disable','crux-flow@crux-flow','--scope','user'],cwd=home,env=hosts.environment(host,home,host_home=host_home),timeout=45,limit=500_000)
+        return [result.public()]
+    base=hosts.paths(host,'user',repo=repo,home=home,host_home=host_home)['base'].resolve()
+    if not base.is_relative_to(home.resolve()): raise FlowError('host configuration lies outside the selected home')
+    name=(base/'config.toml').relative_to(home.resolve()).as_posix()
+    updated=repository.write_setting(host,managed.read_file(home,name),'crux-flow@crux-flow',False)
+    outcome=managed.apply(managed.plan(home,{name:updated},owner='user-activation')) if updated!=managed.read_file(home,name) else {}
+    return [{'status':'ok','action':'set Flow inert in user Codex configuration','transaction':outcome.get('transaction_id')}]
+
+
 @dataclass(frozen=True)
 class InstallPlan:
     source: Path
@@ -97,13 +127,14 @@ class InstallPlan:
     receipt: dict
     no_op: bool
     host_home: Path | None
+    deferred: bool = False
 
     def public(self) -> dict:
         data={'operation':'install','source':str(self.source),'source_digest':self.source_digest,'host':self.host,'scope':self.scope,
               'retained_release':str(self.retained),'release_plan':self.release_plan.public(),
               'projection_plan':self.projection_plan.public(),'controls':self.controls,'before_native':self.before_native,
               'commands':[list(c) for c in self.commands],'recovery_commands':[list(c) for c in self.recovery_commands],
-              'no_op':self.no_op,'runtime_loaded':'unobserved','atomicity':'recoverable scoped files; native registration is a separate boundary'}
+              'no_op':self.no_op,'user_activation':'deferred' if self.deferred else 'active','runtime_loaded':'unobserved','atomicity':'recoverable scoped files; native registration is a separate boundary'}
         data['plan_digest']=identity(data)
         return data
 
@@ -126,7 +157,7 @@ def _retained(home: Path,receipt: dict) -> Path:
 
 
 def plan_install(plugin: Path,source: Path,*,repo: Path,home: Path,host: str,scope: str,
-                 executable: str | None=None,runner=execute,host_home: Path | None=None,allow_side_by_side: bool=False) -> InstallPlan:
+                 executable: str | None=None,runner=execute,host_home: Path | None=None) -> InstallPlan:
     repo=repo.resolve(); home=home.resolve(); source=source.absolute()
     if host=='codex' and scope!='user': raise FlowError('native Codex registration uses user scope; materialize project roles separately')
     selected_root=repo if scope=='project' else home
@@ -135,8 +166,8 @@ def plan_install(plugin: Path,source: Path,*,repo: Path,home: Path,host: str,sco
         capabilities=hosts.probe(host,home=Path(scratch),repo=Path(scratch),executable=executable,runner=runner)
     if not capabilities['present']: raise FlowError('requested host executable is absent')
     exe=capabilities['executable']
-    before=_native_state(host,exe,repo,home,runner,host_home) if host in {'claude','codex'} else None
-    if before and before['upstream_active'] and not allow_side_by_side: raise FlowError('upstream is active; choose an explicit disambiguated adoption plan')
+    before=_native_state(host,exe,repo,home,runner,host_home,cwd=home if scope=='user' else None) if host in {'claude','codex'} else None
+    deferred=bool(before and scope=='user' and before['upstream_active'])
     if before and before['installed'] and prior is None: raise FlowError('existing fork installation has no owned receipt; explicit migration required')
     if host in {'claude','codex'}:
         for parts in [['plugin','marketplace','add'],['plugin','install' if host=='claude' else 'add'],['plugin','list']]:
@@ -156,18 +187,18 @@ def plan_install(plugin: Path,source: Path,*,repo: Path,home: Path,host: str,sco
                  include_skills=host in {'omp','opencode'},host_home=host_home,engine=store/'crux-flow/engine')
         no_op=bool(prior and prior['state']=='installed' and prior['release_digest']==release['digest'] and
                    prior['policy_digest']==identity(effective) and not outputs and
-                   (before is None or (before['installed'] and before['enabled'] and before['statically_valid'] and before.get('runtime_digest')==release['release']['runtime_digest'])))
+                   (before is None or (before['installed'] and before['enabled']==(not deferred) and before['statically_valid'] and before.get('runtime_digest')==release['release']['runtime_digest'])))
         previous={k:v for k,v in prior.items() if k!='previous'} if prior else None
         receipt={'schema_version':1,'host':host,'scope':scope,'release':str(store),'release_digest':release['digest'],
                  'runtime_digest':release['release']['runtime_digest'],'policy_digest':identity(effective),'state':'installed',
-                 'executable':exe,'previous':previous,'host_home':str(host_home) if host_home else None,'projection_transaction':uuid.uuid4().hex}
+                 'executable':exe,'previous':previous,'host_home':str(host_home) if host_home else None,'user_activation':'deferred' if deferred else 'active','projection_transaction':uuid.uuid4().hex}
         if not no_op: outputs[receipt_name(host,scope)]=canonical(receipt)
         projection_plan=managed.plan(root,outputs,owner='installation')
         commands=[] if host not in {'claude','codex'} or no_op else _commands(host,exe,scope,store,replace_existing=bool(before and before['installed']))
         recovery=(_commands(host,exe,scope,_retained(home,prior),replace_existing=True) if prior else
                 [[exe,'plugin','uninstall' if host=='claude' else 'remove','crux-flow@crux-flow',*(['--scope',scope] if host=='claude' else [])]]) if host in {'claude','codex'} else []
         return InstallPlan(source,repo,home,host,scope,exe,release['digest'],release['release']['runtime_digest'],store,
-               release_plan,projection_plan,_controls(repo,home),before,tuple(map(tuple,commands)),tuple(map(tuple,recovery)),previous,receipt,no_op,host_home)
+               release_plan,projection_plan,_controls(repo,home),before,tuple(map(tuple,commands)),tuple(map(tuple,recovery)),previous,receipt,no_op,host_home,deferred)
 
 
 def _run_commands(commands,plan: InstallPlan,runner) -> list[dict]:
@@ -181,6 +212,13 @@ def _run_commands(commands,plan: InstallPlan,runner) -> list[dict]:
     return values
 
 
+def replan(plan: InstallPlan,plugin: Path,*,runner=execute) -> InstallPlan:
+    """Plan again against current state. Hosts share one retained release, so after one host applies,
+    the next host's up-front plan would see those files as a stale inspection."""
+    return plan_install(plugin,plan.source,repo=plan.repo,home=plan.home,host=plan.host,scope=plan.scope,
+                        executable=plan.executable,runner=runner,host_home=plan.host_home)
+
+
 def _success(results,commands): return len(results)==len(commands) and all(r['status']=='ok' for r in results)
 
 
@@ -189,7 +227,8 @@ def apply_install(plan: InstallPlan,*,runner=execute,expected_digest: str | None
     if _controls(plan.repo,plan.home)!=plan.controls: raise FlowError('scoped preferences changed after planning')
     with source_release(plan.source) as current:
         if current['digest']!=plan.source_digest: raise FlowError('source release changed after planning')
-    if plan.before_native is not None and _native_state(plan.host,plan.executable,plan.repo,plan.home,runner,plan.host_home)!=plan.before_native:
+    user=plan.home if plan.scope=='user' else None
+    if plan.before_native is not None and _native_state(plan.host,plan.executable,plan.repo,plan.home,runner,plan.host_home,cwd=user)!=plan.before_native:
         raise FlowError('native registration changed after planning')
     for item in plan.projection_plan.changes:
         if managed.read_file(plan.projection_plan.root,item.path)!=item.before: raise FlowError('stale projection plan')
@@ -197,9 +236,13 @@ def apply_install(plan: InstallPlan,*,runner=execute,expected_digest: str | None
     managed.apply(plan.release_plan)
     actions=_run_commands(plan.commands,plan,runner) if plan.commands else []
     ready=_success(actions,plan.commands)
+    if ready and plan.deferred:
+        try: deferral=_defer(plan.host,plan.executable,scope=plan.scope,repo=plan.repo,home=plan.home,runner=runner,host_home=plan.host_home)
+        except (FlowError,OSError): deferral=[{'status':'failed'}]
+        actions=[*actions,*deferral]; ready=all(r['status']=='ok' for r in deferral)
     if ready and plan.before_native is not None:
-        native=_native_state(plan.host,plan.executable,plan.repo,plan.home,runner,plan.host_home)
-        ready=native['installed'] and native['enabled'] and native['statically_valid'] and native.get('runtime_digest')==plan.runtime_digest
+        native=_native_state(plan.host,plan.executable,plan.repo,plan.home,runner,plan.host_home,cwd=user)
+        ready=native['installed'] and native['enabled']==(not plan.deferred) and native['statically_valid'] and native.get('runtime_digest')==plan.runtime_digest
     if not ready:
         recovery=_run_commands(plan.recovery_commands,plan,runner) if plan.recovery_commands else []
         recovered=_success(recovery,plan.recovery_commands)
@@ -213,7 +256,7 @@ def apply_install(plan: InstallPlan,*,runner=execute,expected_digest: str | None
         recovery=_run_commands(plan.recovery_commands,plan,runner) if plan.recovery_commands else []
         restored=all(managed.read_file(plan.projection_plan.root,c.path)==c.before for c in plan.projection_plan.changes)
         if plan.before_native is not None:
-            native=_native_state(plan.host,plan.executable,plan.repo,plan.home,runner,plan.host_home)
+            native=_native_state(plan.host,plan.executable,plan.repo,plan.home,runner,plan.host_home,cwd=user)
             restored=restored and native['installed']==plan.before_native['installed'] and (not native['installed'] or native.get('runtime_digest')==plan.before_native.get('runtime_digest'))
         return {'state':'failed-recovered' if restored and _success(recovery,plan.recovery_commands) else 'recovery-required',
                 'host':plan.host,'actions':actions,'recovery':recovery,'file_recovery':'restored' if restored else 'inspect transaction journal'}
@@ -288,8 +331,10 @@ def uninstall(*,repo: Path,home: Path,host: str,scope: str,authorized: bool,runn
             result=runner(command,cwd=repo,env=hosts.environment(host,home,host_home=host_home),timeout=45,limit=500000)
             recovery.append(result.public())
             if result.status!='ok': break
+        if restore and old.get('user_activation')=='deferred' and _success(recovery,restore):
+            recovery.extend(_defer(host,old['executable'],scope=scope,repo=repo,home=home,runner=runner,host_home=host_home))
         restored=all(managed.read_file(files.root,c.path)==c.before for c in files.changes)
-        return {'state':'failed-recovered' if restored and _success(recovery,restore) else 'recovery-required','recovery':recovery}
+        return {'state':'failed-recovered' if restored and all(r['status']=='ok' for r in recovery) and len(recovery)>=len(restore) else 'recovery-required','recovery':recovery}
     return {'state':'uninstalled','transaction_id':outcome['transaction_id'],'release_retained':str(retained),'runtime_loaded':'unobserved'}
 
 
@@ -366,7 +411,8 @@ def rollback_install(*, repo: Path, home: Path, host: str, scope: str, authorize
     native = host in {'claude', 'codex'}
     commands = _commands(host, current['executable'], scope, old_release, replace_existing=True) if native else []
     recovery_commands = _commands(host, current['executable'], scope, current_release, replace_existing=True) if native else []
-    before = _native_state(host, current['executable'], repo, home, runner, host_home) if native else None
+    user = home if scope == 'user' else None
+    before = _native_state(host, current['executable'], repo, home, runner, host_home, cwd=user) if native else None
     if before is not None and (not before['installed'] or not before['statically_valid']
                               or before.get('runtime_digest') != current['runtime_digest']):
         raise FlowError('current native installation differs from its owned receipt')
@@ -384,10 +430,12 @@ def rollback_install(*, repo: Path, home: Path, host: str, scope: str, authorize
             actions.append(result.public())
             if result.status != 'ok':
                 raise FlowError('native rollback command failed')
+        if native and previous.get('user_activation') == 'deferred':
+            actions.extend(_defer(host, current['executable'], scope=scope, repo=repo, home=home, runner=runner, host_home=host_home))
         if native:
-            observed = _native_state(host, current['executable'], repo, home, runner, host_home)
+            observed = _native_state(host, current['executable'], repo, home, runner, host_home, cwd=user)
             expected = previous['runtime_digest']
-            if not observed['enabled'] or not observed['statically_valid'] or observed.get('runtime_digest') != expected:
+            if observed['enabled'] != (previous.get('user_activation') != 'deferred') or not observed['statically_valid'] or observed.get('runtime_digest') != expected:
                 raise FlowError('native rollback registration did not match the retained release')
         outcome = managed.apply(files)
     except (FlowError, OSError):
@@ -395,15 +443,17 @@ def rollback_install(*, repo: Path, home: Path, host: str, scope: str, authorize
         restored = all(managed.read_file(root, row.path) == row.before for row in files.changes)
         if native:
             try:
-                observed = _native_state(host, current['executable'], repo, home, runner, host_home)
+                observed = _native_state(host, current['executable'], repo, home, runner, host_home, cwd=user)
                 selected = recovery_commands if observed['installed'] else recovery_commands[1:]
                 for command in selected:
                     result = runner(command, cwd=repo, env=env, timeout=45, limit=500000)
                     recovery.append(result.public())
                     if result.status != 'ok':
                         break
-                observed = _native_state(host, current['executable'], repo, home, runner, host_home)
-                restored = (restored and _success(recovery, selected) and observed['enabled']
+                if current.get('user_activation') == 'deferred':
+                    recovery.extend(_defer(host, current['executable'], scope=scope, repo=repo, home=home, runner=runner, host_home=host_home))
+                observed = _native_state(host, current['executable'], repo, home, runner, host_home, cwd=user)
+                restored = (restored and all(r['status'] == 'ok' for r in recovery) and observed['enabled'] == (current.get('user_activation') != 'deferred')
                             and observed['statically_valid']
                             and observed.get('runtime_digest') == current['runtime_digest'])
             except (FlowError, OSError):

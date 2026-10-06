@@ -43,11 +43,13 @@ def setup(plugin: Path,*,repo: Path,home: Path,selected: dict[str,str],runner=ex
         if any(managed.read_file(home, item.path) != item.before for item in command_plan.changes):
             raise FlowError('CLI launcher changed after setup approval; no host installation applied')
         outcomes = {}
-        for host, plan in plans.items():
+        for index, (host, plan) in enumerate(plans.items()):
             try:
+                if index: plan = lifecycle.replan(plan, plugin, runner=runner)
                 outcomes[host] = lifecycle.apply_install(plan, runner=runner, expected_digest=plan.public()['plan_digest'])
-            except (FlowError, OSError):
-                outcomes[host] = {'state':'failed', 'action':'inspect this host scope; independent hosts remain eligible'}
+            except (FlowError, OSError) as exc:
+                outcomes[host] = {'state':'failed', 'reason':str(exc) if isinstance(exc,FlowError) else type(exc).__name__,
+                                  'action':'inspect this host scope; independent hosts remain eligible'}
         if any(o['state'] not in {'installed','no-op'} for o in outcomes.values()):
             return {'state':'partial','hosts':outcomes,'cli':'not activated','plan':public}
         if not plans:
@@ -56,6 +58,8 @@ def setup(plugin: Path,*,repo: Path,home: Path,selected: dict[str,str],runner=ex
         try: activation=managed.apply(command_plan)
         except (FlowError,OSError):
             return {'state':'partial','hosts':outcomes,'cli':'activation failed; inspect the scoped transaction journal','plan':public}
-        return {'state':'installed','hosts':outcomes,'cli':activation,'commands':[str(home/'.local/bin'/name) for name in ('crux-flow','crux-local')],
+        inert=sorted(h for h,plan in plans.items() if plan.deferred)
+        return {'state':'installed','hosts':outcomes,'cli':activation,
+                'next_step':'run `crux-flow init` inside each repository that should use Flow','user_activation':{'inert_until_repository_init':inert} if inert else 'active','commands':[str(home/'.local/bin'/name) for name in ('crux-flow','crux-local')],
                 'runtime_loaded':'unobserved','path_action':None if str(home/'.local/bin') in os.environ.get('PATH','').split(os.pathsep) else 'add ~/.local/bin to PATH yourself',
                 'plan':public}

@@ -178,7 +178,13 @@ def probe(host: str,*,home: Path,repo: Path,executable: str | None=None,runner=e
         result=runner([exe,*args],cwd=repo,env=env,timeout=8,limit=100_000)
         if result.status!='ok': raise FlowError(f'{host} capability probe failed: {key}')
         results[key]=result.stdout.decode('utf-8',errors='replace')
-    match=re.search(r'\b\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?\b',results['version'])
+    match=re.search(r'(?<![\w.])v?(\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?)\b',results['version'])
     if match is None: raise FlowError('host version is not recognizable')
-    return {'host':host,'present':True,'executable':exe,'version':match[0],
+    return {'host':host,'present':True,'executable':exe,'version':match[1],
             'plugin_commands_advertised':'plugin' in results['help'],'runtime_loaded':'unobserved'}
+
+
+def detect(executables: dict[str,str] | None=None) -> dict[str,str]:
+    """Installed supported hosts, in a stable order. Absence is not an error."""
+    available=executables if executables is not None else {h:p for h in HOSTS if (p:=shutil.which(h))}
+    return {h:available[h] for h in HOSTS if h in available}
