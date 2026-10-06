@@ -126,6 +126,35 @@ per-project settings. Claude Code is supported; the executable-bearing package i
 not advertised as a claude.ai or Cowork plugin. Desktop loading must be checked in
 the actual client, not inferred from CLI installation.
 
+## Publish a release
+
+```sh
+pnpm run release -- --to git@github.com:omnitech-solutions/crux-flow-marketplace.git
+```
+
+One command builds the release, inspects it, stages it into a clone of the distribution
+repository, shows the plan (files added, changed and removed, the tag, the content
+tree digest) and, once approved, pushes the branch and the `vX.Y.Z` tag atomically,
+never forced. The repository root *is* the marketplace for both Claude and Codex.
+With `gh` installed and a GitHub remote, it also attaches the ZIP to a release for
+OpenCode, OMP and `crux-flow install --source`.
+
+- Set `CRUX_FLOW_MARKETPLACE_REPO` instead of repeating `--to`. `--branch` defaults to `main`.
+  `--dry-run` shows the plan and pushes nothing; `--no-github-release` skips the ZIP step.
+- Publishing refuses an uncommitted source checkout (`--allow-dirty` overrides, for
+  testing). Use a dedicated distribution repository; this source repository's root
+  metadata is upstream's.
+- Running it again for the same content is a no-op. A version that is already published
+  with different content is refused: bump the Flow version first.
+- Credentials in a remote URL are never printed. Authentication is whatever your Git
+  and `gh` already use.
+
+Users then install with `claude plugin marketplace add OWNER/REPO` and
+`claude plugin install crux-flow@crux-flow --scope user`, or
+`codex plugin marketplace add OWNER/REPO` and `codex plugin add crux-flow@crux-flow`,
+followed by `crux-flow setup` and `crux-flow init`. A direct marketplace install creates
+no ownership receipts, so `setup` is still required before `init` can project roles.
+
 ## Modes and configuration
 
 | Mode | Elapsed default | Implementation delegates | Initial reviewers | Repair/re-review cycles | Council rounds |

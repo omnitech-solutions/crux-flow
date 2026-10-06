@@ -87,3 +87,29 @@ def test_real_host_selects_flow_per_repository_while_upstream_stays_installed(tm
     status = cli.main(['--repo', str(repo), '--home', str(home), 'deinit', '--host', host, '--yes'], executables={host: executable})
     capsys.readouterr()
     assert status == 0 and effective(repo) == {'crux@crux': True, 'crux-flow@crux-flow': False}
+
+
+@pytest.mark.parametrize('host', ['claude', 'codex'])
+def test_real_host_installs_the_published_marketplace(tmp_path, host, monkeypatch):
+    """Publish to a local bare repository, then install from a checkout of it with the actual host CLI."""
+    import subprocess
+    from crux.flow import hosts, publishing
+    if os.environ.get('CRUX_FLOW_NATIVE_TESTS') != '1':
+        pytest.skip('opt-in native installation observation')
+    executable = shutil.which(host)
+    if executable is None:
+        pytest.skip('requested native host is not installed')
+    for key, value in {'GIT_AUTHOR_NAME': 'T', 'GIT_AUTHOR_EMAIL': 't@example.test', 'GIT_COMMITTER_NAME': 'T', 'GIT_COMMITTER_EMAIL': 't@example.test'}.items():
+        monkeypatch.setenv(key, value)
+    bare = tmp_path / 'marketplace.git'
+    subprocess.run(['git', 'init', '--bare', '-q', '-b', 'main', str(bare)], check=True)
+    assert publishing.publish(PLUGIN, target=str(bare), allow_dirty=True, approve=lambda plan: True, github_release=False)['status'] == 'published'
+    checkout = tmp_path / 'checkout'; subprocess.run(['git', 'clone', '-q', str(bare), str(checkout)], check=True)
+    home = tmp_path / 'home'; (home / f'.{host}').mkdir(parents=True)
+    env = hosts.environment(host, home); scope = ['--scope', 'user'] if host == 'claude' else []
+    for argv in ([executable, 'plugin', 'marketplace', 'add', str(checkout), *scope],
+                 [executable, 'plugin', 'install' if host == 'claude' else 'add', 'crux-flow@crux-flow', *scope]):
+        outcome = subprocess.run(argv, env=env, cwd=home, capture_output=True, timeout=120)
+        assert outcome.returncode == 0, (argv[1:], outcome.stderr.decode()[-400:])
+    rows = lifecycle.inventory(host, executable, cwd=home, home=home, runner=__import__('crux.flow.processes', fromlist=['execute']).execute)
+    assert {lifecycle._identifier(r): r.get('enabled') for r in rows} == {'crux-flow@crux-flow': True}

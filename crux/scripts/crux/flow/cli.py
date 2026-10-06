@@ -28,6 +28,8 @@ def parser() -> argparse.ArgumentParser:
         cmd=sub.add_parser(name); cmd.add_argument('--host',choices=(*hosts.HOSTS,'all'),default='all'); cmd.add_argument('--json',action='store_true'); cmd.add_argument('--strict',action='store_true')
     cmd=sub.add_parser('setup'); cmd.add_argument('--host',choices=(*hosts.HOSTS,'all'),default='all'); _mutation(cmd)
     cmd=sub.add_parser('package'); cmd.add_argument('--output',type=Path)
+    cmd=sub.add_parser('publish'); cmd.add_argument('--to',default=os.environ.get('CRUX_FLOW_MARKETPLACE_REPO'),help='distribution Git URL or path (or CRUX_FLOW_MARKETPLACE_REPO)')
+    cmd.add_argument('--branch',default='main'); cmd.add_argument('--allow-dirty',action='store_true'); cmd.add_argument('--no-github-release',action='store_true'); _mutation(cmd)
     for name in ('install','upgrade'):
         cmd=sub.add_parser(name); cmd.add_argument('--host',choices=(*hosts.HOSTS,'all'),default='all'); cmd.add_argument('--scope',choices=('user','project'),default='user'); cmd.add_argument('--source',type=Path,required=True)
         cmd.add_argument('--host-home',type=Path); _mutation(cmd)
@@ -177,6 +179,13 @@ def main(argv: list[str] | None=None,*,plugin: Path=PLUGIN,runner=execute,execut
             result={'hosts':reports}
             if args.command=='doctor' and args.strict and any(not r['statically_valid'] for h,r in reports.items() if args.host!='all' or h in available): code=2
             if args.command=='doctor' and args.strict and not available: code=2
+        elif args.command=='publish':
+            from . import publishing
+            if not args.to: raise FlowError('publish needs --to <git url or path> or CRUX_FLOW_MARKETPLACE_REPO')
+            result=publishing.publish(plugin,target=args.to,branch=args.branch,runner=runner,dry_run=args.dry_run,approve=lambda p:_approve(p,args,confirm),
+                                      allow_dirty=args.allow_dirty,github_release=False if args.no_github_release else None,
+                                      gh=(executables or {}).get('gh') if executables is not None else None)
+            if result['status'] in {'unverified'} or result.get('github_release',{}).get('status')=='failed': code=2
         elif args.command=='package': result=packaging.build(plugin,args.output) if args.output is not None else packaging.build_default(plugin,args.repo/'.cache/crux-flow-releases')
         elif args.command=='setup':
             from .setup import setup

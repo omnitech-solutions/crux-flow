@@ -37,7 +37,7 @@ pnpm test
 pnpm run verify
 ```
 
-`build` emits a self-contained local marketplace directory and release ZIP.
+`build` emits a self-contained local marketplace directory and release ZIP; `pnpm run release -- --to <git-url>` publishes it (see the operator guide).
 `test` runs the Flow test suite. `verify` also runs the relevant original Crux
 integration tests and derived-catalog checks. For the full upstream suite:
 
