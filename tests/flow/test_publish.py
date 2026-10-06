@@ -142,3 +142,13 @@ def test_a_forwarded_double_dash_separator_is_ignored(remote, capsys):
     from crux.flow.cli import main
     assert main(['publish', '--', '--to', str(remote), '--allow-dirty', '--no-github-release', '--yes']) == 0
     assert json.loads(capsys.readouterr().out)['status'] == 'published'
+
+
+def test_cli_dry_run_and_repeat_publish_exit_cleanly_for_github_style_targets(remote, capsys, monkeypatch):
+    from crux.flow.cli import main
+    monkeypatch.setenv('GIT_CONFIG_COUNT', '1'); monkeypatch.setenv('GIT_CONFIG_KEY_0', f'url.{remote}.insteadOf')
+    monkeypatch.setenv('GIT_CONFIG_VALUE_0', 'git@github.com:acme/market.git')
+    target = ['publish', '--to', 'git@github.com:acme/market.git', '--allow-dirty']
+    assert main([*target, '--dry-run']) == 0 and json.loads(capsys.readouterr().out)['status'] == 'planned'
+    assert main([*target, '--no-github-release', '--yes']) == 0 and json.loads(capsys.readouterr().out)['status'] == 'published'
+    assert main([*target, '--yes']) == 0 and json.loads(capsys.readouterr().out)['status'] == 'already-published'

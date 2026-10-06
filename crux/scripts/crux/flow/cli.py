@@ -187,7 +187,7 @@ def main(argv: list[str] | None=None,*,plugin: Path=PLUGIN,runner=execute,execut
             result=publishing.publish(plugin,target=args.to,branch=args.branch,runner=runner,dry_run=args.dry_run,approve=lambda p:_approve(p,args,confirm),
                                       allow_dirty=args.allow_dirty,github_release=False if args.no_github_release else None,
                                       gh=(executables or {}).get('gh') if executables is not None else None)
-            if result['status'] in {'unverified'} or result.get('github_release',{}).get('status')=='failed': code=2
+            release=result.get('github_release'); code=2 if result['status']=='unverified' or (isinstance(release,dict) and release.get('status')=='failed') else code
         elif args.command=='package': result=packaging.build(plugin,args.output) if args.output is not None else packaging.build_default(plugin,args.repo/'.cache/crux-flow-releases')
         elif args.command=='setup':
             from .setup import setup
