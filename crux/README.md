@@ -1,3 +1,5 @@
+> **Crux Flow fork:** this file is the upstream Crux (`crux@crux`) reference. For this fork, install and update with `crux-flow install`, `crux-flow init` and `crux-flow update` (plugin `crux-flow@crux-flow`, skills `crux-flow:<name>`); see `FLOW_GUIDE.md`.
+
 # crux
 
 A Claude Code plugin that maintains a `./bionic/` tree inside a software project — **52 skills** and a **10-agent role layer** across seven concerns: **code docs**, **research wiki**, **ADRs**, **briefs**, **work journal**, **promptbooks**, **invariants**. You curate, decide, and discuss; Claude does the bookkeeping.

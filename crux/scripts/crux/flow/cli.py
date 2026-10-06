@@ -30,12 +30,12 @@ def parser() -> argparse.ArgumentParser:
     cmd=sub.add_parser('package'); cmd.add_argument('--output',type=Path)
     cmd=sub.add_parser('publish'); cmd.add_argument('--to',default=os.environ.get('CRUX_FLOW_MARKETPLACE_REPO'),help='distribution Git URL or path (or CRUX_FLOW_MARKETPLACE_REPO)')
     cmd.add_argument('--branch',default='main'); cmd.add_argument('--allow-dirty',action='store_true'); cmd.add_argument('--no-github-release',action='store_true'); _mutation(cmd)
-    for name in ('install','upgrade'):
-        cmd=sub.add_parser(name); cmd.add_argument('--host',choices=(*hosts.HOSTS,'all'),default='all'); cmd.add_argument('--scope',choices=('user','project'),default='user'); cmd.add_argument('--source',type=Path,required=True)
+    for name in ('install','update','upgrade'):
+        cmd=sub.add_parser(name); cmd.add_argument('--host',choices=(*hosts.HOSTS,'all'),default='all'); cmd.add_argument('--scope',choices=('user','project'),default='user'); cmd.add_argument('--source',type=Path,required=name=='upgrade',help='release directory or ZIP (install and update default to the running package)')
         cmd.add_argument('--host-home',type=Path); _mutation(cmd)
     for name in ('uninstall','rollback'):
         cmd=sub.add_parser(name); cmd.add_argument('--host',choices=(*hosts.HOSTS,'all'),default='all'); cmd.add_argument('--scope',choices=('user','project'),default='user'); _mutation(cmd)
-    cmd=sub.add_parser('init'); cmd.add_argument('--host',choices=(*hosts.HOSTS,'all'),default='all'); cmd.add_argument('--mode',choices=('aggressive','balanced','thorough','upstream')); cmd.add_argument('--no-docs',action='store_true'); _mutation(cmd)
+    cmd=sub.add_parser('init'); cmd.add_argument('--host',choices=(*hosts.HOSTS,'all'),default='all'); cmd.add_argument('--mode',choices=('aggressive','balanced','thorough','upstream')); cmd.add_argument('--no-docs',action='store_true'); cmd.add_argument('--source',type=Path,help='release directory or ZIP for missing installations (defaults to the running package)'); cmd.add_argument('--host-home',type=Path); _mutation(cmd)
     cmd=sub.add_parser('deinit'); cmd.add_argument('--host',choices=(*hosts.HOSTS,'all'),default='all'); _mutation(cmd)
     cmd=sub.add_parser('init-docs'); cmd.add_argument('--host',choices=(*hosts.HOSTS,'all'),default='all'); cmd.add_argument('--scope',choices=('user','project'),default=None); _mutation(cmd)
     mode=sub.add_parser('mode'); modes=mode.add_subparsers(dest='action',required=True); modes.add_parser('list')
@@ -78,6 +78,7 @@ def parser() -> argparse.ArgumentParser:
         cmd.add_argument('--transaction', required=True)
         cmd.add_argument('--scope', choices=('project', 'user', 'source'), default='project')
         _mutation(cmd)
+    cmd=sub.add_parser('version'); cmd.add_argument('--check',action='store_true',help='exit 2 when the installed launcher is not this checkout\'s current build')
     sub.add_parser('guide')
     return root
 
@@ -188,6 +189,17 @@ def main(argv: list[str] | None=None,*,plugin: Path=PLUGIN,runner=execute,execut
                                       allow_dirty=args.allow_dirty,github_release=False if args.no_github_release else None,
                                       gh=(executables or {}).get('gh') if executables is not None else None)
             release=result.get('github_release'); code=2 if result['status']=='unverified' or (isinstance(release,dict) and release.get('status')=='failed') else code
+        elif args.command=='version':
+            from . import setup as launcher
+            running='release' if (plugin/'release.json').is_file() else 'checkout'
+            with lifecycle.install_source(plugin,None) as built: release=packaging.inspect(built if running=='checkout' else plugin.parent.parent)
+            raw=managed.read_file(args.home,launcher.RECEIPT)
+            installed=Path(mapping(decode(raw))['retained_payload']).parent.name if raw else None
+            result={'running_from':running,'version':release['release']['identity']['version'],'release_digest':release['digest'],
+                    'source_commit':release['release']['source_commit'],'installed_launcher_release':installed,
+                    'launcher_current':installed==release['digest'] if running=='checkout' else None,
+                    'refresh':None if running=='release' or installed==release['digest'] else 'run `pnpm run refresh` in the checkout'}
+            if args.check and running=='checkout' and installed!=release['digest']: code=2
         elif args.command=='package': result=packaging.build(plugin,args.output) if args.output is not None else packaging.build_default(plugin,args.repo/'.cache/crux-flow-releases')
         elif args.command=='setup':
             from .setup import setup
@@ -195,32 +207,39 @@ def main(argv: list[str] | None=None,*,plugin: Path=PLUGIN,runner=execute,execut
             result=setup(plugin,repo=args.repo,home=args.home,selected=selected,runner=runner,dry_run=args.dry_run,approve=lambda p:_approve(p,args,confirm))
             result['skipped']=skipped
             if result['state']=='partial': code=2
-        elif args.command in {'install','upgrade'}:
-            selected,skipped=_selected(args.host,executables); plans={}; outcomes={}
-            for h,exe in selected.items():
-                if h=='codex' and args.scope=='project' and args.host=='all': skipped[h]='native registration is user-scoped; use separate project role materialization'; continue
-                plan=lifecycle.plan_install(plugin,args.source,repo=args.repo,home=args.home,host=h,scope=args.scope,executable=exe,runner=runner,host_home=args.host_home)
-                if args.command=='upgrade':
-                    from .upstream import semver
-                    if plan.previous is None: raise FlowError('upgrade requires an owned installed release')
-                    old=packaging.inspect(Path(plan.previous['release']))['release']['identity']['version']
-                    new=packaging.inspect(plan.retained)['release']['identity']['version'] if plan.retained.exists() else None
-                    if new is None:
-                        with lifecycle.source_release(args.source) as candidate: new=candidate['release']['identity']['version']
-                    if semver(new)<=semver(old): raise FlowError('upgrade requires a newer tested fork release; use install to rematerialize settings')
-                plans[h]=plan
-            public={'operation':args.command,'hosts':{h:p.public() for h,p in plans.items()},'skipped':skipped}
-            if args.dry_run: result={'state':'planned',**public}
-            else:
-                if not plans: raise FlowError('no requested compatible host installation route')
-                if not _approve(public,args,confirm): raise FlowError('operation cancelled')
-                for index,(h,p) in enumerate(plans.items()):
-                    try:
-                        if index: p=lifecycle.replan(p,plugin,runner=runner)
-                        outcomes[h]=lifecycle.apply_install(p,runner=runner,expected_digest=p.public()['plan_digest'])
-                    except (FlowError,OSError) as exc: outcomes[h]={'state':'failed','reason':str(exc) if isinstance(exc,FlowError) else type(exc).__name__,'action':'inspect scoped transaction journal; later independent hosts remain eligible'}
-                result={'hosts':outcomes,'skipped':skipped,'plan':public}
-                if any(r['state'] not in {'installed','no-op'} for r in outcomes.values()): code=2
+        elif args.command in {'install','update','upgrade'}:
+            with lifecycle.install_source(plugin,args.source) as source:
+                selected,skipped=_selected(args.host,executables); plans={}; outcomes={}
+                for h,exe in selected.items():
+                    if h=='codex' and args.scope=='project' and args.host=='all': skipped[h]='native registration is user-scoped; use separate project role materialization'; continue
+                    plan=lifecycle.plan_install(plugin,source,repo=args.repo,home=args.home,host=h,scope=args.scope,executable=exe,runner=runner,host_home=args.host_home)
+                    if args.command=='upgrade':
+                        from .upstream import semver
+                        if plan.previous is None: raise FlowError('upgrade requires an owned installed release')
+                        old=packaging.inspect(Path(plan.previous['release']))['release']['identity']['version']
+                        new=packaging.inspect(plan.retained)['release']['identity']['version'] if plan.retained.exists() else None
+                        if new is None:
+                            with lifecycle.source_release(source) as candidate: new=candidate['release']['identity']['version']
+                        if semver(new)<=semver(old): raise FlowError('upgrade requires a newer tested fork release; use install to rematerialize settings')
+                    elif args.command=='update':
+                        from .upstream import semver
+                        if plan.previous is None: skipped[h]='not installed; run crux-flow install'; continue
+                        old=packaging.inspect(Path(plan.previous['release']))['release']['identity']['version']
+                        with lifecycle.source_release(source) as candidate: new=candidate['release']['identity']['version']
+                        if semver(new)<semver(old): raise FlowError('update refuses to downgrade an installed release; use rollback or upgrade with an explicit newer source')
+                    plans[h]=plan
+                public={'operation':args.command,'hosts':{h:p.public() for h,p in plans.items()},'skipped':skipped}
+                if args.dry_run: result={'state':'planned',**public}
+                else:
+                    if not plans: raise FlowError('no requested compatible host installation route')
+                    if not _approve(public,args,confirm): raise FlowError('operation cancelled')
+                    for index,(h,p) in enumerate(plans.items()):
+                        try:
+                            if index: p=lifecycle.replan(p,plugin,runner=runner)
+                            outcomes[h]=lifecycle.apply_install(p,runner=runner,expected_digest=p.public()['plan_digest'])
+                        except (FlowError,OSError) as exc: outcomes[h]={'state':'failed','reason':str(exc) if isinstance(exc,FlowError) else type(exc).__name__,'action':'inspect scoped transaction journal; later independent hosts remain eligible'}
+                    result={'hosts':outcomes,'skipped':skipped,'plan':public}
+                    if any(r['state'] not in {'installed','no-op'} for r in outcomes.values()): code=2
         elif args.command in {'uninstall','rollback'}:
             from . import initialization
             func=lifecycle.uninstall if args.command=='uninstall' else lifecycle.rollback_install
@@ -244,7 +263,7 @@ def main(argv: list[str] | None=None,*,plugin: Path=PLUGIN,runner=execute,execut
             from . import initialization
             found,skipped=_selected(args.host,executables)
             result=initialization.init_repository(plugin,repo=args.repo,home=args.home,selected=found,skipped=skipped,runner=runner,dry_run=args.dry_run,
-                                                  approve=lambda p:_approve(p,args,confirm),docs=not args.no_docs,mode=args.mode)
+                                                  approve=lambda p:_approve(p,args,confirm),docs=not args.no_docs,mode=args.mode,source=args.source,host_home=args.host_home)
             if result['status'] in {'partial','failed'}: code=2
         elif args.command=='deinit':
             from . import initialization

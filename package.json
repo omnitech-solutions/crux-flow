@@ -4,6 +4,9 @@
   "scripts": {
     "setup": "uv run --script ./crux-flow setup",
     "crux": "uv run --script ./crux-flow",
+    "hooks:install": "git config core.hooksPath .githooks",
+    "refresh": "uv run --script ./crux-flow setup --yes",
+    "version:check": "uv run --script ./crux-flow version --check",
     "build": "uv run --script ./crux-flow package",
     "release": "uv run --script ./crux-flow publish",
     "test": "uv run --group test python -m pytest",

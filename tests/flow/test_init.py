@@ -73,6 +73,9 @@ class World:
         ok = lambda data=b'{}': ProcessResult('ok', 0, 0, len(data), data, b'')
         if '--version' in argv: return ok(self.VERSIONS[host])
         if '--help' in argv: return ok(b'plugin marketplace add remove install uninstall list --scope --json')
+        if argv[1:4] == ['plugin', 'marketplace', 'list']:
+            rows=[] if host not in self.market else [{'name':'crux-flow','root':str(self.market[host]),'path':str(self.market[host])}]
+            return ok(json.dumps(rows if host=='claude' else {'marketplaces':rows}).encode())
         if argv[1:4] == ['plugin', 'marketplace', 'add']: self.market[host] = Path(argv[4]); return ok()
         if argv[1:3] in (['plugin', 'add'], ['plugin', 'install']):
             self.user[host]['crux-flow@crux-flow'] = {'enabled': True, 'path': self.market[host] / 'crux-flow'}
@@ -134,6 +137,50 @@ def snapshot(root: Path) -> dict:
 
 
 # ---- host-agnostic onboarding ---------------------------------------------------------------------
+
+@pytest.mark.parametrize('host', ['claude', 'codex'])
+def test_init_installs_missing_native_plugin_and_skips_it_on_repeat(host, env, capsys):
+    repo, home, world, release = env
+    world.trust(repo)
+    before = snapshot(home)
+    _, preview = cli(env, 'init', '--host', host, '--source', release['root'], '--dry-run', '--no-docs', capsys=capsys, code=0)
+    assert preview['hosts'][host]['installation']['commands']
+    assert snapshot(home) == before and not list(repo.iterdir())
+    _, out = cli(env, 'init', '--host', host, '--source', release['root'], '--yes', '--no-docs', capsys=capsys, code=0)
+    assert out['hosts'][host]['status'] == 'configured'
+    assert world.effective(host, repo)['crux-flow@crux-flow'] is True
+    writes = [c for c in world.calls if '--help' not in c and
+              (c[1:4] == ['plugin', 'marketplace', 'add'] or c[1:3] in (['plugin', 'add'], ['plugin', 'install']))]
+    assert len(writes) == 2
+    world.calls.clear()
+    _, again = cli(env, 'init', '--host', host, '--yes', '--no-docs', capsys=capsys, code=0)
+    assert again['hosts'][host]['status'] == 'already-correct'
+    installation=again['hosts'][host]['installation']
+    assert installation['state']=='skipped-already-installed'
+    assert installation['marketplace']['status']=='already-registered'
+    assert installation['plugin']['status']=='already-installed'
+    assert installation['plugin']['path'] and installation['marketplace']['path']
+    assert installation['commands']==[]
+    assert not [c for c in world.calls if '--help' not in c and
+                (c[1:4] == ['plugin', 'marketplace', 'add'] or c[1:3] in (['plugin', 'add'], ['plugin', 'install']))]
+
+
+@pytest.mark.parametrize('host', ['claude', 'codex'])
+@pytest.mark.parametrize('missing', ['plugin', 'marketplace'])
+def test_init_installs_only_the_missing_native_step(host, missing, env, capsys):
+    machine_install(env, hosts=(host,))
+    repo, _, world, _ = env
+    world.trust(repo)
+    if missing=='plugin': world.user[host].pop('crux-flow@crux-flow')
+    else: world.market.pop(host)
+    world.calls.clear()
+    _, out=cli(env, 'init', '--host', host, '--yes', '--no-docs', capsys=capsys, code=0)
+    assert out['hosts'][host]['status']=='configured'
+    writes=[c for c in world.calls if '--help' not in c and
+            (c[1:4]==['plugin','marketplace','add'] or c[1:3] in (['plugin','add'],['plugin','install']))]
+    assert len(writes)==1
+    assert (writes[0][1:4]==['plugin','marketplace','add'])==(missing=='marketplace')
+
 
 def test_init_configures_claude_and_codex_without_naming_a_host(env, capsys):
     machine_install(env)
@@ -476,3 +523,13 @@ def test_a_failed_host_reports_its_reason(env, capsys):
     env[2].fail_list.add('codex')
     status, out = cli(env, 'init', '--yes', '--no-docs', installed=('codex',), capsys=capsys)
     assert status == 2 and out['hosts']['codex']['status'] == 'failed' and out['hosts']['codex']['reason']
+
+
+@pytest.mark.parametrize('host', ['claude', 'codex'])
+def test_init_asks_for_no_approval_when_nothing_would_change(host, env, capsys):
+    repo, home, world, release = env
+    world.trust(repo)
+    cli(env, 'init', '--host', host, '--source', release['root'], '--yes', '--no-docs', capsys=capsys, code=0)
+    # No --yes and no terminal: any approval request would fail, so success proves none was made.
+    _, again = cli(env, 'init', '--host', host, '--no-docs', capsys=capsys, code=0)
+    assert again['hosts'][host]['status'] == 'already-correct'

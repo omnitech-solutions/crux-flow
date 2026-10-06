@@ -31,6 +31,39 @@ def test_actual_requested_native_installation_in_disposable_home(tmp_path, relea
     assert removal['state'] == 'uninstalled', removal
 
 
+@pytest.mark.parametrize('host', ['claude', 'codex'])
+def test_real_init_installs_missing_native_plugin_and_skips_repeat(tmp_path,release,host,capsys):
+    import json
+    from crux.flow.cli import main
+    from crux.flow.processes import execute
+    if os.environ.get('CRUX_FLOW_NATIVE_TESTS')!='1': pytest.skip('opt-in native installation observation')
+    executable=shutil.which(host)
+    if executable is None: pytest.skip('requested native host is not installed')
+    repo=tmp_path/'repo'; home=tmp_path/'home'; repo.mkdir(); home.mkdir()
+    host_home=home/'custom-host'; host_home.mkdir()
+    if host=='codex':
+        (host_home/'config.toml').write_text(f'[projects."{repo.resolve()}"]\ntrust_level = "trusted"\n')
+    calls=[]
+    def runner(argv,**kwargs):
+        calls.append(argv)
+        return execute(argv,**kwargs)
+    args=['--repo',str(repo),'--home',str(home),'init','--host',host,'--source',release['root'],
+          '--host-home',str(host_home),'--yes','--no-docs']
+    assert main(args,runner=runner,executables={host:executable})==0
+    first=json.loads(capsys.readouterr().out)
+    assert first['hosts'][host]['installation']['state']=='installed'
+    actions=first['hosts'][host]['installation']['actions']
+    assert [row['command'][1:3] for row in actions]==[['plugin','marketplace'],['plugin','install' if host=='claude' else 'add']]
+    assert first['hosts'][host]['effective_in_repository'] is True
+    calls.clear()
+    assert main(args,runner=runner,executables={host:executable})==0
+    again=json.loads(capsys.readouterr().out)
+    assert again['hosts'][host]['status']=='already-correct'
+    assert again['hosts'][host]['installation']['state']=='skipped-already-installed'
+    assert not [c for c in calls if '--help' not in c and
+                (c[1:4]==['plugin','marketplace','add'] or c[1:3] in (['plugin','install'],['plugin','add']))]
+
+
 def _stub_upstream(root: Path) -> Path:
     """A minimal marketplace named `crux` offering a plugin `crux`, readable by both hosts."""
     import json

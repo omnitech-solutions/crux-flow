@@ -29,6 +29,9 @@ class Native:
         if self.fail and self.fail in argv and '--help' not in argv: return ProcessResult('failed',1,0,0,b'',b'private diagnostics')
         if '--version' in argv: data=b'host 0.160.0'
         elif '--help' in argv: data=b'plugin marketplace add remove install uninstall list --scope --json'
+        elif argv[1:4]==['plugin','marketplace','list']:
+            rows=[] if self.market is None else [{'name':'crux-flow','root':str(self.market),'path':str(self.market)}]
+            data=json.dumps(rows if self.host=='claude' else {'marketplaces':rows}).encode()
         elif argv[1:4]==['plugin','marketplace','add']: self.market=Path(argv[4]); data=b'{}'
         elif argv[1:3] in (['plugin','add'],['plugin','install']):
             self.active=self.market/'crux-flow'; data=b'{}'

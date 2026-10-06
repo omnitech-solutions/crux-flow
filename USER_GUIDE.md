@@ -1,4 +1,6 @@
 <!-- generated-from: USER_GUIDE.md@sha256:922e39d5da3e06b071f55ef17734775802e8aa221e9928f3b524c52486147829; model: claude-sonnet-5.5; date: 2026-09-30 -->
+> **Crux Flow fork:** this file is the upstream Crux (`crux@crux`) reference. For this fork, install and update with `crux-flow install`, `crux-flow init` and `crux-flow update` (plugin `crux-flow@crux-flow`, skills `crux-flow:<name>`); see `FLOW_GUIDE.md`.
+
 # Working with `bionic/` in crux
 
 Your project keeps its documentation in `bionic/` (or a directory you choose with `docs_dir`; see [Per-project configuration](#per-project-configuration-the-repo-root-bionicyml-file)). It holds seven concerns, plus the two default-on surfaces `arch` and `observations`. The `crux` plugin maintains all of it. **You do not write these docs by hand.** You curate, decide, and discuss. Your agent does the bookkeeping.

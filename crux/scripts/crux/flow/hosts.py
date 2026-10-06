@@ -115,6 +115,7 @@ def skills(plugin: Path, host: str, *, engine: Path | None=None) -> dict[str,byt
         if raw is None: raise FlowError('skill source disappeared')
         if path.name=='SKILL.md':
             head,body,_=_parts(raw)
+            body=re.sub(r'(?<![\w/-])/crux:(?=[a-z])','/crux-flow:',body)   # the fork's skills live in the crux-flow plugin namespace
             body=re.sub(r'<!-- BEGIN GENERATED: runtime-compat -->.*?<!-- END GENERATED: runtime-compat -->','',body,flags=re.S)
             if engine is None:
                 location=('The installed plugin contains engine/ with the canonical Crux runtime. '

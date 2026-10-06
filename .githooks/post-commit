@@ -1,0 +1,27 @@
+#!/bin/sh
+# Keep the installed crux-flow launcher on the release built from the commit just made.
+# post-commit, not pre-commit: the release records HEAD, which only exists afterwards.
+# Never blocks a commit. Skip entirely with CRUX_FLOW_NO_HOOK=1.
+[ -n "$CRUX_FLOW_NO_HOOK" ] && exit 0
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+inputs='crux crux-flow LICENSE FLOW_GUIDE.md reference-source.json'
+git diff-tree --root --no-commit-id --name-only -r HEAD | grep -Eq '^(crux/|crux-flow$|LICENSE$|FLOW_GUIDE\.md$|reference-source\.json$)' || exit 0
+cd "$root" || exit 0
+command -v uv >/dev/null 2>&1 || { echo "crux-flow: uv not found; skipped launcher refresh" >&2; exit 0; }
+./crux-flow version --check >/dev/null 2>&1
+case $? in
+  0) exit 0 ;;
+  2) ;;
+  *) echo "crux-flow: could not check the installed launcher; run 'pnpm run version:check'" >&2; exit 0 ;;
+esac
+# shellcheck disable=SC2086
+if [ -n "$(git status --porcelain -- $inputs)" ]; then
+  echo "crux-flow: installed launcher is stale, but release inputs have uncommitted changes; commit them, then run 'pnpm run refresh'" >&2
+  exit 0
+fi
+if ./crux-flow setup --yes >/dev/null 2>&1; then
+  echo "crux-flow: installed launcher refreshed to $(git rev-parse --short HEAD)" >&2
+else
+  echo "crux-flow: launcher refresh failed; run 'pnpm run refresh' to see why" >&2
+fi
+exit 0

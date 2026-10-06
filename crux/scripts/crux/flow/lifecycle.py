@@ -22,6 +22,21 @@ def receipt_name(host: str,scope: str) -> str:
 
 
 @contextmanager
+def install_source(plugin: Path, source: Path | None):
+    if source is not None:
+        yield source
+    elif (plugin/'release.json').is_file():
+        # Packaged engines live at <marketplace>/<distribution>/engine.
+        # Use the complete marketplace so its existing manifest is validated.
+        yield plugin.parent.parent
+    else:
+        from . import packaging
+        with tempfile.TemporaryDirectory(prefix='crux-install-') as temp:
+            built=packaging.build(plugin,Path(temp)/'build')
+            yield Path(built['root'])
+
+
+@contextmanager
 def source_release(source: Path) -> Iterator[dict]:
     if source.is_symlink(): raise FlowError('symlinked release source refused')
     if source.is_dir():
@@ -79,12 +94,27 @@ def _native_state(host: str,exe: str,repo: Path,home: Path,runner,host_home: Pat
     return report
 
 
-def _commands(host: str,exe: str,scope: str,release: Path,*,replace_existing: bool=False) -> list[list[str]]:
+def marketplace_root(host: str,exe: str,*,repo: Path,home: Path,runner,host_home: Path | None=None) -> str | None:
+    result=runner([exe,'plugin','marketplace','list','--json'],cwd=home,env=hosts.environment(host,home,host_home=host_home),timeout=12,limit=500_000)
+    if result.status!='ok': raise FlowError('native marketplace inventory could not be inspected')
+    data=decode(result.stdout)
+    rows=data if host=='claude' else mapping(data).get('marketplaces',[])
+    if not isinstance(rows,list): raise FlowError('invalid native marketplace inventory')
+    matches=[mapping(row) for row in rows if mapping(row).get('name')=='crux-flow']
+    if len(matches)>1: raise FlowError('ambiguous Flow marketplace registration')
+    if not matches: return None
+    row=matches[0]; root=row.get('root') if host=='codex' else row.get('path',row.get('installLocation'))
+    if not isinstance(root,str) or not Path(root).is_absolute(): raise FlowError('Flow marketplace has no local absolute root')
+    return root
+
+
+def _commands(host: str,exe: str,scope: str,release: Path,*,replace_existing: bool=False,registered: bool=False) -> list[list[str]]:
     commands=[]
     if replace_existing:
         commands.append([exe,'plugin','uninstall' if host=='claude' else 'remove','crux-flow@crux-flow',*(['--scope',scope] if host=='claude' else [])])
         commands.append([exe,'plugin','marketplace','remove','crux-flow',*(['--scope',scope] if host=='claude' else [])])
-    commands.append([exe,'plugin','marketplace','add',str(release),*(['--scope',scope] if host=='claude' else [])])
+    if replace_existing or not registered:
+        commands.append([exe,'plugin','marketplace','add',str(release),*(['--scope',scope] if host=='claude' else [])])
     commands.append([exe,'plugin','install' if host=='claude' else 'add','crux-flow@crux-flow',*(['--scope',scope] if host=='claude' else [])])
     return commands
 
@@ -128,12 +158,13 @@ class InstallPlan:
     no_op: bool
     host_home: Path | None
     deferred: bool = False
+    before_marketplace: str | None = None
 
     def public(self) -> dict:
         data={'operation':'install','source':str(self.source),'source_digest':self.source_digest,'host':self.host,'scope':self.scope,
               'retained_release':str(self.retained),'release_plan':self.release_plan.public(),
               'projection_plan':self.projection_plan.public(),'controls':self.controls,'before_native':self.before_native,
-              'commands':[list(c) for c in self.commands],'recovery_commands':[list(c) for c in self.recovery_commands],
+              'commands':[list(c) for c in self.commands],'recovery_commands':[list(c) for c in self.recovery_commands], 'before_marketplace':self.before_marketplace,
               'no_op':self.no_op,'user_activation':'deferred' if self.deferred else 'active','runtime_loaded':'unobserved','atomicity':'recoverable scoped files; native registration is a separate boundary'}
         data['plan_digest']=identity(data)
         return data
@@ -167,6 +198,7 @@ def plan_install(plugin: Path,source: Path,*,repo: Path,home: Path,host: str,sco
     if not capabilities['present']: raise FlowError('requested host executable is absent')
     exe=capabilities['executable']
     before=_native_state(host,exe,repo,home,runner,host_home,cwd=home if scope=='user' else None) if host in {'claude','codex'} else None
+    market=marketplace_root(host,exe,repo=repo,home=home,runner=runner,host_home=host_home) if before is not None else None
     deferred=bool(before and scope=='user' and before['upstream_active'])
     if before and before['installed'] and prior is None: raise FlowError('existing fork installation has no owned receipt; explicit migration required')
     if host in {'claude','codex'}:
@@ -187,18 +219,25 @@ def plan_install(plugin: Path,source: Path,*,repo: Path,home: Path,host: str,sco
                  include_skills=host in {'omp','opencode'},host_home=host_home,engine=store/'crux-flow/engine')
         no_op=bool(prior and prior['state']=='installed' and prior['release_digest']==release['digest'] and
                    prior['policy_digest']==identity(effective) and not outputs and
-                   (before is None or (before['installed'] and before['enabled']==(not deferred) and before['statically_valid'] and before.get('runtime_digest')==release['release']['runtime_digest'])))
+                   (before is None or (market is not None and before['installed'] and before['enabled']==(not deferred) and before['statically_valid'] and before.get('runtime_digest')==release['release']['runtime_digest'])))
         previous={k:v for k,v in prior.items() if k!='previous'} if prior else None
         receipt={'schema_version':1,'host':host,'scope':scope,'release':str(store),'release_digest':release['digest'],
                  'runtime_digest':release['release']['runtime_digest'],'policy_digest':identity(effective),'state':'installed',
                  'executable':exe,'previous':previous,'host_home':str(host_home) if host_home else None,'user_activation':'deferred' if deferred else 'active','projection_transaction':uuid.uuid4().hex}
         if not no_op: outputs[receipt_name(host,scope)]=canonical(receipt)
         projection_plan=managed.plan(root,outputs,owner='installation')
-        commands=[] if host not in {'claude','codex'} or no_op else _commands(host,exe,scope,store,replace_existing=bool(before and before['installed']))
+        registered=False
+        if market is not None and before is not None and not before['installed']:
+            if packaging.inspect(Path(market))['digest']!=release['digest']:
+                raise FlowError('registered Flow marketplace refers to another release; select that release with --source')
+            registered=True
+        commands=[] if host not in {'claude','codex'} or no_op else _commands(host,exe,scope,store,replace_existing=bool(before and before['installed']),registered=registered)
+        if before is not None and before['installed'] and before['statically_valid'] and before.get('runtime_digest')==release['release']['runtime_digest'] and before['enabled']==(not deferred):
+            commands=[] if market is not None else [[exe,'plugin','marketplace','add',str(store),*(['--scope',scope] if host=='claude' else [])]]
         recovery=(_commands(host,exe,scope,_retained(home,prior),replace_existing=True) if prior else
                 [[exe,'plugin','uninstall' if host=='claude' else 'remove','crux-flow@crux-flow',*(['--scope',scope] if host=='claude' else [])]]) if host in {'claude','codex'} else []
         return InstallPlan(source,repo,home,host,scope,exe,release['digest'],release['release']['runtime_digest'],store,
-               release_plan,projection_plan,_controls(repo,home),before,tuple(map(tuple,commands)),tuple(map(tuple,recovery)),previous,receipt,no_op,host_home,deferred)
+               release_plan,projection_plan,_controls(repo,home),before,tuple(map(tuple,commands)),tuple(map(tuple,recovery)),previous,receipt,no_op,host_home,deferred,market)
 
 
 def _run_commands(commands,plan: InstallPlan,runner) -> list[dict]:
@@ -207,7 +246,7 @@ def _run_commands(commands,plan: InstallPlan,runner) -> list[dict]:
     directory.mkdir(parents=True,exist_ok=True)
     for command in commands:
         result=runner(list(command),cwd=plan.repo,env=hosts.environment(plan.host,plan.home,host_home=plan.host_home),timeout=45,limit=500_000)
-        values.append(result.public())
+        values.append({'command':list(command),**result.public()})
         if result.status!='ok': break
     return values
 
@@ -230,6 +269,8 @@ def apply_install(plan: InstallPlan,*,runner=execute,expected_digest: str | None
     user=plan.home if plan.scope=='user' else None
     if plan.before_native is not None and _native_state(plan.host,plan.executable,plan.repo,plan.home,runner,plan.host_home,cwd=user)!=plan.before_native:
         raise FlowError('native registration changed after planning')
+    if plan.before_native is not None and marketplace_root(plan.host,plan.executable,repo=plan.repo,home=plan.home,runner=runner,host_home=plan.host_home)!=plan.before_marketplace:
+        raise FlowError('marketplace registration changed after planning')
     for item in plan.projection_plan.changes:
         if managed.read_file(plan.projection_plan.root,item.path)!=item.before: raise FlowError('stale projection plan')
     if plan.no_op: return {'state':'no-op','host':plan.host,'retained_release':str(plan.retained),'runtime_loaded':'unobserved'}
