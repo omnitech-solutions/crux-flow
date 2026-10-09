@@ -146,7 +146,12 @@ def environment(host: str,home: Path,*,host_home: Path | None=None) -> dict[str,
     env=dict(os.environ)
     env['HOME']=str(home)
     if host=='codex': env['CODEX_HOME']=str(host_home or home/'.codex')
-    elif host=='claude': env['CLAUDE_CONFIG_DIR']=str(host_home or home/'.claude')
+    elif host=='claude':
+        # Claude Code finds its login by the configuration directory it is told about: naming even its own default
+        # directory makes it look for a separate login, and a model turn then ends "Not logged in". The variable is
+        # therefore set only to redirect Claude away from its default, or to keep one the caller already set.
+        target=host_home or home/'.claude'
+        if 'CLAUDE_CONFIG_DIR' in env or target!=Path.home()/'.claude': env['CLAUDE_CONFIG_DIR']=str(target)
     elif host=='opencode': env['XDG_CONFIG_HOME']=str((host_home.parent if host_home else home/'.config'))
     elif host=='omp': env['PI_CODING_AGENT_DIR']=str(host_home or home/'.omp/agent')
     else: raise FlowError('unsupported host')
