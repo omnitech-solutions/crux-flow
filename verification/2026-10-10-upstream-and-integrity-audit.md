@@ -282,3 +282,45 @@ reference copies and are labeled as such in the README rather than rewritten, so
 5. Whether to add credits to the OpenRouter account (live probe needs more than 50 requests a day to give a rate) or run the probe through the existing paid Claude path.
 6. Whether `COMPLETION_REPORT.md` (the 0.2.0 build record, stale numbers) is kept, merged into `verification/README.md`, or deleted.
 7. Whether to add the verb `crux-flow upstream update` now or with the first real update.
+
+---
+
+## 6. Update applied (2026-10-10, branch `upstream-3.27.4`, not pushed, not merged)
+
+Upstream 3.25.1 (`732c355a`) to v3.27.4 (`06989514bc97`). `master` is untouched.
+
+### How
+
+`upstream prepare` could not run (no upstream ancestry in this checkout). The same replay was done as a per-file three-way merge in a
+scratch repository: base = the upstream v3.25.1 tree, ours = this tree's `crux/`, theirs = the v3.27.4 tree. Git's merge agreed with
+the audit: 16 patched files merged cleanly and 4 conflicted. The fork's deliberate trimming of upstream test corpora (netnewswire,
+`test_adr_signals.py`, `test_swift_pack.py`, `test_swift_xcode.py`) was kept. Commits, in order: vendored upstream for unpatched files;
+the clean patches; one commit per conflict resolution; Flow adaptations; the pin, the refreshed upstream `CHANGELOG.md` (an unmodified
+upstream copy) and the regenerated surface record; docs.
+
+### The four conflicts
+
+| File | What upstream changed | What the fork's patch was for | New patch | Proof |
+|---|---|---|---|---|
+| `scripts/advance-run.py` | 500 to 1245 lines in `main`. Every `--outcome` resolves and hash-checks a book, classifies the prompt against the council gate, and has a format-two publish path. New `--gate-info`, `--implementation-revision`, `--migration-batch`. | Six guarantees: (1) a run with a `flow` block is advanced only by Flow's `advance_file`; (2) upstream `--abandon` cannot erase Flow history; (3) `guard_advance` inside `advance()` for in-process callers; (4) `_emit` writes booleans and refuses non-finite numbers; (5) a changed schema-2 `flow` block splices as one `set`; (6) a patch's final advance is refused when containment cannot be checked. | The same six, re-applied to the new shape. The hook sits after the format checks and before any gate or book work; it also refuses `--gate-info` and the two selectors by name. The containment check keys on the resolved book's `cycle_kind` (a book is always resolved now). | `tests/flow/test_shared_writer_patches.py`: each patch removed in turn fails exactly its test (verified by mutation); the scenarios and `test_records.py` pass. |
+| `schemas/run.schema.json` | `format_version` const "1" becomes enum "1","2"; SHA-256 commit pattern; `implementation_bindings`, `migration_bindings`, an `allOf`. | The `flow` property (about 280 lines). | Upstream file plus the identical `flow` property, nothing else. | `tests/flow/test_formats.py`; the surface `schemas` section. |
+| `crux/council/async_council.py` | Gate mode: seats resolved from roles, served-model and served-provider checks, per-attempt records. | Overall deadline, frozen `resolved_models`, router-digest binding. | Merged beside gate mode; the retry consumes the overall deadline; a frozen configuration cannot seat a gate council. | `tests/flow/test_council_patches.py` (16 tests). |
+| `skills/run-promptbook/references/advance.md` | "Gate prompts have no hand route" text. | One sentence on `--book` for patch completion. | The sentence kept on top of upstream's text. | Declared text, digest in the surface record. |
+
+### What Flow adapted
+
+- **Formats.** Upstream writes format "2" for cycle, patch and iterate books and runs (council-gated, with implementation bindings) and "1" for ordinary books (`author-promptbook`, `start.md`). Flow's books and runs are ordinary and stay "1". Flow now reads "1" and "2": a format 2 run is inspectable (`history`) and never executed ("advance it with run-promptbook"); any other format is refused naming the formats Flow reads; a Flow run that claims format 2 is refused. `supported_formats` lists "1","2" for run and promptbook.
+- **Librarian.** Upstream 3.27.3 gave it Bash. In the three Flow modes it is stripped on every host (Claude tools, OpenCode shell permission, OMP bash tool, Codex source tools); upstream mode keeps upstream's role. Tests fail without the strip.
+- **Leaf rule.** Unchanged. `test_no_flow_mode_role_can_delegate`, `test_upstream_mode_keeps_upstream_delegation_grants` and the surface delegation invariant pass against the new roles.
+- **Runs in flight and the router bump (4.0.0 to 4.2.0).** A run freezes the `ModelConfig` of each API role. `ModelConfig` gained defaulted fields, so a config frozen before lacked them and the strict reader refused; the frozen digest also refused. Decision: a frozen run keeps what it froze. New fields default, the council is seated from the frozen configurations, and the attempt's recorded justification states that the shipped router differs. A run frozen against the current router still demands it unchanged. Tested with a run frozen the old way.
+- **Installer.** Upstream now ships an executable script (`check-refutation-record.py`); the retained release copy wrote every file 0644 and failed its own manifest. The retained copy now keeps the manifest mode (`lifecycle.py`, `setup.py`; tested).
+- **Tripwire.** An emptied `scripts_called` list that later fills was reported as a hard removal; it is now an addition. A removed script is still hard.
+- **Regenerated.** `catalog/skills.json` and `agents.json` (no change), runtime compatibility (no change), the surface record last. Pins: `flow-policy.json`, `reference-source.json`, README, FLOW_SEAMS, FLOW_GUIDE.
+
+### What is different for a consumer
+
+Role files lose every delegation grant and gain `disallowedTools: Agent` (Claude); `maxTurns`/`steps` rise to upstream's new values (architect/historian 100, developer/reviewer 200, dev-lead 250); the Codex roles carry the leaf sentence and a skill path pinned to the new release digest; models are unchanged. A run started before the update is not stranded. A format 2 run is now named, not mis-parsed. Nothing in `.crux-flow.yml` is renamed or newly required.
+
+### Verification
+
+See the report that accompanied this branch for the exit codes and totals of `pnpm run verify`, the scenarios, the property test and `upstream check`.
