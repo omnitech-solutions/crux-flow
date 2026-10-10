@@ -1,7 +1,7 @@
 # Crux Flow integration seams
 
 Every point where Flow touches upstream Crux or a host, whether the seam is official, and the test that pins it.
-Baseline: Bionic Crux 3.25.1, commit `732c355a5bc3130f6cd3763214f7c908b302a3e8` (`reference-source.json`).
+Baseline: Bionic Crux 3.27.4, commit `06989514bc97de7b252d03979b5d2db08a61a919` (`reference-source.json`).
 The source files, not the public catalog, are the contract for this version.
 
 `crux/surface/record.json` pins the machine-checkable half of this page (see `tests/flow/test_surface.py`); the audit

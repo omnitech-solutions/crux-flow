@@ -8,8 +8,8 @@
     "policy_revision": "2",
     "projection_version": "2",
     "upstream_repository": "https://github.com/bionic-coding/crux.git",
-    "upstream_commit": "732c355a5bc3130f6cd3763214f7c908b302a3e8",
-    "upstream_version": "3.25.1"
+    "upstream_commit": "06989514bc97de7b252d03979b5d2db08a61a919",
+    "upstream_version": "3.27.4"
   },
   "aliases": {
     "rapid": "aggressive"

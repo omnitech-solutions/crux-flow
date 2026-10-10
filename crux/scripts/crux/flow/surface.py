@@ -331,7 +331,9 @@ def changes(recorded: dict, live: dict, declaration: dict) -> list[dict]:
         before=old.get(path,'<absent>'); after=new.get(path,'<absent>')
         if before==after: continue
         kind='added' if path not in old else 'removed' if path not in new else 'changed'
-        severity='hard' if kind=='removed' and path[0] in hard_sections else 'notice'
+        # an empty list or mapping flattens to one leaf: when it fills up that leaf disappears, which is an addition, not a removal
+        filled=kind=='removed' and before in ([],{}) and any(other[:len(path)]==path and len(other)>len(path) for other in new)
+        severity='hard' if kind=='removed' and path[0] in hard_sections and not filled else 'notice'
         result.append({'section':path[0],'path':'/'.join(path),'kind':kind,'severity':severity,'recorded':before,'live':after})
     return result
 

@@ -1,4 +1,4 @@
-<!-- generated-from: CHANGELOG.md@sha256:7b8d4ff406627e0d257a3a6835484729cb67916888929cba9a08926ac475fe98; model: claude-sonnet-5.5; date: 2026-09-30 -->
+<!-- generated-from: CHANGELOG.md@sha256:78804f9be24d5f679687316aa515a421ff6c8e9cbb587272070157677b6d1b3e; model: claude-sonnet-5.5; date: 2026-10-09 -->
 # Changelog
 
 All notable changes to crux. The format roughly follows [Keep a Changelog](https://keepachangelog.com/) and the project adheres to [Semantic Versioning](https://semver.org/).
@@ -8,6 +8,154 @@ All notable changes to crux. The format roughly follows [Keep a Changelog](https
 ### Added
 
 ### Changed
+
+### Fixed
+
+### Removed
+
+## [3.27.4] — 2026-10-09
+
+### Added
+
+### Changed
+
+### Fixed
+
+- Codex: the librarian can now complete `query-docs` from its read-only sandbox, where `uv run` cannot start. It uses the authority-state output supplied by its caller. It runs `authority-view.py` itself only where `uv run` can start, and it refuses to answer when it has neither. When `query-docs` delegates to the librarian, it now tells the caller to run `authority-view.py state` and `retained-roots` first and pass along their output.
+
+### Removed
+
+## [3.27.3] — 2026-10-09
+
+### Added
+
+### Changed
+
+### Fixed
+
+- On Codex, the librarian can now read skill instructions and local files through the shell. Its instructions limit shell use to read-only retrieval, and its Codex sandbox stays `read-only`. On OpenCode, the librarian's shell permission changes from deny to allow.
+
+### Removed
+
+## [3.27.2] — 2026-10-09
+
+### Added
+
+### Changed
+
+- Models: the flagship level now pins Claude Opus 5.5 by its full ID `claude-opus-5-5` instead of the `opus` family alias, so the architect, brainstormer and dev-lead run Opus 5.5 on every Claude Code provider.
+- Models: on OpenCode, the architect now runs Opus 5.5 and the commander runs Kimi K3. The `haiku-latest` alias now points at Haiku 5.5, and the unused `opus-stable` alias is removed.
+- Dev-lead: a new Testing section asks for evidence proportional to the change, a time estimate before expensive runs, and a full test suite that finishes in under 30 minutes.
+
+### Fixed
+
+### Removed
+
+## [3.27.1] — 2026-10-08
+
+### Added
+
+### Changed
+
+- Contracts: the next advance now refuses while a closed ADR module's ADR is still Proposed. The historian now reads the objectives before any work, including verbatim transcription. The commander checks each proposed deferral against the Outcome and Evidence sentences. The verify template's first prompt now says to reproduce at the run's `base_commit` and record that commit.
+
+### Fixed
+
+- Lint: a demoted rule mentioned in a brief now gets advice that matches a new sentence in the brief template.
+- Signals: the ADR signals report now says "no history yet" for `schema_growth` when HEAD is unborn.
+- Remedy: the submodule remedy now lists steps in an order in which none refuses again on the path being fixed. It no longer offers to delete the submodule's `.git` entry.
+- Speed: the authority view now uses a batched path that cuts git calls from 596 to 122 with identical output.
+
+### Removed
+
+## [3.27.0] — 2026-10-08
+
+### Added
+
+### Changed
+
+- Orchestration: a cycle run now names a tester, who runs the full test suite under a lock and writes a pass record. A later run reuses that record when the gate label, command, HEAD commit and clean working tree all match. The tester's window holds the commit lane, an in-flight unit hands its work back by commit, and an owner decision carries its provenance.
+- Release: in the development repository's release process, the official release no longer has a dry-run step. Preflight check 1 now covers `uv.lock` and `reviewed_plugin_version`, the public-documentation generator reuses unchanged renditions, and DEPLOY.md now documents the heading format the prose-review advisory reads.
+- Projections: allocating an identifier or transitioning a decision record (ADR) now regenerates the summaries, doctrine and architecture projections after the commit.
+
+### Fixed
+
+- Tests (development repository): the council-record ordering test now pins `LC_ALL=C` for its plain git helper, so its ambiguous-argument assertion holds under a non-English git locale.
+- Tests (development repository): fixture repositories now disable git auto-gc and auto-maintenance, so a detached repack can no longer delete an object while a test copies the repository.
+- `log-work`: the writer's report now names its `committed` key `recorded`. The writer never runs version control and leaves the journal files modified and uncommitted, so the old name was misleading.
+- Starting a run now works with a committed promptbook that has an unquoted date (for example `created_at: 2026-10-07`). Previously it was refused with `book-validation-refused`. The start script now loads the book through the same loader the validator uses.
+- Drift-gate runs: a `validation-errors` finding now carries the guard's first three error entries (400 characters each) alongside the count, so a transient failure leaves its text behind.
+
+### Removed
+
+## [3.26.2] — 2026-10-08
+
+### Added
+
+- An Implementation Decision can declare an empty constraint set and give a reason. Council preflight, the approval close and current eligibility refuse the declaration if an undeclared live rule's path scope overlaps the decision's scope.
+- SHA-256 repositories can now write and gate commit-range review reports (format 2). Reports for SHA-1 ranges are unchanged.
+
+### Changed
+
+- `iterate` and `patch-cycle` now route on whether an enduring constraint changes. A replaceable approach whose reasoning must survive retrieval stays an Implementation Decision instead of becoming an ADR.
+- A completion prompt in an implementation-only cycle now references the reviewed Implementation Decision. Before, it required Accepted ADR references.
+- The cycle, `iterate` and patch templates now direct the agent to write the result record.
+- The developer handoff now states that only the current run's approval binding defines delivery intent.
+- A council gate now orders its evidence by committed history, not by the host clock. A record committed first can no longer outrank a record committed later, even when a rolled-back clock stamps the later record earlier. When history contradicts a stamp, the gate stops and names both records.
+
+### Fixed
+
+- The Codex guide no longer says a Codex council cannot begin. The workspace-write sandbox keeps the git directory read-only, so an unapproved invocation still fails before any model request. With approvals enabled, the agent requests escalation for the whole `run-council.py` command, and the council runs. The 3.26.0 release notes repeated the old claim.
+- Implementation migration now refuses a governing citation of a demoted rule in any tracked instruction file, including nested `AGENTS.md` and `CLAUDE.md`. It does the same in any project-local skill under `.claude/skills`, `.agents/skills`, `.opencode/skills` or `.opencode/skill`. Before, it checked only the root instruction files.
+- Once a migration is published, a tracked link or submodule under a skill root is refused with a remedy, even a link that only mirrors a skill directory. A tracked instruction or skill file that is missing from the working tree (sparse checkout, skip-worktree or unstaged deletion) is refused with `migration-source-unreadable`.
+- The governing readers now refuse in the same way. `summarize-adrs`, `compile-doctrine` and the `query-docs` authority view print a `{"remedy": ...}` line on stderr.
+- A directory-scoped Implementation Decision can now record complete delivery. A rename review now covers the old path. A dangling symlink no longer counts as an absent source.
+- A decision label returned by a council seat no longer reaches INFO logs. The log shows a fixed label in place of an unknown value.
+- The diagnosis and fix history for these fixes is recorded in the development repository's journal and run records.
+
+### Known limitations
+
+- Migration does not scan nested skill roots such as `packages/web/.claude/skills`, or skill reference files with a suffix outside the scanned set such as `.txt`.
+- Migration does not follow a tracked directory link outside the skill roots when its target is outside the repository, ignored or untracked. It also skips instruction files under directory names the linter excludes (`build/AGENTS.md`), and it matches skill roots by exact case on case-insensitive filesystems.
+- The migration apply report prints no remedy line. The rules catalog, `derive-arch` and the reviews index refuse with the bare code and no remedy line.
+- A migration inspection has no cap on its candidate count.
+- A council gate's history read ignores git's commit-graph file, so a forged or corrupt commit-graph cannot change the evidence order. The read is slower on large repositories and runs on every gate advance. In a 200,000-commit repository, records spread through history took 1.84 s instead of 0.42 s, and records in the last 2,000 commits took 0.69 s instead of 0.40 s. Larger repositories are not measured.
+
+## [3.26.1] — 2026-10-07
+
+### Added
+
+### Changed
+
+- Six agents now get more turns before they stop: architect 100, commander 250, dev-lead 250, developer 200, historian 100 and reviewer 200. The OpenCode projection carries the same values as `steps`.
+
+### Fixed
+
+- A repository with no commits now reads as `original` authority. Previously the authority view refused with `history-unavailable`, so `query-docs` could not answer between `init-docs` and the first commit.
+- After a clause migration is published, a new brief can cite a demoted rule as history. Previously the summaries, doctrine and rules-catalog readers refused with `migration-citation-repair-required`. A governing citation of a demoted rule still refuses.
+
+### Removed
+
+## [3.26.0] — 2026-10-07
+
+### Added
+
+- Architectural Decisions and Implementation Decisions are now separate records. An ADR records an enduring constraint. A council-reviewed Implementation Decision records a replaceable choice, so a later choice does not need to revoke, deprecate or supersede the earlier one. Implementation Decisions author no rule, and doctrine, summaries and every other governing reader exclude them.
+- `dev-cycle` can now build an `implementation` cycle kind. It has implementation, dev and review modules, no ADR module, and at least 13 prompts. Council review, independent review, authorization and the direct-fix path are unchanged.
+- `implementation-decisions.py` has four subcommands. `validate` checks a decision revision. `query` reads the source at the revision you name and answers `UNOBSERVED` when it finds no evidence. `result` appends delivery evidence, and `annotate` records a title or source-label correction beside the reviewed original. Only `result` and `annotate` write.
+- `authority-view.py` reports whether current authority is `original` or `published` and lists retained demonstration holdings. `audit-docs`, `query-docs`, `cleanup-campsite` and `archive-promptbook` now run it as an executable step before they walk or answer.
+- `implementation-migration.py` publishes a reviewed clause migration through `inventory`, `dry-run` and `apply`. It accepts only the crux repository's own pilot batch. In any other project every batch refuses with `migration-outside-pilot` or `migration-authorizer-refused`.
+
+### Changed
+
+- A tree that has published a clause migration now needs full Git history. In a shallow clone the governing readers refuse with `history-unavailable`. In the development repository, CI now checks out with `fetch-depth: 0`.
+- Scripts now declare their third-party imports, and an import-closure gate reports any import a script does not declare.
+- The implementation commands now bound the YAML they read before parsing it.
+- In the development repository, the test runner now runs the plugin and tools suites in parallel. Shared fixtures and the combined runner cut the full run time about fivefold, to 10.6 minutes. The authority view now starts about 590 Git subprocesses where it started about 9,500.
+- Council deliberation and independent review are now separate processes with separate gates. A council gate passes only on a committed council-runner record that names each seat's requested and served model and provider. An independent-review gate passes only on a reviewer report from `write-review-report.py`, and neither kind of evidence satisfies the other's gate.
+- A book that carries the five-reviewer alternative to the council is now corrected when it executes, and its bytes stay unchanged. An existing OpenCode install keeps its earlier agent text until you run `install-opencode-agents` again, because a template change does not alter an installed agent.
+- The council runner now commits an attempt record before it sends any request. It then commits its own result record and verifies that the committed bytes match the bytes it computed. An attempt with no committed result holds the gate. `run-council.py --recover` commits or recognises the original record and never asks for a new verdict. The conductor no longer commits council records.
+- The conductor now retries a preflight refusal, a mistyped path or an uncommitted run-work subject, instead of stopping for the owner. A third refusal at one gate prompt is the escalation-loop stop. A Codex session in the workspace-write sandbox cannot begin a council.
 
 ### Fixed
 

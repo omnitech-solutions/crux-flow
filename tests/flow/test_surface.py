@@ -150,7 +150,7 @@ def test_an_added_command_or_a_version_move_is_only_a_notice(plugin):
 
 
 def test_the_regenerator_keeps_the_sibling_contract(plugin):
-    assert run(plugin,'--dry-run')==(0,{'drift':False,'upstream':'3.25.1'})
+    assert run(plugin,'--dry-run')==(0,{'drift':False,'upstream':'3.27.4'})
     record=plugin/surface.RECORD; value=json.loads(record.read_text()); value['hooks']=['hooks/x']
     record.write_text(json.dumps(value))
     code,payload=run(plugin,'--dry-run')
@@ -182,7 +182,7 @@ def test_upstream_check_is_offline_unless_asked_and_reports_what_blocks_the_proc
     from crux.flow import upstream
     def refuse(_): raise AssertionError('the default must not touch the network')
     offline=upstream.inspect(PLUGIN,tmp_path,observe=refuse)
-    assert offline['network'] is False and offline['latest'] is None and offline['vendored']['version']=='3.25.1'
+    assert offline['network'] is False and offline['latest'] is None and offline['vendored']['version']=='3.27.4'
     assert offline['surface']['state']=='clean' and offline['procedure']['ready'] is False
     assert offline['procedure']['blockers']==['not a Git checkout: a flattened export is not history']
     seen=[]
@@ -203,3 +203,13 @@ def test_candidate_preparation_regenerates_the_record_last_and_verification_chec
     assert [c['name'] for c in testing.commands(Path('/x'))]==['catalog','surface','reference','package']
     source=(PLUGIN/'scripts/crux/flow/upstream.py').read_text()
     assert "'generate-routing-table.py', 'generate-flow-surface.py'" in source
+
+
+def test_a_skill_that_starts_calling_scripts_is_a_notice_never_a_removal():
+    # An empty `scripts_called` list is one leaf; filling it (upstream 3.27 did for `council`) is an addition.
+    recorded={'skills':{'council':{'scripts_called':[]}}}
+    live={'skills':{'council':{'scripts_called':{'run-council.py':True}}}}
+    found=surface.changes(recorded,live,{'hard_on_removal':['skills']})
+    assert found and all(c['severity']=='notice' for c in found)
+    gone=surface.changes({'skills':{'council':{'scripts_called':{'run-council.py':True}}}},{'skills':{'council':{'scripts_called':[]}}},{'hard_on_removal':['skills']})
+    assert any(c['severity']=='hard' for c in gone)    # a script actually dropped is still hard

@@ -1,6 +1,6 @@
 # Crux Flow 0.2.0
 
-Crux Flow is a fork of [Bionic Crux](https://github.com/bionic-coding/crux) 3.25.1 that replaces its configuration and orchestration layer. Upstream's skills, record formats and generators stay.
+Crux Flow is a fork of [Bionic Crux](https://github.com/bionic-coding/crux) 3.27.4 that replaces its configuration and orchestration layer. Upstream's skills, record formats and generators stay.
 
 - One mode (`aggressive`, `balanced`, `thorough`, `upstream`) sets the caps for a change: elapsed budget, delegates, reviewers, repair cycles, council rounds.
 - One orchestrator owns each run. Every delegate is a leaf and starts no agent of its own.
@@ -181,7 +181,7 @@ Run `pnpm run verify` and the scenarios on every change; the live layers answer 
 - A native sub-agent spawn is cooperative: Flow cannot count one it is not told about.
 - Review attestations are external records, not authenticated identities.
 - OpenCode and OMP are proven against fake host processes only. Claude and Codex activation is proven in disposable homes behind an opt-in flag. A Desktop client loading a plugin is unobserved.
-- The vendored upstream is 3.25.1; the latest is 3.27.4. This checkout has no upstream Git ancestry, so `upstream prepare` refuses here. The audit lists the conflicts.
+- The vendored upstream is 3.27.4 (commit `06989514bc97`), applied on branch `upstream-3.27.4` by a three-way merge against the upstream 3.25.1 tree, because this checkout has no upstream Git ancestry and `upstream prepare` refuses here. Flow reads run and promptbook format 1 and 2 and executes only its own format 1 runs; the audit's "Update applied" section lists every conflict and what Flow adapted.
 - The live free-model probe has produced no rate yet: on 2026-10-10 the account's free tier was exhausted. The harness reports that as `unavailable`, never as a pass.
 - macOS and Linux only.
 

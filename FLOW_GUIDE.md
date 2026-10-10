@@ -1,6 +1,6 @@
 # Crux Flow 0.2.0 — operator guide
 
-Crux Flow retains Crux 3.25.1's knowledge tree, authored skills, record numbering,
+Crux Flow retains Crux 3.27.4's knowledge tree, authored skills, record numbering,
 promptbook schema and preserving run writer. The fork adds proportionate execution
 policy, scoped model maintenance and host lifecycle operations. It does not install
 a daemon, database, alternate book format or custom model gateway.
@@ -734,7 +734,7 @@ Not built: `crux-flow upstream update`, one verb that runs prepare, verify and t
 checkout with real ancestry, where it can be tested on a real release.
 
 This source archive preserves reconstructed source provenance; it does not invent the original Git history. For long-term
-upstream maintenance, integrate it on a branch rooted at the recorded Crux 3.25.1 commit using the accompanying upstream patch.
+upstream maintenance, integrate it on a branch rooted at the recorded Crux commit (3.27.4, `06989514bc97`). Until the history exists, the per-file three-way merge of the previous upstream tree, this tree and the new upstream tree reproduces what `upstream prepare` would replay.
 Daily operation and packaging do not need that historical checkout.
 
 ## Verification and platform boundary
