@@ -100,9 +100,9 @@ def test_a_role_that_gains_a_delegation_tool_is_broken_on_every_host(plugin):
 
 def test_a_schema_version_flow_does_not_read_is_broken(plugin):
     schema=plugin/'schemas/run.schema.json'; value=json.loads(schema.read_text())
-    value['properties']['format_version']={'type':'string','enum':['1','2']}
+    value['properties']['format_version']={'type':'string','enum':['1','2','3']}   # Flow reads 1 and 2; a 3 must be refused by name
     schema.write_text(json.dumps(value))
-    assert any("run format_version ['2']" in e for e in surface.invariants(plugin,surface.collect(plugin)))
+    assert any("run format_version ['3']" in e for e in surface.invariants(plugin,surface.collect(plugin)))
 
 
 def test_a_manifest_schema_version_flow_does_not_read_is_broken(plugin):
@@ -186,9 +186,11 @@ def test_upstream_check_is_offline_unless_asked_and_reports_what_blocks_the_proc
     assert offline['surface']['state']=='clean' and offline['procedure']['ready'] is False
     assert offline['procedure']['blockers']==['not a Git checkout: a flattened export is not history']
     seen=[]
-    def observe(repository): seen.append(repository); return {'latest':{'tag':'v3.27.4','commit':'a'*40}}
+    def observe(repository): seen.append(repository); return {'latest':{'tag':'v3.99.0','commit':'a'*40}}
     online=upstream.inspect(PLUGIN,tmp_path,fetch=True,observe=observe)
-    assert seen==['https://github.com/bionic-coding/crux.git'] and online['latest']=={'tag':'v3.27.4','commit':'a'*40,'behind':True}
+    assert seen==['https://github.com/bionic-coding/crux.git'] and online['latest']=={'tag':'v3.99.0','commit':'a'*40,'behind':True}
+    current=upstream.inspect(PLUGIN,tmp_path,fetch=True,observe=lambda _: {'latest':{'tag':'v3.27.4','commit':'a'*40}})
+    assert current['latest']['behind'] is False             # the vendored release is the latest: not behind
 
 
 def test_upstream_check_reports_a_broken_surface_without_the_network(plugin,tmp_path):
