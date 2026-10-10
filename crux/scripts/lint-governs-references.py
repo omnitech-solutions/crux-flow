@@ -26,7 +26,7 @@ It writes nothing — it is a linter, not a regenerator, and is deliberately
 NOT named `generate-*.py` so it carries no roster row in the
 regenerative-outputs table.
 
-This script imports neither `yaml` nor `httpx` itself, and reaches both
+This script uses `yaml` for source locations and reaches `httpx`
 through `summaries_projection.py` — PEP 723 inline metadata applies only to
 the script `uv run` is invoked on, never to a module that script imports, so
 every transitive dependency has to be declared here. PyYAML is reached by the
@@ -227,7 +227,10 @@ JSON contract (stdout; findings and refusals sorted for determinism):
     `reason` in `unresolved | unreviewed` (unchanged from ADR-0088).
   - `rule_findings`: citation findings, `{path, line, token, reason,
     message}` with `reason` in `unknown | retired`.
-  - `rule_tokens`: the number of `rule:` tokens seen across `scanned`.
+  - `rule_tokens`: current `rule:` tokens; `raw_rule_tokens` includes historical ones.
+  - `historical_rule_tokens` / `historical_references`: known retired citations
+    mapped to proven frozen plan scalars in default scope, carrying no authority.
+    Explicit `--path` retains ordinary lint. Failed proof never suppresses a finding.
   - `refusals`: `{path, reason, detail}` with `reason` in `not_regular |
     outside_root | too_large | too_many_files | not_utf8 | not_found |
     symlink_root`. `detail` is a fixed sentence per reason, never content.
@@ -250,8 +253,11 @@ import stat
 import sys
 from pathlib import Path
 
+import yaml
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import summaries_projection as sp  # noqa: E402
+import implementation_migration as migration  # noqa: E402
 
 # The shared bound-and-redact helper, reached through the module that already
 # binds it by path. Every token this linter echoes into a CI log comes out of
@@ -385,13 +391,17 @@ class _Scope:
     passes symlink, regular-file, containment and bound checks BEFORE it is
     admitted, and every failure is a refusal, never a skip."""
 
-    def __init__(self, root: Path):
-        self.root = root.resolve()
+    def __init__(self, root: Path, *, _source_io=None):
+        self._source_io = _source_io
+        self.root = root.resolve() if _source_io is None else _source_io.resolve(root)
         self.files: set[Path] = set()
         self.refusals: list[dict] = []
         self.overflow = False
 
     def admit(self, candidate: Path) -> None:
+        if self._source_io is not None:
+            self._guarded_admit(candidate)
+            return
         if self.overflow:
             return
         if candidate.is_symlink():
@@ -423,6 +433,9 @@ class _Scope:
         """Walk `top` top-down, pruning excluded directory names and every
         path in `excluded` (compared on the joined, unresolved spelling
         `os.walk` yields, which is the spelling the prefixes were built in)."""
+        if self._source_io is not None:
+            self._guarded_walk(top, excluded)
+            return
         if top.is_symlink():
             self.refusals.append(_refusal(top, "symlink_root"))
             return
@@ -443,15 +456,82 @@ class _Scope:
                 if self.overflow:
                     return
 
+    def _metadata(self, path: Path):
+        from admission_source_io import SourceIOExcluded
+        try:
+            return self._source_io.metadata(path)
+        except SourceIOExcluded:
+            return False
 
-def default_scan_roots(root: Path) -> list[Path]:
+    def _guarded_admit(self, candidate: Path) -> None:
+        if self.overflow:
+            return
+        metadata = self._metadata(candidate)
+        if metadata is False:
+            return
+        if metadata is None:
+            self.refusals.append(_refusal(candidate, "not_found"))
+            return
+        if stat.S_ISLNK(metadata["st_mode"]):
+            return
+        resolved = self._source_io.resolve(candidate.parent) / candidate.name
+        if not stat.S_ISREG(metadata["st_mode"]):
+            self.refusals.append(_refusal(resolved, "not_regular"))
+            return
+        if not _contained(self.root, resolved):
+            self.refusals.append(_refusal(resolved, "outside_root"))
+            return
+        if metadata["st_size"] > MAX_FILE_BYTES:
+            self.refusals.append(_refusal(resolved, "too_large"))
+            return
+        if resolved in self.files:
+            return
+        if len(self.files) >= MAX_SCANNED_FILES:
+            self.refusals.append(_refusal(resolved, "too_many_files"))
+            self.overflow = True
+            return
+        self.files.add(resolved)
+
+    def _guarded_walk(self, top: Path, excluded: frozenset[Path]) -> None:
+        metadata = self._metadata(top)
+        if not metadata:
+            return
+        if stat.S_ISLNK(metadata["st_mode"]):
+            self.refusals.append(_refusal(top, "symlink_root"))
+            return
+        if not stat.S_ISDIR(metadata["st_mode"]):
+            return
+        pending = [top]
+        while pending and not self.overflow:
+            here = pending.pop()
+            directories = []; files = []
+            for path in sorted(self._source_io.glob(here, "*")):
+                if path in excluded or path.name in EXCLUDED_DIR_NAMES:
+                    continue
+                metadata = self._metadata(path)
+                if not metadata or stat.S_ISLNK(metadata["st_mode"]):
+                    continue
+                if stat.S_ISDIR(metadata["st_mode"]):
+                    directories.append(path)
+                elif path.suffix in SCAN_EXTENSIONS:
+                    files.append(path)
+            for path in files:
+                self.admit(path)
+                if self.overflow:
+                    return
+            pending.extend(reversed(directories))
+
+
+def default_scan_roots(root: Path, *, _source_io=None) -> list[Path]:
     """The two default roots: `<root>/crux` and the documentation tree."""
-    return [root / "crux", sp.resolve_tree(root)]
+    if _source_io is None:
+        return [root / "crux", sp.resolve_tree(root)]
+    return [root / "crux", sp.resolve_tree(root, _source_io=_source_io)]
 
 
-def excluded_paths(root: Path) -> frozenset[Path]:
+def excluded_paths(root: Path, *, _source_io=None) -> frozenset[Path]:
     """The absolute (joined, unresolved) prefix exclusions for `root`."""
-    tree = sp.resolve_tree(root)
+    tree = sp.resolve_tree(root) if _source_io is None else sp.resolve_tree(root, _source_io=_source_io)
     plugin = root / "crux"
     return frozenset(
         [tree / p for p in TREE_EXCLUDED_PREFIXES]
@@ -600,11 +680,13 @@ def catalog_collisions(tree_slugs: dict[str, str], catalog: dict[str, str],
     return out
 
 
-def resolve_scope(root: Path, extra: list[str]) -> tuple[list[Path], list[Path], list[dict]]:
+def resolve_scope(root: Path, extra: list[str], *, _source_io=None) -> tuple[list[Path], list[Path], list[dict]]:
     """`(files, roots, refusals)` for the run. With `extra` empty, the default
     scope (both roots, prefix exclusions applied). Otherwise each `--path`
     item: a file is admitted as named, a directory is walked with the
     allowlist and the directory-name exclusions only."""
+    if _source_io is not None:
+        return _guarded_scope(root, extra, _source_io)
     root = root.resolve()
     scope = _Scope(root)
     if not extra:
@@ -635,6 +717,36 @@ def resolve_scope(root: Path, extra: list[str]) -> tuple[list[Path], list[Path],
                 scope.walk(p, frozenset())
             else:
                 scope.admit(p)
+    return sorted(scope.files), reported, scope.refusals
+
+
+def _guarded_scope(root: Path, extra: list[str], source_io) -> tuple[list[Path], list[Path], list[dict]]:
+    root = source_io.resolve(root)
+    scope = _Scope(root, _source_io=source_io)
+    if not extra:
+        roots = [path for path in default_scan_roots(root, _source_io=source_io)
+                 if scope._metadata(path)]
+        excluded = excluded_paths(root, _source_io=source_io)
+        for path in roots:
+            scope.walk(path, excluded)
+        reported = sorted(source_io.resolve(path) for path in roots
+                          if not stat.S_ISLNK(scope._metadata(path)["st_mode"]))
+    else:
+        reported = []
+        for item in extra:
+            path = Path(item)
+            if not path.is_absolute():
+                path = root / path
+            reported.append(path)
+            metadata = scope._metadata(path)
+            if metadata is False:
+                continue
+            if metadata is not None and stat.S_ISLNK(metadata["st_mode"]):
+                scope.refusals.append(_refusal(path, "symlink_root"))
+            elif metadata is not None and stat.S_ISDIR(metadata["st_mode"]):
+                scope.walk(path, frozenset())
+            else:
+                scope.admit(path)
     return sorted(scope.files), reported, scope.refusals
 
 
@@ -729,13 +841,139 @@ def _row_resolves(row: dict | None) -> bool:
     observation row by construction (`build_resolver` states why), and an
     observation sits outside the ADR-0088 receipt machinery entirely.
     """
-    return row is not None and row.get("review_state") != "unreviewed"
+    return row is not None and not row.get("historical") and row.get("review_state") != "unreviewed"
+
+
+#: The advice a brief gets for a demoted rule. crux/templates/BRIEF-template.md states the same.
+BRIEF_HISTORICAL_ADVICE = "in a brief, describe the former rule in prose without a citation token"
+
+
+def _historical_message(token: str, row: dict, *, brief: bool = False) -> str:
+    cites = sorted({"rule:" + sp.slug_of(handle) for handle in row["replacements"]})
+    if brief:
+        tail = f", or cite its replacement {', '.join(cites)}" if cites else ""
+        return f"{token} cites historical implementation reasoning; {BRIEF_HISTORICAL_ADVICE}{tail}"
+    return f"{token} cites historical implementation reasoning; replace with {', '.join(cites)}"
+
+
+def _lint_projection(root: Path) -> tuple[dict, dict]:
+    """Production proof boundary; historical facts never enter the live resolver."""
+    import implementation_migration as migration
+    view = migration.authority_view(root)
+    adrs = sp.adrs_dir(root)
+    manifest = sp.read_manifest(root)
+    declared = sp.declared_input_domain(adrs / "summaries")
+    sp._projection_require(not isinstance(declared, list) or "implementation-migration" not in declared
+        or view["state"] == "published", "lint declared migration input unavailable")
+    gf = sp.governs_from(manifest)
+    observations = sp.observations_source(root, manifest)
+    reviews = sp.read_reviews(adrs)
+    records = sp.collect_records(adrs, governs_from=gf, observations=observations)
+    aliases = sp.collect_observation_alias_rows(observations, records)
+    overlay = sp._summary_authority_records(records, view, sp.removed_handles(reviews), aliases)
+    resolver = sp.build_resolver(overlay["records"], reviews, gf, alias_rows=aliases)
+    migration._unchanged_inputs(root, view["dependency_fingerprints"])
+    return resolver, overlay
+
+
+def _frozen_scalar_tokens(text: str, subset: dict) -> dict[int, list]:
+    """Map raw citation offsets to canonical frozen fields, refusing ambiguity."""
+    if any(isinstance(t, (yaml.tokens.AnchorToken, yaml.tokens.AliasToken,
+                          yaml.tokens.TagToken)) for t in yaml.scan(text)):
+        return {}
+    node = yaml.compose(text, Loader=yaml.SafeLoader)
+    offsets: dict[int, list] = {}
+
+    def walk(item, selected, field):
+        if isinstance(item, yaml.MappingNode):
+            keys = [key.value for key, _ in item.value]
+            if any(not isinstance(key, yaml.ScalarNode) or key.tag != "tag:yaml.org,2002:str"
+                   for key, _ in item.value) or len(keys) != len(set(keys)):
+                raise ValueError("ambiguous mapping")
+            for key, child in item.value:
+                value = selected.get(key.value) if isinstance(selected, dict) else None
+                walk(child, value, field + [key.value])
+        elif isinstance(item, yaml.SequenceNode):
+            if isinstance(selected, list) and len(item.value) != len(selected):
+                raise ValueError("ambiguous sequence")
+            for index, child in enumerate(item.value):
+                value = selected[index] if isinstance(selected, list) else None
+                walk(child, value, field + [index])
+        elif isinstance(selected, str) and item.tag == "tag:yaml.org,2002:str" and item.value == selected:
+            start, end = item.start_mark.index, item.end_mark.index
+            if item.style in ("|", ">"):
+                start = text.index("\n", start, end) + 1  # header comments are not content
+            matches = list(RULE_RE.finditer(text, start, end))
+            if [m.group() for m in matches] == find_rule_tokens(item.value):
+                offsets.update((m.start(), field) for m in matches)
+
+    walk(node, subset, [])
+    return offsets
+
+
+def _frozen_plan_citations(root: Path, path: Path, text: str) -> tuple[dict, dict]:
+    """Default-only historical proof; every failure leaves ordinary lint intact."""
+    try:
+        import council_records as cr
+        import council_history_v3 as history
+        vp = cr._validator()
+        tree = sp.resolve_tree(root)
+        _, tree_rel = cr.resolve_in_repo(root, tree)
+        if cr.symlink_below(root, Path(tree_rel).parts) or path.parent != tree / "promptbooks/active":
+            return {}, {}
+        book = vp.load_yaml(text)
+        if not isinstance(book, dict) or not isinstance(book.get("current_run"), str):
+            return {}, {}
+        if not re.fullmatch(re.escape(book.get("id", "")) + r"-[a-z0-9][a-z0-9-]*", path.stem):
+            return {}, {}
+        run_path = tree / "promptbooks/runs" / path.stem / f"run-{book['current_run']}.yaml"
+        for candidate in (path, run_path):
+            _, rel = cr.resolve_in_repo(root, candidate)
+            if cr.symlink_below(root, Path(rel).parts) or cr.repo_root(candidate) != root:
+                return {}, {}
+        run_text = read_source(run_path)
+        if not isinstance(run_text, str):
+            return {}, {}
+        run = vp.load_yaml(run_text)
+        errors: list[dict] = []
+        for doc, schema in ((book, vp.PROMPTBOOK_SCHEMA), (run, vp.RUN_SCHEMA)):
+            vp.validate(doc, vp.load_schema(schema), "#", "#", errors, str(path))
+            vp.post_schema_pass(doc, errors, str(path))
+        vp.cycle_coverage_pass(book, errors, str(path))
+        if errors or run["run_id"] != book["current_run"] or run["book_id"] != book["id"]:
+            return {}, {}
+        resolved = cr.resolve_book(run_path)
+        if resolved.path != path or vp.compute_book_hash(book) != run["book_content_hash"]:
+            return {}, {}
+        identity = history.start_identity(root, run, run_path)
+        start_blob = cr.git(root, "cat-file", "blob", identity["commit"] + ":" + identity["run"]["path"])
+        if start_blob.returncode or cr.sha256_bytes(start_blob.stdout) != identity["run"]["sha256"]:
+            return {}, {}
+        start = history.start_snapshot_yaml.load_yaml(start_blob.stdout.decode())
+        if not run.get("started_at") or start.get("started_at") != run["started_at"]:
+            return {}, {}
+        if read_source(path) != text or read_source(run_path) != run_text:
+            return {}, {}
+        return _frozen_scalar_tokens(text, vp.frozen_plan_subset(book)), {
+            "book_id": book["id"], "run_id": run["run_id"],
+            "book_content_hash": run["book_content_hash"],
+            "source_sha256": cr.sha256_bytes(text.encode("utf-8")),
+            "run_path": str(run_path), "start_identity": identity,
+        }
+    except Exception:
+        return {}, {}
 
 
 def find_unresolved(paths: list[Path], resolver: dict,
                     slugs: dict[str, str] | None = None,
                     retired_slugs: dict[str, list[str]] | None = None,
                     shipped_slugs: dict[str, str] | None = None,
+                    *, frozen_root: Path | None = None,
+                    historical: list[dict] | None = None,
+                    retired_handles: dict[str, list[str]] | None = None,
+                    historical_slugs: dict[str, dict] | None = None,
+                    authoring: bool = False,
+                    briefs: Path | None = None,
                     ) -> tuple[list[dict], list[dict], int, list[dict]]:
     """`(handle_findings, rule_findings, rule_tokens, refusals)` across `paths`.
 
@@ -753,7 +991,8 @@ def find_unresolved(paths: list[Path], resolver: dict,
     resolver entirely), when its slug is retired (`reason: retired`, the
     message naming the displacing rules), or when the slug is unknown
     (`reason: unknown`). One entry per distinct (path, line, token), sorted.
-    `rule_tokens` counts every token seen, resolving or not.
+    `rule_tokens` counts current tokens, resolving or not. Proven historical
+    citations are reported separately when the default-scope caller requests it.
 
     Resolution is keyed by the CITING SURFACE, per
     rule:citation-resolves-by-its-citing-surface. `slugs` is the reader-owned
@@ -762,9 +1001,16 @@ def find_unresolved(paths: list[Path], resolver: dict,
     reader's projection holds). Each path is read under the map its own location
     selects. `shipped_slugs` omitted means one map for every path, which is what
     a caller asking a single-surface question wants.
+
+    `briefs` is the absolute briefs directory of the tree. A path under it is a
+    brief, and a historical citation found there gets `BRIEF_HISTORICAL_ADVICE`
+    (describe the former rule in prose, or cite its replacement) instead of the
+    "replace with" advice every other surface gets. `None` treats every path as a non-brief surface.
     """
     slugs = slugs or {}
     retired_slugs = retired_slugs or {}
+    historical_slugs = historical_slugs or {}
+    historical_handles = {row["source_handle"]: row for row in historical_slugs.values()}
     seen: set[tuple[str, str]] = set()
     handle_findings: list[dict] = []
     rule_seen: set[tuple[str, int, str]] = set()
@@ -780,18 +1026,26 @@ def find_unresolved(paths: list[Path], resolver: dict,
         # cited never does.
         here = (shipped_slugs if shipped_slugs is not None and is_shipped_surface(path)
                 else slugs)
+        reader_history = historical_slugs if authoring or not is_shipped_surface(path) else {}
+        in_brief = briefs is not None and Path(os.path.abspath(path)).is_relative_to(briefs)
+        offsets, proof = ({}, {})
+        if frozen_root is not None and historical is not None and any(
+                token[5:] in retired_slugs or token[5:] in reader_history for token in find_rule_tokens(text)):
+            offsets, proof = _frozen_plan_citations(frozen_root, path, text)
         for handle in find_handles(text):
             key = (str(path), handle)
             if key in seen:
                 continue
             row = resolver.get(handle)
-            if _row_resolves(row):
+            history_row = historical_handles.get(handle)
+            if history_row is None and _row_resolves(row):
                 continue
             seen.add(key)
             handle_findings.append({
                 "path": str(path),
                 "handle": redact(handle, quoted=False),
-                "reason": "unresolved" if row is None else "unreviewed",
+                "reason": "historical" if history_row is not None else "unresolved" if row is None else "unreviewed",
+                **({"message": _historical_message(redact(handle, quoted=False), history_row, brief=in_brief)} if history_row else {}),
             })
         for m in RULE_RE.finditer(text):
             rule_tokens += 1
@@ -799,14 +1053,29 @@ def find_unresolved(paths: list[Path], resolver: dict,
             slug = token[len("rule:"):]
             named = here.get(slug)
             row = resolver.get(named) if named is not None else None
-            if named is not None and _row_resolves(row):
+            history_row = reader_history.get(slug)
+            if (history_row is not None or named is None and slug in retired_slugs) and m.start() in offsets:
+                rule_tokens -= 1
+                historical.append({**proof, "path": str(path), "line": _line_of(text, m.start()),
+                    "column": m.start() - text.rfind("\n", 0, m.start()), "field": offsets[m.start()],
+                    "token": redact(token, quoted=False), "authority": "none",
+                    "retired_handles": [redact(h, quoted=False) for h in (retired_handles or {}).get(slug, [])],
+                    "successors": [redact(h, quoted=False) for h in (
+                        history_row["replacements"] if history_row else retired_slugs[slug])],
+                    **({"historical_handle": history_row["source_handle"],
+                        "destination": history_row.get("destination")} if history_row else {})})
+                continue
+            if history_row is None and named is not None and _row_resolves(row):
                 continue
             key3 = (str(path), _line_of(text, m.start()), token)
             if key3 in rule_seen:
                 continue
             rule_seen.add(key3)
             safe = redact(token, quoted=False)
-            if named is not None:
+            if history_row is not None:
+                reason = "historical"
+                message = _historical_message(safe, history_row, brief=in_brief)
+            elif named is not None:
                 # A live slug whose rule does not resolve. The two reasons are
                 # the handle leg's own words, so one condition carries one name
                 # whichever token shape reported it.
@@ -852,35 +1121,9 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     root = Path(args.repo_root).resolve()
     try:
-        adrs = sp.adrs_dir(root)
-        # ADR-0088: the resolver is built WITH review state — a citation of a
-        # non-resolving handle (unknown, removed, or unreviewed) fails.
-        manifest = sp.read_manifest(root)
-        governs_from = sp.governs_from(manifest)
-        # The input domain is active ADRs UNION ratified observations
-        # (docs/AGENTS.md §4, ADR-0095 requirement 4). `observations_source`
-        # is THE one resolution of that half, shared with `summarize-adrs.py`
-        # and `compile-doctrine.py`. Omitting it built a resolver holding zero
-        # OBS handles while the on-disk resolver held three, so every
-        # observation-derived citation was unresolvable — a gate reading a
-        # narrower domain than the artifact it gates.
-        observations = sp.observations_source(root, manifest)
-        reviews = sp.read_reviews(adrs)
-        records = sp.collect_records(adrs, governs_from=governs_from,
-                                     observations=observations)
-        # ADR-0095 requirement 4: a `decided` observation contributes no rule
-        # row but keeps each of its handles in the resolver as an ALIAS onto
-        # the ADR its `decided_by` names — the alias exists precisely "so a
-        # citation written against the observation still resolves after
-        # promotion". Omitting it built a resolver narrower than the artifact
-        # this gate exists to police: a decided observation's handle resolved
-        # on disk, in `resolver.json`, and failed here. The producer at
-        # `summarize-adrs.py` passes the same rows into the same builder.
-        alias_rows = sp.collect_observation_alias_rows(observations, records)
-        resolver = sp.build_resolver(records, reviews, governs_from,
-                                     alias_rows=alias_rows)
-        # ADR-0099 clause 2: the slug maps AND the collision gate, one traversal.
-        slugs, retired_slugs = sp.live_and_retired_slugs(records)
+        resolver, overlay = _lint_projection(root)
+        records = overlay["records"]
+        slugs, retired_slugs = overlay["slugs"], overlay["retired_slugs"]
         # rule:citation-resolves-by-its-citing-surface. Two readings of the same
         # citation grammar, and the citing file's location picks between them:
         #
@@ -931,9 +1174,22 @@ def main(argv=None) -> int:
         shipped_slugs = dict(catalog_slugs) if catalog_present else dict(slugs)
         reader_slugs = {**catalog_slugs, **slugs}    # this projection wins
         scan_paths, roots, refusals = resolve_scope(root, args.path)
+        historical: list[dict] = []
+        retired_handles: dict[str, list[str]] = {}
+        for record in sp.retired_records(records):
+            retired_handles.setdefault(sp.slug_of(record["handle"]), []).append(record["handle"])
         handle_findings, rule_findings, rule_tokens, read_refusals = find_unresolved(
             scan_paths, resolver, reader_slugs, retired_slugs,
-            shipped_slugs=shipped_slugs)
+            shipped_slugs=shipped_slugs, frozen_root=root if not args.path else None,
+            historical=historical, retired_handles=retired_handles,
+            historical_slugs=overlay["historical_slugs"], authoring=authoring,
+            briefs=Path(os.path.abspath(sp.resolve_tree(root))) / "briefs")
+    except migration.Refused as exc:
+        reason = redact(exc, quoted=False)
+        print(json.dumps({"refusals": [{"path": redact(root, quoted=False), "reason": reason}],
+            "validation_errors": [{"problem": reason}], "historical_references": [],
+            "rule_findings": [], "unresolved": [], "scanned": []}, sort_keys=True))
+        return 1
     except sp.GovernsValidationError as exc:
         print(json.dumps({"validation_errors": exc.problems}, sort_keys=True))
         return 1
@@ -953,6 +1209,9 @@ def main(argv=None) -> int:
         "unresolved": handle_findings,
         "rule_findings": rule_findings,
         "rule_tokens": rule_tokens,
+        "raw_rule_tokens": rule_tokens + len(historical),
+        "historical_rule_tokens": len(historical),
+        "historical_references": historical,
         "collisions": collisions,
         "refusals": refusals,
     }

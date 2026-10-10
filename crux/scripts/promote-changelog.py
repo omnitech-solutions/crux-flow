@@ -37,8 +37,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-SEMVER_RE = re.compile(r"^v?(\d+)\.\d+\.\d+(-[A-Za-z0-9.-]+)?$")
-DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+from changelog_reference import SEMVER_RE, DATE_RE
 SECTION_RE = re.compile(r"^## \[([^\]]+)\]")
 FENCE_RE = re.compile(r"^```")
 SUBSECTION_RE = re.compile(r"^### ")

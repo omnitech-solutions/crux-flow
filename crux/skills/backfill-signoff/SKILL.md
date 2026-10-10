@@ -40,6 +40,61 @@ One invocation signs **one** batch. The write set, all under one threaded date:
 
 **Excluded from run-execution autonomy.** This is a human-gate skill: the owner reading the enumerated spans (step 3) IS the review the two-layer gate provides. Like `escalate-arch-runtime`, a running promptbook or dev-cycle must NOT invoke it unattended. Its writes are in-repo edits, which `docs/AGENTS.md` §11 otherwise treats as pre-authorized inside a started run — but that default does not reach here, because the authorization this skill needs is a human reading a rendering, and no run plan can pre-supply that. A run that reaches a "sign off backfill batch" step STOPS and hands the batch to the owner; it is never auto-approved or allowlisted for auto-approval. The gate is prose, not a flag — the same trust model as `transition-invariant`; a broader §11 amendment naming every human-gate skill as a stop point is a follow-on.
 
+## Migration disposition for one signed admission
+
+Use this explicit mode when a reviewed migration entry affects an existing
+signed backfill admission. Ordinary backfill sign-off retains its existing
+batch contract. A migration disposition preserves the admission's signed
+history and records a separate human instruction.[^migration-disposition]
+
+Render a concrete proposal before asking the human:
+
+```bash
+uv run "${CRUX_PLUGIN_ROOT}/scripts/signoff-backfill.py" \
+  --migration-disposition <batch-path> --source-identity <clause-identity> \
+  --handle <old-handle> --dry-run --repo-root <repo-root>
+```
+
+Show the old rule and anchor, current signed receipt, signing batch, normalized
+receipt digest, normalized signing-batch digest, and complete raw ledger digest.
+Show the complete migration entry and digest, historical destination, surviving
+obligations, and replacement architectural texts. The producer validates the
+existing admission, manifest ledger, log entry, and journal hook. A signed-shaped
+row without those canonical corroborations refuses. A current removal tombstone
+also refuses; migration cannot reuse it as an admission.
+
+Obtain a verbatim explicit human instruction to preserve this specific signed
+admission and migrate this specific entry. Obtain the human's disposition
+rationale. General run approval, council approval, OpenRouter consent, and the
+original backfill sign-off supply no migration verdict. Never author an
+instruction, derive one from a rationale token, or approve several historical
+subjects together. Replacement compatibility, when required, follows the
+ordinary reconciliation human gate against each replacement's own texts.
+
+After that human reading and instruction, record the receipt:
+
+```bash
+uv run "${CRUX_PLUGIN_ROOT}/scripts/signoff-backfill.py" \
+  --migration-disposition <batch-path> --source-identity <clause-identity> \
+  --handle <old-handle> --human-instruction <verbatim-human-instruction> \
+  --rationale <human-rationale> [--date YYYY-MM-DD] --repo-root <repo-root>
+```
+
+The writer creates one immutable content-addressed receipt under the configured
+`adrs/migrations/dispositions/` directory. Existing signature surfaces and
+projections retain their bytes. Exact replay is a no-op; conflicting content
+refuses. Give the receipt path and SHA-256 to the migration batch author for its
+`signed_dispositions` references. Council reviews the final batch with those
+references. A receipt alone supplies no migration authority. The receipt records
+local evidence under the existing signature trust model; it does not authenticate
+the human cryptographically.
+
+This mode remains a human gate. Synthetic fixture instructions support producer
+tests only. A real migration waits for the specific human instruction and
+rationale after the concrete proposal is ready.
+
+[^migration-disposition]: rule:authority-migration-is-reviewed-and-source-bound
+
 ## When to use
 
 - The owner says: "sign off backfill batch <id>", "backfill sign-off", "sign the backfill".

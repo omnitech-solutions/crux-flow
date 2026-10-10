@@ -1,0 +1,705 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "crux council record (format_version 1)",
+  "description": "One council round, written only by the council runner (crux/scripts/run-council.py). The gate check at advance reads this shape and nothing else as council evidence. Every binding is by content hash: the book, the question, each subject and the router registry. `outcome` is derived from quorum alone: `ran` when at least two seats responded, `could-not-run` otherwise. A `ran` record carrying a non-null `refusal_reason` is a council that ran but whose full write the secret scan refused; the record is then reduced (no model text) and the gate reads it as the could-not-run stop.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_type",
+    "format_version",
+    "writer",
+    "written_at",
+    "book",
+    "run_id",
+    "binding",
+    "council_kind",
+    "round",
+    "question",
+    "system_prompt_sha256",
+    "vote_instruction_sha256",
+    "subjects",
+    "registry",
+    "outcome",
+    "refusal_reason",
+    "quorum_met",
+    "degraded",
+    "errored_seats",
+    "seats",
+    "aggregate"
+  ],
+  "properties": {
+    "record_type": {
+      "const": "council-record"
+    },
+    "format_version": {
+      "const": "1"
+    },
+    "writer": {
+      "const": "run-council",
+      "$comment": "The only council-record writer. A record naming any other writer is refused by the gate check."
+    },
+    "written_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z(?![\\s\\S])",
+      "$comment": "UTC with microseconds, stamped by the council runner. Record order is the order of these stamps; an equal stamp is a tie, which stops the gate."
+    },
+    "book": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "content_hash"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^(?:(?!(?:PB|ADR|RUN|BRIEF)-)[A-Z][A-Z0-9]{1,9}-)?PB-\\d{4}(?![\\s\\S])"
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
+        }
+      }
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^RUN-\\d{3}(?![\\s\\S])"
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prompt",
+        "module_tag"
+      ],
+      "$comment": "An adr or verify gate admits a record bound to any prompt of its own module (module_tag); a patch gate admits a record bound to its own prompt (module_tag null).",
+      "properties": {
+        "prompt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "module_tag": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(adr|implementation|verify)-\\d+(?![\\s\\S])"
+        }
+      }
+    },
+    "council_kind": {
+      "type": "string",
+      "enum": [
+        "adr",
+        "implementation",
+        "verify",
+        "patch"
+      ],
+      "$comment": "The actual decision module kind, not the outer book kind. Implementation and verify include ARCHITECTURAL; original adr and patch vote scales remain unchanged."
+    },
+    "round": {
+      "type": "integer",
+      "minimum": 1,
+      "$comment": "The round number the conductor claims. The gate counts places itself and stops on a record whose round differs from its place; this number never passes a gate."
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "$comment": "A path that matched the secret scan is written as \"[withheld: matched the secret scan]\"."
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        }
+      }
+    },
+    "system_prompt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+    },
+    "vote_instruction_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+    },
+    "subjects": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256",
+          "retained_copy"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "$comment": "Repository-relative, POSIX separators. A path that matched the secret scan is written as \"[withheld: matched the secret scan]\"."
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+            "$comment": "sha256 of the file bytes. Null only on a could-not-run record whose subject was refused before it could be read."
+          },
+          "retained_copy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "$comment": "Run-directory-relative path of the opt-in retained copy, or null."
+          }
+        }
+      }
+    },
+    "registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "version"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "ran",
+        "could-not-run"
+      ]
+    },
+    "refusal_reason": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "names"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "no-key",
+            "refused-assignment",
+            "fewer-than-three-providers",
+            "no-quorum",
+            "refused-subject",
+            "refused-input",
+            "secret-scan"
+          ]
+        },
+        "names": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "$comment": "The inputs, roles or record fields the refusal concerns, by name. Never a value."
+        }
+      }
+    },
+    "quorum_met": {
+      "type": "boolean"
+    },
+    "degraded": {
+      "type": "boolean",
+      "$comment": "True when at least one seated seat errored. A degraded round with quorum passes, visibly."
+    },
+    "errored_seats": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "registry_key",
+          "requested_model",
+          "fault_label"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "openai_top",
+              "anthropic_top",
+              "google_top"
+            ]
+          },
+          "registry_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requested_model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fault_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "seats": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "registry_key",
+          "requested_model",
+          "provider_namespace",
+          "serving_providers",
+          "served_model",
+          "served_provider",
+          "generation_id",
+          "errored",
+          "fault_label",
+          "finish_reason",
+          "retried",
+          "attempts",
+          "decision",
+          "confidence",
+          "reasoning",
+          "findings"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "openai_top",
+              "anthropic_top",
+              "google_top"
+            ]
+          },
+          "registry_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requested_model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "$comment": "The registry entry's api_string, sent as the request's model."
+          },
+          "provider_namespace": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "$comment": "The part of requested_model before '/'. Three seats seated means three distinct namespaces."
+          },
+          "serving_providers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "served_model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "$comment": "The reply's top-level `model` as the gateway reported it. A responding seat in a gate council always carries one inside its entry's accepted set."
+          },
+          "served_provider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "$comment": "The reply's top-level `provider` as the gateway reported it, from the last attempt that got a reply. A responding seat in a gate council always carries one inside its entry's accepted_served_providers set."
+          },
+          "generation_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "$comment": "The reply's top-level `id`, for a later audit."
+          },
+          "errored": {
+            "type": "boolean"
+          },
+          "fault_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finish_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retried": {
+            "type": "boolean"
+          },
+          "attempts": {
+            "type": "array",
+            "$comment": "Every attempt the seat made, in order: one, or two when the seat was retried once after a retryable fault. Each records what that attempt's reply reported, the fault label the attempt ended with, and its two match results. A match result is null when no reply decoded. The checks are enforced only on a reply that would otherwise yield a vote, served model first; a reply that failed a check yields no vote.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "attempt",
+                "replied",
+                "served_model",
+                "served_provider",
+                "generation_id",
+                "finish_reason",
+                "fault_label",
+                "served_model_match",
+                "served_provider_match"
+              ],
+              "properties": {
+                "attempt": {
+                  "type": "integer",
+                  "enum": [
+                    1,
+                    2
+                  ]
+                },
+                "replied": {
+                  "type": "boolean",
+                  "$comment": "True once a response body arrived and decoded as JSON."
+                },
+                "served_model": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "served_provider": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "generation_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "finish_reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "fault_label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "$comment": "Null on the attempt that yielded the seat's vote."
+                },
+                "served_model_match": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "served_provider_match": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "decision": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "$comment": "The seat's own decision token as returned, or null for an errored seat. The gate reads this, never the aggregate."
+          },
+          "confidence": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "reasoning": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "$comment": "Null in a reduced record."
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "dimension",
+                "safety_adjacent",
+                "kind",
+                "text"
+              ],
+              "$comment": "A finding is a nit only when kind is `nit`, dimension is present and not Security, and safety_adjacent is false. Every other finding blocks. A missing tag is recorded as null and counts against the finding.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^(openai_top|anthropic_top|google_top):[A-Za-z0-9][A-Za-z0-9_.-]{0,63}(?![\\s\\S])",
+                  "$comment": "Seat-qualified by role."
+                },
+                "dimension": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "safety_adjacent": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "kind": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "blocking",
+                    "nit",
+                    null
+                  ]
+                },
+                "text": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "$comment": "Null in a reduced record."
+                }
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "errored"
+              ],
+              "properties": {
+                "errored": {
+                  "const": true
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "decision": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "errored"
+              ],
+              "properties": {
+                "errored": {
+                  "const": false
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "attempts": {
+                  "$comment": "A responding seat's vote came from an attempt whose reply matched both checks and ended with no fault.",
+                  "contains": {
+                    "type": "object",
+                    "required": [
+                      "fault_label",
+                      "served_model_match",
+                      "served_provider_match"
+                    ],
+                    "properties": {
+                      "fault_label": {
+                        "type": "null"
+                      },
+                      "served_model_match": {
+                        "type": "boolean",
+                        "const": true
+                      },
+                      "served_provider_match": {
+                        "type": "boolean",
+                        "const": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "aggregate": {
+      "type": "object",
+      "required": [
+        "consensus",
+        "action"
+      ],
+      "$comment": "The async council's aggregate label and action, kept for the reader. The gate never reads it.",
+      "properties": {
+        "consensus": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "const": "could-not-run"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "refusal_reason": {
+            "type": "object"
+          },
+          "quorum_met": {
+            "const": false
+          },
+          "aggregate": {
+            "properties": {
+              "action": {
+                "const": "DEFER_TO_HUMAN"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "const": "ran"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "quorum_met": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "council_kind"
+        ],
+        "properties": {
+          "council_kind": {
+            "const": "implementation"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "binding": {
+            "properties": {
+              "module_tag": {
+                "type": "string",
+                "pattern": "^implementation-[1-9]\\d*(?![\\s\\S])"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "binding": {
+            "properties": {
+              "module_tag": {
+                "type": "string",
+                "pattern": "^implementation-\\d+(?![\\s\\S])"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "council_kind": {
+            "const": "implementation"
+          }
+        }
+      }
+    }
+  ]
+}

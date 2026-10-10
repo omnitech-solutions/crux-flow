@@ -234,8 +234,8 @@ Each initiation runs behind its existing gate:
 
 - **Retrospective** — if `docs/whats_next.md` says a retrospective is due
   (CLN-RETRO-1 finding), invoke `retrospective`. Its council rubric and
-  forge gates apply unchanged; the parallel-reviewer fallback covers key-less
-  nights.
+  forge gates apply unchanged. A key-less night builds nothing: retrospective
+  proposals defer to the owner in the morning note.[^defer]
 - **Solo whiteboards** — invoke `whiteboarding` in unattended mode (see
   that skill's Unattended mode section). The gardener writes the returned
   session to `docs/inbox/gardener-whiteboard-<slug>.md`; dispatch is
@@ -677,3 +677,4 @@ corruption language.
 - `log-work` — used when filing garden-related journal entries.
 
 [^scope]: rule:out-of-scope-is-surface-absent
+[^defer]: rule:only-a-preflight-refusal-is-retried

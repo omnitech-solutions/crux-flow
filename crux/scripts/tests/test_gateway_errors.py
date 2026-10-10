@@ -393,7 +393,7 @@ class GatewayErrorLabelTests(unittest.TestCase):
     ERROR_LABEL_VOCABULARY = frozenset({
         "refused", "insufficient-credit", "timeout", "auth", "rate-limit",
         "unreachable", "provider", "client-config", "malformed-response",
-        "unexpected-status", "truncated",
+        "unexpected-status", "truncated", "served-model", "served-provider-mismatch",
     })
 
     def test_error_label_set_is_pinned(self):

@@ -120,55 +120,22 @@ def _atomic_write_text(path: Path, body: str, *, contained_under: Path) -> None:
 
 
 def build(root: Path, *, manifest: dict | None = None) -> dict[Path, str]:
-    """Return {path: wanted contents} for the two doctrine artifacts.
-
-    `manifest` is the parsed `<docs_dir>/manifest.yml`; None reads it from
-    the tree. Passing one lets a caller build twice from one tree with the
-    observations source read and suppressed — the identity postcondition's
-    P1a/P1b legs — while every other input stays on disk and constant.
-
-    ADR-0095 requirement 5: the record set is active ADRs UNION ratified
-    observations, read iff `observations` is in `concerns_enabled` — the same
-    predicate summarize-adrs.py gates on. An enabled concern this build cannot
-    read is an environment error (exit 2), never a silently narrower domain.
-    """
-    adrs = sp.adrs_dir(root)
+    """Build exactly two outputs after fresh proof and complete content validation."""
+    root = Path(root).absolute()
     if manifest is None:
         manifest = sp.read_manifest(root)
-    # ADR-0095 requirement 6: a tree may enable observations and never enable
-    # ADRs. An absent `<tree>/adrs/` stays refused (the fail-closed guard this
-    # projection was written with) UNLESS `adrs` is absent from
-    # `concerns_enabled` and `observations` is present — then doctrine compiles
-    # from the observation half alone. Without this, the STANDALONE drift gate
-    # that `check-drift` and CHK-DRIFT-1 invoke fails on exactly the ADR-less
-    # tree the survey exists to serve; it only appears to work under
-    # `survey.py --phase project` because summarize-adrs.py runs first and
-    # creates `adrs/summaries/` as a side effect. Mirrors summarize-adrs.py.
-    concerns = manifest.get("concerns_enabled") or []
-    observations_only = "adrs" not in concerns and "observations" in concerns
-    if not adrs.is_dir() and not observations_only:
-        raise FileNotFoundError(f"{adrs} not found")
-    governs_from = sp.governs_from(manifest)
-    observations = sp.observations_source(root, manifest)
+    dp._doctrine_destinations(root)
+    loaded, view, pending, actual = dp._load_doctrine_inputs(root, manifest)
+    plan = dp._plan_doctrine_outputs(loaded, view, pending)
+    proven = sp._committed_publication_ref(pending, actual) if pending is not None else None
+    return {path: content.decode("utf-8") for path, content in dp._materialize_doctrine_outputs(plan, proven).items()}
 
-    records = sp.collect_records(adrs, governs_from=governs_from,
-                                 observations=observations)
-    invariants = dp.read_invariants(root)
-    reconciliations = dp.read_reconciliations(root)
-    bindings = sp.read_run_bindings(sp.runs_dir(root))
-    exempt_entries = sp.governs_exempt_entries(manifest)
 
-    entries = dp.build_domain_entries(records, invariants, reconciliations,
-                                      bindings, governs_from,
-                                      tree_name=sp.tree_name(root), repo_root=root)
-    digests = dp.input_digests(root, records, invariants, governs_from,
-                               observations)
-
-    doctrine = dp.doctrine_dir(root)
-    return {
-        doctrine / "index.md": dp.build_index(entries, exempt_entries, digests),
-        doctrine / "_meta.json": dp.build_meta(digests),
-    }
+def _print_remedy(exc) -> None:
+    """Print a migration refusal's path-free next step on stderr, beside the unchanged code."""
+    remedy = getattr(exc, "remedy", None)
+    if isinstance(remedy, str) and remedy:
+        sys.stderr.write(json.dumps({"remedy": remedy}) + "\n")
 
 
 def main(argv=None) -> int:
@@ -188,6 +155,7 @@ def main(argv=None) -> int:
         return 1
     except Exception as exc:
         sys.stderr.write(f"compile-doctrine: {type(exc).__name__}: {exc}\n")
+        _print_remedy(exc)
         return 2
 
     if args.dry_run:
@@ -220,6 +188,7 @@ def main(argv=None) -> int:
             written.append(str(path.relative_to(root)))
     except Exception as exc:
         sys.stderr.write(f"compile-doctrine: {type(exc).__name__}: {exc}\n")
+        _print_remedy(exc)
         return 2
     print(json.dumps({"written": written}, sort_keys=True))
     return 0

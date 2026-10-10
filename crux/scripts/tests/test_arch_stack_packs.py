@@ -264,6 +264,7 @@ class PinConfigHashingTests(unittest.TestCase):
         self.addCleanup(self._d.cleanup)
         (self.root / "crux" / "skills").mkdir(parents=True)
         (self.root / "crux" / "schemas").mkdir(parents=True)
+        (self.root / "bionic").mkdir()
         self.cfg_file = self.root / ".bionic.yml"
         self.cfg_file.write_text('config_version: "1"\ndocs_dir: bionic\narch_stack: crux\n')
 

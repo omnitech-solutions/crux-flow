@@ -71,6 +71,8 @@ from ..core import (
     _canon,
     _cell,
     _contained,
+    _retained_source_resolver,
+    _retained_source_walk,
     _mermaid,
     _node_ids,
     _norm_path,
@@ -171,9 +173,9 @@ def _walk_rb_dir(root: Path, base: Path):
     """Yield contained `.rb` files under `base` (skips VCS/vendor + dot dirs and
     file symlinks that escape the root). `os.walk` does not follow directory
     symlinks (followlinks defaults to False)."""
-    if not base.is_dir():
+    if _retained_source_resolver(root)(base) is None or not base.is_dir():
         return
-    for dirpath, dirnames, filenames in os.walk(base):
+    for dirpath, dirnames, filenames in _retained_source_walk(root, base):
         dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS and not d.startswith(".")]
         for fn in sorted(filenames):
             if fn.endswith(".rb"):
@@ -213,6 +215,7 @@ def _autoload_roots(root: Path, rails_root: Path) -> tuple:
     /`eager_load_paths` additions in `config/application.rb` that parse as string
     literals (point 3). A non-literal/expression assignment EMITS a residual note
     rather than silently defaulting, so an under-covered root stays legible."""
+    admit = _retained_source_resolver(root)
     residuals: list = []
     literal_dirs: list = []
     nonliteral = False
@@ -222,10 +225,10 @@ def _autoload_roots(root: Path, rails_root: Path) -> tuple:
     # environment-file sibling to be honored, not silently defaulted past.
     cfg_files = [rails_root / "config" / "application.rb"]
     env_dir = rails_root / "config" / "environments"
-    if env_dir.is_dir():
+    if admit(env_dir) is not None and env_dir.is_dir():
         cfg_files += sorted(p for p in env_dir.glob("*.rb"))
     for cfg in cfg_files:
-        if not cfg.is_file():
+        if admit(cfg) is None or not cfg.is_file():
             continue
         raw = _safe_read_bytes(root, cfg, oversize)
         if raw is None:
@@ -237,8 +240,8 @@ def _autoload_roots(root: Path, rails_root: Path) -> tuple:
             residue = re.sub(r"[\[\]{}(),\s]", "", _RB_PATH_STRING.sub("", rhs))
             if strings and not residue:
                 for s in strings:
-                    cand = rails_root / s
-                    if _contained(root, cand) and cand.is_dir():
+                    cand = admit(rails_root / s)
+                    if cand is not None and cand.is_dir():
                         literal_dirs.append(cand)
             else:
                 nonliteral = True
@@ -253,17 +256,17 @@ def _autoload_roots(root: Path, rails_root: Path) -> tuple:
             "residual); the conventional `app/*` + `lib` set is used."
         )
     app = rails_root / "app"
-    roots: list = sorted(d for d in app.iterdir() if d.is_dir()) if app.is_dir() else []
+    roots: list = sorted(d for d in app.iterdir() if admit(d) is not None and d.is_dir()) if admit(app) is not None and app.is_dir() else []
     lib = rails_root / "lib"
-    if lib.is_dir():
+    if admit(lib) is not None and lib.is_dir():
         roots.append(lib)
     roots += literal_dirs
     seen: set = set()
     uniq: list = []
     for r in roots:
-        if not _contained(root, r):
+        rp = admit(r)
+        if rp is None:
             continue
-        rp = r.resolve()
         if rp not in seen:
             seen.add(rp)
             uniq.append(r)

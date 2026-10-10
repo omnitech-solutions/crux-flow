@@ -60,6 +60,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import summaries_projection as sp
+import implementation_migration as migration
 
 
 def main(argv=None) -> int:
@@ -73,6 +74,13 @@ def main(argv=None) -> int:
     try:
         manifest = sp.read_manifest(root)
         adrs = sp.adrs_dir(root)
+        view = migration.authority_view(root)
+        declared = sp.declared_input_domain(adrs / "summaries")
+        sp._projection_require(not isinstance(declared, list) or "implementation-migration" not in declared
+            or view["state"] == "published", "coverage declared migration input unavailable")
+        records = sp.collect_records(adrs, governs_from=sp.governs_from(manifest))
+        if view["state"] == "published":
+            sp._summary_authority_records(records, view, sp.removed_handles(sp.read_reviews(adrs)), {})
         report = sp.coverage(adrs, manifest)
         # ADR-0088: the backfill contract (at-most-once ledger, frozen cohort,
         # completion marker, receipts x log x journal cross-validation).
@@ -96,6 +104,10 @@ def main(argv=None) -> int:
                          "ADR ids into that key once to enable it; an empty list enables it for a "
                          "tree with no ADRs yet.",
             })
+        migration._unchanged_inputs(root, view["dependency_fingerprints"])
+    except migration.Refused as exc:
+        print(json.dumps({"validation_errors": [{"problem": str(exc)}]}, sort_keys=True))
+        return 1
     except sp.GovernsValidationError as exc:
         print(json.dumps({"validation_errors": exc.problems}, sort_keys=True))
         return 1

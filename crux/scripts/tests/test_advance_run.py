@@ -55,10 +55,18 @@ def _cli(args):
                           capture_output=True, text=True)
 
 
+def _scrubbed_environ() -> dict[str, str]:
+    """`os.environ` without the variables that redirect git to another repository, so an
+    exported GIT_DIR never makes a fixture commit land in a repository the test did not build."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from council_records import GIT_REDIRECT_VARS
+    return {k: v for k, v in os.environ.items() if k not in GIT_REDIRECT_VARS}
+
+
 def _git(cwd: Path, *args: str) -> None:
-    """Run git with the ambient config neutralized, so a result never depends on
-    the developer's ~/.gitconfig."""
-    env = dict(os.environ)
+    """Run git with the ambient config and repository redirects neutralized, so a result never
+    depends on the developer's ~/.gitconfig or an exported GIT_DIR."""
+    env = _scrubbed_environ()
     env.update({
         "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_CONFIG_SYSTEM": os.devnull,
@@ -76,13 +84,48 @@ def _yaml_text(doc) -> str:
     return yaml.safe_dump(doc, sort_keys=False, allow_unicode=True)
 
 
+# `--outcome` resolves the run's book and verifies `book_content_hash` before it
+# writes, so every fixture run names a book that hashes to its own value. The
+# plan-bearing keys are `id`, `title`, `goal`, `prompts` and a few more; the
+# pointer keys (`current_run`, `current_prompt`) are outside the hash, so one bare
+# book text serves every test that only needs a resolvable book.
+BARE_BOOK_TEXT = "id: PB-9001\ncurrent_run: RUN-001\ncurrent_prompt: 1\n"
+
+
+def _book_hash(book_text: str) -> str:
+    return _vp.compute_book_hash(load_yaml(book_text))
+
+
+def _rebind(run_text: str, book_text: str) -> str:
+    """`run_text` with its `book_content_hash` line naming `book_text`'s hash."""
+    import re
+    out, n = re.subn(r"(?m)^book_content_hash: [^\r\n]*",
+                     f"book_content_hash: '{_book_hash(book_text)}'", run_text)
+    assert n == 1, "the fixture run must carry exactly one book_content_hash line"
+    return out
+
+
+def _layout_run(root: Path, run_text: str, book_text: str = BARE_BOOK_TEXT,
+                name: str = "PB-9001-x") -> tuple[Path, Path]:
+    """A run snapshot and its book at the real layout, so no `--book` is needed.
+    Returns ``(run_path, book_path)``; the run's hash is bound to the book."""
+    runs = root / "promptbooks" / "runs" / name
+    active = root / "promptbooks" / "active"
+    runs.mkdir(parents=True, exist_ok=True)
+    active.mkdir(parents=True, exist_ok=True)
+    book = active / f"{name}.yaml"
+    book.write_bytes(book_text.encode("utf-8"))
+    run = runs / "run-RUN-001.yaml"
+    run.write_bytes(_rebind(run_text, book_text).encode("utf-8"))
+    return run, book
+
+
 def _write_and_reload(doc: dict, *args: str) -> dict:
     """Write `doc`, run the real `main()` over it with `args`, and reload the file
     it wrote. The reload is what the trailing-field hazard is about."""
     import yaml
     with tempfile.TemporaryDirectory() as td:
-        path = Path(td) / "run-RUN-001.yaml"
-        path.write_text(_yaml_text(doc))
+        path, _ = _layout_run(Path(td), _yaml_text(doc))
         with contextlib.redirect_stdout(io.StringIO()):
             _ar.main([str(path), *args])
         return yaml.safe_load(path.read_text())
@@ -93,7 +136,7 @@ def _run_doc(n_prompts=3):
         "format_version": "1",
         "run_id": "RUN-001",
         "book_id": "PB-9001",
-        "book_content_hash": "sha256:" + "0" * 64,
+        "book_content_hash": _book_hash(BARE_BOOK_TEXT),
         "started_at": "2026-07-22T00:00:00Z",
         "completed_at": None,
         "status": "in_progress",
@@ -246,7 +289,6 @@ class AbandonCliTests(unittest.TestCase):
     `archive-promptbook`, at archival."""
 
     def _write_run(self, tmp: Path) -> Path:
-        import yaml
         path = tmp / "run-RUN-001.yaml"
         path.write_text(_yaml_text(_run_doc(3)))
         return path
@@ -332,9 +374,23 @@ class AbandonCliTests(unittest.TestCase):
             old_book_bytes, old_run_bytes = old_book.read_bytes(), old_run.read_bytes()
 
             new_book = active / "PB-9001-new.yaml"
-            new_book.write_bytes((FIXTURES / "promptbook-valid.yaml").read_bytes())
+            # A cycle book grandfathered at run start has no gate prompt, so this advance is
+            # the unclassified path the test is about: the Markdown strand, not a gate. The
+            # flag lies outside the content hash, so it binds only through the book at the
+            # run's base_commit; the repository and the commit pin it.
+            new_book.write_text((FIXTURES / "promptbook-valid.yaml").read_text().replace(
+                "cycle_kind: adr\n", "cycle_kind: adr\ncycle_grandfathered: true\ngrandfather_reason: fixture\n", 1))
+            git_env = {**_scrubbed_environ(), "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull,
+                       "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
+                       "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid"}
+            for cmd in (["init", "-q", "-b", "main"], ["add", "-A"], ["commit", "-q", "-m", "start"]):
+                subprocess.run(["git", "-C", str(root), *cmd], check=True, env=git_env, capture_output=True)
+            base = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], check=True, env=git_env,
+                                  capture_output=True, text=True).stdout.strip()
             new_run = new_runs / "run-RUN-001.yaml"
-            new_run.write_bytes((FIXTURES / "run-valid.yaml").read_bytes())
+            run_text = _rebind((FIXTURES / "run-valid.yaml").read_text(), new_book.read_text())
+            run_text = run_text.replace("current_prompt: 2\n", f"current_prompt: 2\nbase_commit: '{base}'\n", 1)
+            new_run.write_bytes(run_text.encode("utf-8"))
             (books / "index.md").write_text(
                 "# Promptbooks\n\n_Last updated: 2026-09-27_\n\n"
                 "## Active (2)\n\n"
@@ -511,14 +567,15 @@ class BookRewriteValidationBackstopTests(unittest.TestCase):
         import json
         with tempfile.TemporaryDirectory() as td:
             tmp = Path(td)
+            book_text = ("id: PB-9001\ngoal: the real goal\n"
+                         "current_run: RUN-001\ncurrent_prompt: 1\n")
             doc = _run_doc(2)
+            doc["book_content_hash"] = _book_hash(book_text)
             doc["prompts"][1]["n"] = "2\ngoal: PWNED-INJECTED-KEY"
             run = tmp / "run-RUN-001.yaml"
             run.write_text(_yaml_text(doc))
             run_before = run.read_text()
             book = tmp / "PB-9001-x.yaml"
-            book_text = ("id: PB-9001\ngoal: the real goal\n"
-                         "current_run: RUN-001\ncurrent_prompt: 1\n")
             book.write_text(book_text)
             proc = _cli([str(run), "--outcome", "done", "--book", str(book)])
             self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
@@ -689,10 +746,9 @@ class BaseCommitPinTests(unittest.TestCase):
         self.root = Path(self._td.name).resolve()
         self.addCleanup(self._td.cleanup)
         _git(self.root, "init", "-q", "-b", "main")
-        self.run_path = self.root / "run-RUN-001.yaml"
         doc = _run_doc(3)
         doc["base_commit"] = "a" * 40
-        self.run_path.write_text(_yaml_text(doc))
+        self.run_path, _ = _layout_run(self.root, _yaml_text(doc))
 
     def _commit(self):
         _git(self.root, "add", "-A")
@@ -762,10 +818,9 @@ class BaseCommitPinTests(unittest.TestCase):
 
     def test_the_pin_is_inert_outside_a_git_work_tree(self):
         with tempfile.TemporaryDirectory() as td:
-            path = Path(td) / "run-RUN-001.yaml"
             doc = _run_doc(3)
             doc["base_commit"] = "a" * 40
-            path.write_text(_yaml_text(doc))
+            path, _ = _layout_run(Path(td), _yaml_text(doc))
             proc = _cli([str(path), "--outcome", "done"])
             self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 
@@ -869,11 +924,7 @@ class SpliceWriterTests(unittest.TestCase):
     # -- harness ---------------------------------------------------------------
 
     def _files(self, text: str | None = None) -> tuple[Path, Path]:
-        run = self.tmp / "run-RUN-001.yaml"
-        run.write_bytes((self.base if text is None else text).encode("utf-8"))
-        book = self.tmp / "PB-9999-x.yaml"
-        book.write_bytes(BOOK_TEXT.encode("utf-8"))
-        return run, book
+        return _layout_run(self.tmp, self.base if text is None else text, BOOK_TEXT, "PB-9999-x")
 
     def _main(self, args: list[str]) -> tuple[int, str]:
         buf = io.StringIO()

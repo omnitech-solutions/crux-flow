@@ -145,8 +145,10 @@ class StateFile:
     """A mutable, single-writer, keyed state store. Atomic write-temp-rename;
     fail-closed on a parse error (never guesses)."""
 
-    def __init__(self, path: Path, *, contained_under: Path | None = None):
+    def __init__(self, path: Path, *, contained_under: Path | None = None,
+                 _source_io=None):
         self.path = Path(path)
+        self._source_io = _source_io
         # [SECURITY:S5] The tree this file must stay inside. Every WRITER
         # supplies it; the read-only constructors do not, and `save` guards
         # what it can without one (see `_assert_write_target`).
@@ -163,11 +165,14 @@ class StateFile:
         # rows because the counter IS the identity source — recomputing it from
         # the surviving rows would reissue a pruned key.
         self.successor_counters: dict[str, int] = {}
-        if self.path.exists():
+        present = (self.path.exists() if _source_io is None
+                   else _source_io.kind(self.path) is not None)
+        if present:
             self._load()
 
     def _load(self):
-        text = self.path.read_text(encoding="utf-8")
+        text = (self.path.read_text(encoding="utf-8") if self._source_io is None
+                else self._source_io.read_text(self.path))
         try:
             import yaml
             data = yaml.safe_load(text) or {}
@@ -412,7 +417,7 @@ def anchor_of(candidate_key: str) -> str:
     return candidate_key.split("+", 1)[0]
 
 
-def _contained_record(observations_dir: Path, path: Path) -> Path:
+def _contained_record(observations_dir: Path, path: Path, *, kind="observation", _source_io=None) -> Path:
     """The record's resolved path, or a refusal.
 
     [SECURITY:S5] `glob` returns a symlink and `read_text` follows it, so a
@@ -422,14 +427,26 @@ def _contained_record(observations_dir: Path, path: Path) -> Path:
     `observation_evidence.resolve_contained` is the one place that decides it.
     `survey_sheet.record_paths` carries the same leg over the same directory.
     """
-    resolved = _oe.resolve_contained(observations_dir, path.name)
-    if resolved is None or not resolved.is_file():
+    transport_refusal = None
+    try:
+        resolved = (_oe.resolve_contained(observations_dir, path.name) if _source_io is None
+                    else _oe.resolve_contained(observations_dir, path.name, _source_io=_source_io))
+        is_file = (resolved is not None and (resolved.is_file() if _source_io is None
+                                            else _source_io.kind(resolved) == "file"))
+    except ValueError as exc:
+        transport_refusal = getattr(exc, "code", None)
+        if _source_io is None or transport_refusal not in {
+                "admission-source-io-containment-refused", "admission-source-io-nonresolution-refused"}:
+            raise
+        is_file = False
+    if not is_file:
         raise ValueError(
             f"refusing to read {redact(path.name, quoted=False)}: it does not "
             f"resolve to a file inside "
-            f"{redact(observations_dir, quoted=False)} — an observation "
+            f"{redact(observations_dir, quoted=False)} — an {kind} "
             "record is read from "
-            "the concern directory, never through a link out of it")
+            "the concern directory, never through a link out of it"
+            + (f" [{transport_refusal}]" if transport_refusal else "")) from None
     return resolved
 
 
@@ -446,7 +463,74 @@ def frontmatter_problem(name: str, exc: Exception) -> str:
     return parse_problem("observation frontmatter", name, exc)
 
 
-def read_recorded_observations(observations_dir: Path) -> dict[str, dict]:
+def _selected_recovery_tree(repo_root: Path, docs_dir: str | None, *, _source_io=None) -> Path:
+    if _source_io is not None:
+        from observation_admission import _selected_tree
+        return _selected_tree(_source_io.resolve(Path(repo_root)), docs_dir, _source_io)
+    import bionic_config
+    if docs_dir is not None:
+        return bionic_config.validate_docs_dir_override(Path(repo_root), docs_dir)
+    from summaries_projection import resolve_tree
+    return resolve_tree(repo_root)
+
+
+def _check_recovery_sources(repo_root: Path, evidence, docs_dir: str | None, *, _source_io=None) -> None:
+    # Lazy imports preserve admission -> summaries -> survey -> recovery layering.
+    from observation_admission import recovery_source_problems
+    options = {} if docs_dir is None else {"docs_dir": docs_dir}
+    if _source_io is None:
+        problems = recovery_source_problems(repo_root, evidence=evidence, **options)
+    else:
+        from observation_admission import _context_for_source_io, _source_problems
+        context = _context_for_source_io(repo_root, docs_dir=docs_dir, _source_io=_source_io)
+        problems = _source_problems(context, evidence) if evidence else []
+    if problems:
+        raise ValueError("recovery source refused: " + "; ".join(redact(p) for p in problems))
+
+
+def _check_correlation_directory(repo_root, directory, concern, docs_dir, *, _source_io=None) -> None:
+    if repo_root is None:
+        return
+    options = {} if _source_io is None else {"_source_io": _source_io}
+    expected = _selected_recovery_tree(repo_root, docs_dir, **options) / concern
+    actual_dir = Path(directory).resolve() if _source_io is None else _source_io.resolve(Path(directory))
+    expected_dir = expected.resolve() if _source_io is None else _source_io.resolve(expected)
+    if actual_dir != expected_dir:
+        raise ValueError("recovery correlation directory differs from the explicitly selected tree")
+    prefix = "OBS" if concern == "observations" else "ADR"
+    kind = "observation" if concern == "observations" else "architectural decision"
+    from summaries_projection import read_frontmatter
+    paths = (expected.glob(prefix + "-*.md") if _source_io is None
+             else _source_io.glob(expected, prefix + "-*.md"))
+    for path in sorted(paths):
+        resolved = _contained_record(expected, path, kind=kind, **options)
+        text = None if _source_io is None else _source_io.read_text(resolved)
+        try:
+            read_frontmatter(resolved.read_text(encoding="utf-8") if _source_io is None else text)
+        except Exception as exc:
+            raise ValueError(parse_problem(f"{kind} frontmatter", path.name, exc)) from None
+    _check_recovery_sources(repo_root, [], docs_dir, **options)
+
+
+def _check_recorded_source(repo_root, path, frontmatter, docs_dir, *, _source_io=None) -> None:
+    if repo_root is None:
+        return
+    from observation_admission import admission_problems
+    options = {} if docs_dir is None else {"docs_dir": docs_dir}
+    if _source_io is None:
+        problems = admission_problems(repo_root, slug=None,
+            evidence=frontmatter.get("evidence", []), source_record=path, **options)
+    else:
+        from observation_admission import _context_for_source_io, _source_problems, _own_handle
+        context = _context_for_source_io(repo_root, docs_dir=docs_dir, _source_io=_source_io)
+        problems = _source_problems(context, frontmatter.get("evidence", []))
+        _own_handle(context, path, None)
+    if problems:
+        raise ValueError("recovery recorded source refused: " + "; ".join(redact(p) for p in problems))
+
+
+def read_recorded_observations(observations_dir: Path, *, repo_root: Path | None = None,
+                               docs_dir: str | None = None, _source_io=None) -> dict[str, dict]:
     """Collect `{anchor_id: {"id", "status", "rule", "evidence"}}` from every
     `OBS-*.md` under the observations concern. Read-only; a missing directory
     is an empty map. Fail-closed on frontmatter that does not parse — guessing
@@ -458,12 +542,16 @@ def read_recorded_observations(observations_dir: Path) -> dict[str, dict]:
     the concern itself."""
     out: dict[str, dict] = {}
     d = Path(observations_dir)
-    if not d.is_dir():
+    options = {} if _source_io is None else {"_source_io": _source_io}
+    _check_correlation_directory(repo_root, d, "observations", docs_dir, **options)
+    if not (d.is_dir() if _source_io is None else _source_io.kind(d) == "directory"):
         return out
-    for op in sorted(d.glob("OBS-*.md")):
-        resolved = _contained_record(d, op)
+    paths = d.glob("OBS-*.md") if _source_io is None else _source_io.glob(d, "OBS-*.md")
+    for op in sorted(paths):
+        resolved = _contained_record(d, op, **options)
         m = re.match(r"^---\n(.*?)\n---\n",
-                     resolved.read_text(encoding="utf-8"), re.DOTALL)
+                     (resolved.read_text(encoding="utf-8") if _source_io is None
+                      else _source_io.read_text(resolved)), re.DOTALL)
         if not m:
             continue
         try:
@@ -471,6 +559,7 @@ def read_recorded_observations(observations_dir: Path) -> dict[str, dict]:
             fm = yaml.safe_load(m.group(1)) or {}
         except Exception as exc:  # fail-closed
             raise ValueError(frontmatter_problem(op.name, exc)) from exc
+        _check_recorded_source(repo_root, resolved, fm, docs_dir, **options)
         aid = fm.get("anchor_id")
         if not aid:
             continue
@@ -486,7 +575,9 @@ def read_recorded_observations(observations_dir: Path) -> dict[str, dict]:
 
 
 def emit_candidate(state: StateFile, recorded: dict[str, dict], cand: dict) -> str:
-    """The emit path for one mined candidate, deduplicated against recorded
+    """Low-level correlation, without source approval; production uses the checked route.
+
+    The emit path for one mined candidate, deduplicated against recorded
     observations (ADR-0095 req. 2). `cand` carries `id` (= candidate_id),
     `rule` (the redaction-scanned statement) and `evidence` (path:line-range
     list). Returns one of:
@@ -542,23 +633,92 @@ def emit_candidate(state: StateFile, recorded: dict[str, dict], cand: dict) -> s
     return "successor" if state.upsert_observed(succ) else "present"
 
 
-def find_ratified_adr(adrs_dir: Path, cid: str) -> str | None:
+def _checked_recovery_inputs(repo_root, recorded, roster, docs_dir) -> None:
+    evidence = []
+    for row in roster:
+        if not isinstance(row, dict) or not isinstance(row.get("evidence"), list) or not row["evidence"]:
+            raise ValueError("recovery roster must contain candidates with nonempty source evidence lists")
+        evidence.extend(row["evidence"])
+    _check_recovery_sources(repo_root, evidence, docs_dir)
+    canonical = read_recorded_observations(
+        _selected_recovery_tree(repo_root, docs_dir) / "observations", repo_root=repo_root, docs_dir=docs_dir)
+    if canonical != recorded:
+        raise ValueError("supplied recovery correlation differs from canonical recorded observations")
+
+
+def _staged_recovery_state(state: StateFile) -> StateFile:
+    import copy
+    staged = copy.copy(state)
+    staged.rows = copy.deepcopy(state.rows)
+    staged.stale_anchors = copy.deepcopy(state.stale_anchors)
+    staged.successor_counters = copy.deepcopy(state.successor_counters)
+    return staged
+
+
+def _publish_recovery_state(state: StateFile, staged: StateFile) -> None:
+    state.rows = staged.rows
+    state.stale_anchors = staged.stale_anchors
+    state.successor_counters = staged.successor_counters
+
+
+def checked_emit_candidate(repo_root: Path, state: StateFile, recorded: dict[str, dict],
+                           cand: dict, *, docs_dir: str | None = None) -> str:
+    """Check source facts and canonical correlation before changing one candidate."""
+    import copy
+    candidate = copy.deepcopy(cand)
+    _checked_recovery_inputs(repo_root, recorded, [candidate], docs_dir)
+    staged = _staged_recovery_state(state)
+    result = emit_candidate(staged, recorded, candidate)
+    _checked_recovery_inputs(repo_root, recorded, [candidate], docs_dir)
+    _publish_recovery_state(state, staged)
+    return result
+
+
+def checked_emit_candidates(repo_root: Path, state: StateFile, recorded: dict[str, dict],
+                            candidates: list[dict], *, present_candidates: list[dict] | None = None,
+                            docs_dir: str | None = None) -> list[str]:
+    """Validate the full mined roster; publish emission, prune and stale signals together."""
+    import copy
+    candidates = copy.deepcopy(candidates)
+    roster = copy.deepcopy(candidates if present_candidates is None else present_candidates)
+    _checked_recovery_inputs(repo_root, recorded, roster, docs_dir)
+    if any(candidate not in roster for candidate in candidates):
+        raise ValueError("emitted recovery candidates must belong to the validated full source roster")
+    present = {row.get("anchor_id") or row["id"] for row in roster}
+    staged = _staged_recovery_state(state)
+    results = [emit_candidate(staged, recorded, row) for row in candidates]
+    staged.prune(present)
+    staged.signal_stale_anchors(recorded, present)
+    _checked_recovery_inputs(repo_root, recorded, roster, docs_dir)
+    _publish_recovery_state(state, staged)
+    return results
+
+
+def find_ratified_adr(adrs_dir: Path, cid: str, *, repo_root: Path | None = None,
+                      docs_dir: str | None = None) -> str | None:
     """Idempotent-ratify correlation (ADR-0062 Decision 5): find a Proposed ADR
     whose frontmatter carries `recovered_id: <cid>`. None if not yet created."""
+    _check_correlation_directory(repo_root, adrs_dir, "adrs", docs_dir)
     for ap in sorted(Path(adrs_dir).glob("ADR-*.md")):
         text = ap.read_text(encoding="utf-8")
         m = re.match(r"^---\n(.*?)\n---\n", text, re.DOTALL)
         if not m:
             continue
         fm = m.group(1)
-        if re.search(rf"^recovered_id:\s*{re.escape(cid)}\s*$", fm, re.MULTILINE):
+        match = re.search(rf"^recovered_id:\s*{re.escape(cid)}\s*$", fm, re.MULTILINE)
+        if match:
+            if repo_root is not None:
+                rel = ap.absolute().relative_to(Path(repo_root).absolute()).as_posix()
+                line = text[:m.start(1) + match.start()].count("\n") + 1
+                _check_recovery_sources(repo_root, [f"{rel}:{line}-{line}"], docs_dir)
             mid = re.search(r"^id:\s*(\S+)", fm, re.MULTILINE)
             return mid.group(1) if mid else ap.stem
     return None
 
 
 def find_ratified_observation(observations_dir: Path, cid: str,
-                              predecessor_id: str | None = None) -> str | None:
+                              predecessor_id: str | None = None, *, repo_root: Path | None = None,
+                              docs_dir: str | None = None) -> str | None:
     """Observation twin of `find_ratified_adr` (ADR-0095 req. 3a): the
     idempotency check before `transition-decision ratify --as observation`
     creates a record. Correlation key is `anchor_id`, which schema §17.1
@@ -589,6 +749,7 @@ def find_ratified_observation(observations_dir: Path, cid: str,
     plus a counter removed the prose from the key, and with it the reason the
     gap could not be closed.)"""
     d = Path(observations_dir)
+    _check_correlation_directory(repo_root, d, "observations", docs_dir)
     if not d.is_dir():
         return None
     anchor = anchor_of(cid)
@@ -603,6 +764,7 @@ def find_ratified_observation(observations_dir: Path, cid: str,
             fm = yaml.safe_load(m.group(1)) or {}
         except Exception as exc:  # fail-closed, as read_recorded_observations is
             raise ValueError(frontmatter_problem(op.name, exc)) from exc
+        _check_recorded_source(repo_root, resolved, fm, docs_dir)
         if not isinstance(fm, dict) or str(fm.get("anchor_id", "")) != anchor:
             continue
         rid = str(fm.get("id") or op.stem)

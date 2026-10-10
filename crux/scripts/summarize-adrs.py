@@ -28,7 +28,7 @@ artifact bindings and builds three derived artifacts behind ONE drift gate:
                              {alias_of, alias_handles} instead (ADR-0095)
   - implementation-map.md  ADR <-> run implementation map
   - _meta.json              input-hash + schema metadata for the projection:
-                             schema "4" declares `input_domain` (the sources
+                             schema "6" declares `input_domain` (the sources
                              the build read) and `observations_sha256`
 
 The input domain is active ADRs UNION `ratified` observations
@@ -68,6 +68,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import stat
 import sys
 from pathlib import Path
 
@@ -146,131 +147,121 @@ def _atomic_write_text(path: Path, body: str, *, contained_under: Path) -> None:
         raise
 
 
-def build(root: Path, *, manifest: dict | None = None) -> dict[Path, str]:
-    """Return {path: wanted contents} for the four summaries artifacts.
+def _historical_summary_clauses(root: Path, view: dict) -> tuple[list[dict], dict | None]:
+    """Load only the exact batch named by a proved publication, without a second approval."""
+    import implementation_migration as migration
+    if view["state"] != "published":
+        sp._projection_require(not view["publications"], "summaries unproved publication refused")
+        return [], None
+    latest = view["publications"][-1]
+    text, _ = migration._read(root, latest["path"])
+    sp._projection_require(migration._digest(text.encode()) == latest["sha256"],
+                           "summaries publication changed during input loading")
+    locator = json.loads(text)
+    batch, raw = migration._load_batch(root, locator["batch"]["path"])
+    sp._projection_require(migration._digest(raw) == locator["batch"]["sha256"],
+                           "summaries proved batch changed during input loading")
+    fingerprints = {}
+    for ref in view["dependency_fingerprints"]:
+        sp._projection_require(ref["path"] not in fingerprints or fingerprints[ref["path"]] == ref["sha256"],
+                               "summaries conflicting migration dependency fingerprints")
+        fingerprints[ref["path"]] = ref["sha256"]
+    sp._projection_require(fingerprints.get(locator["batch"]["path"]) == locator["batch"]["sha256"],
+                           "summaries batch not in validated input snapshot")
+    selected = {source["source_identity"]: source for source in view["source_refs"]}
+    sp._projection_require(len(selected) == len(view["source_refs"]), "summaries duplicate selected identity")
+    clauses = []
+    for entry in batch["entries"]:
+        source = selected.get(entry["source_identity"])
+        sp._projection_require(source is not None and source["source_adr"] == entry["source_adr"]
+            and source["clause_sha256"] == entry["clause"]["sha256"], "summaries selected clause identity mismatch")
+        if entry["disposition"] == "historical-implementation":
+            clauses.append(dict(source_identity=entry["source_identity"],
+                source_ref={k: source[k] for k in ("path", "source_adr", "clause_sha256")},
+                destination=entry["historical_destination"], replacements=entry["replacement_handles"]))
+    sp._projection_require(set(selected) == {entry["source_identity"] for entry in batch["entries"]},
+                           "summaries selected source roster mismatch")
+    return sorted(clauses, key=lambda row: row["source_identity"]), locator
 
-    `manifest` is the parsed `<docs_dir>/manifest.yml`; None reads it from
-    the tree. Passing one lets a caller build twice from one tree with the
-    observations source read and suppressed — the identity postcondition's
-    P1a/P1b legs — while every other input stays on disk and constant.
 
-    Requirement 6 (ADR-0095): a tree may enable observations and never
-    enable ADRs. An absent `<tree>/adrs/` is refused (the fail-closed guard
-    the projection was written with) UNLESS `adrs` is absent from
-    `concerns_enabled` and `observations` is present — then the projection
-    is built from the observation half alone, still at `adrs/summaries/`,
-    which the write path creates.
-    """
+def _summary_destinations(root: Path, *, _source_io=None) -> tuple[Path, dict]:
+    """Read-only path preflight; never creates a destination or temporary file."""
+    tree = sp.resolve_tree(root, _source_io=_source_io)
+    paths = {name: tree / "adrs/summaries" / name for name in
+        ("rule-table.md", "resolver.json", "implementation-map.md", "_meta.json")}
+    for path in paths.values():
+        if sp._source_resolve(tree, _source_io) not in sp._source_resolve(path.parent, _source_io).parents:
+            raise OSError("summaries destination is not contained under the validated tree")
+        if _source_io is None:
+            blocked = (path.is_symlink() or (path.exists() and not path.is_file()) or
+                       path.with_suffix(path.suffix + ".tmp").exists() or
+                       path.with_suffix(path.suffix + ".tmp").is_symlink())
+        else:
+            metadata = _source_io.metadata(path)
+            temporary = _source_io.metadata(path.with_suffix(path.suffix + ".tmp"))
+            blocked = (metadata is not None and not stat.S_ISREG(metadata['st_mode'])) or temporary is not None
+        if blocked:
+            raise OSError("summaries destination is symlinked or has an owned temporary path")
+    return tree, paths
+
+
+def _load_summary_inputs(root: Path, manifest: dict) -> tuple[dict, dict, dict | None, dict | None]:
+    """Public proof boundary followed by one complete, contained input snapshot."""
+    import implementation_migration as migration
+    tree, paths = _summary_destinations(root)
+    view = migration.authority_view(root)
     adrs = sp.adrs_dir(root)
+    concerns = manifest.get("concerns_enabled") or []
+    if not adrs.is_dir() and not ("adrs" not in concerns and "observations" in concerns):
+        raise FileNotFoundError(f"{adrs} not found")
+    summaries = adrs / "summaries"
+    declared = sp.declared_input_domain(summaries)
+    sp._projection_require(not isinstance(declared, list) or "implementation-migration" not in declared
+        or view["state"] == "published", "summaries declared migration input unavailable")
+    gf = sp.governs_from(manifest)
+    reviews = sp.read_reviews(adrs)
+    observations = sp.observations_source(root, manifest)
+    records = sp.collect_records(adrs, governs_from=gf, observations=observations)
+    aliases = sp.collect_observation_alias_rows(observations, records)
+    clauses, locator = _historical_summary_clauses(root, view)
+    metadata = dict(adr_frontmatter_sha256=sp.adr_frontmatter_sha256(adrs),
+        backfill_reviews_sha256=sp.backfill_reviews_sha256(adrs),
+        input_domain=["adrs", "backfill-reviews"] + (["observations", "survey-receipts"] if observations is not None else []),
+        observations_sha256=sp.observations_sha256(observations) if observations is not None else None,
+        survey_receipts_sha256=sp.survey_receipts_sha256(observations) if observations is not None else None,
+        schema="6", tool="summarize-adrs.py")
+    loaded = dict(tree=tree, paths=paths, records=records, reviews=reviews, aliases=aliases,
+        governs_from=gf, implementation_map=sp.build_implementation_map(adrs, sp.runs_dir(root), repo_root=root),
+        metadata=metadata, archived_handles=sorted(sp.archived_handles(adrs)),
+        signed_handles=sorted(sp.signed_reconciliation_handles(adrs)), historical_clauses=clauses,
+        publication_history=[{k: row[k] for k in ("path", "sha256", "publication_commit")}
+                             for row in view["publications"][:-1]])
+    pending = actual = None
+    if locator is not None:
+        actual = {k: view["publications"][-1][k] for k in ("path", "sha256", "publication_commit")}
+        pending = dict(path=actual["path"], sha256=actual["sha256"], close_identity={k: locator[k] for k in
+            ("batch", "book_id", "run_id", "book_content_hash", "slot", "gate_prompt")})
+        # U8 validated these exact source/dependency bytes; recheck after every loaded reader.
+        migration._unchanged_inputs(root, view["dependency_fingerprints"] +
+                                   [{"path": actual["path"], "sha256": actual["sha256"]}])
+    return loaded, view, pending, actual
+
+
+def build(root: Path, *, manifest: dict | None = None) -> dict[Path, str]:
+    """Build four schema-six outputs using fresh production authority proof."""
+    root = Path(root).absolute()
     if manifest is None:
         manifest = sp.read_manifest(root)
-    concerns = manifest.get("concerns_enabled") or []
-    observations_only = "adrs" not in concerns and "observations" in concerns
-    if not adrs.is_dir() and not observations_only:
-        raise FileNotFoundError(f"{adrs} not found")
-    runs = sp.runs_dir(root)
-    summaries = adrs / "summaries"
-
-    governs_from = sp.governs_from(manifest)
-    # ADR-0088: the anchor contract is boundary-scoped, and the reviews
-    # manifest drives the review_state facet on resolver rows + rule table.
-    reviews = sp.read_reviews(adrs)
-    # ADR-0095 requirement 4: the input domain is active ADRs UNION ratified
-    # observations. The observations source is read iff the concern is
-    # enabled; an enabled concern this build cannot read is an environment
-    # error (exit 2), never a silently narrower domain.
-    input_domain = ["adrs", "backfill-reviews"]
-    observations = sp.observations_source(root, manifest)
-    if observations is not None:
-        # ADR-0098 clause 2: the per-batch survey receipts are ONE declared
-        # source beside the records, under the existing fail-closed refusal.
-        # Declared together with `observations` because they are the same
-        # source read two ways — the records and the receipts that published
-        # them — and a build that read one without the other could render a
-        # partially applied batch.
-        input_domain.extend(["observations", "survey-receipts"])
-    records = sp.collect_records(adrs, governs_from=governs_from,
-                                 observations=observations)
-    alias_rows = sp.collect_observation_alias_rows(observations, records)
-    rule_table = sp.build_rule_table(records, reviews, governs_from)
-    # ADR-0099 clause 2 (`ADR-0099/slug-uniqueness-gate`): the resolver
-    # carries two top-level keys beside its handle rows — `slugs` (live slug
-    # -> its one live handle) and `retired_slugs` (retired slug -> the sorted
-    # live handles that displaced it). They are merged HERE, at the
-    # serialization boundary, and nowhere earlier. `build_resolver` stays a
-    # pure handle -> row builder. `live_and_retired_slugs` is the map and the
-    # fail-closed gate in one traversal, so a collision raises
-    # `GovernsValidationError` into main()'s existing exit-1 envelope before
-    # anything is serialized. A handle key always matches `ADR-NNNN/slug` or
-    # `OBS-NNNN/slug`, so neither new key can collide with a handle key, and
-    # every existing key keeps its meaning. Both keys are emitted on an empty
-    # corpus (`{}` each), never omitted.
-    #
-    # Alias rows are OUTSIDE the slug maps and outside the gate. An alias
-    # handle (a `decided` observation's `OBS-NNNN/slug`) is a redirect onto
-    # an ADR, not a rule, and `live_and_retired_slugs` reads records only.
-    # An alias `OBS-0001/foo` beside a rule `ADR-0050/foo` is benign:
-    # `slugs["foo"]` resolves to the ADR handle, which is where the alias
-    # points anyway.
-    resolver_rows = sp.build_resolver(records, reviews, governs_from,
-                                      alias_rows=alias_rows)
-    slugs, retired_slugs = sp.live_and_retired_slugs(records)
-    resolver = json.dumps({**resolver_rows,
-                           "slugs": slugs,
-                           "retired_slugs": retired_slugs},
-                          sort_keys=True, indent=2) + "\n"
-    impl_map = sp.build_implementation_map(adrs, runs)
-    meta = json.dumps(
-        {
-            "adr_frontmatter_sha256": sp.adr_frontmatter_sha256(adrs),
-            # ADR-0088 (amending ADR-0086 Decision 3): the input hash's domain
-            # widens to the reviews manifest — primary authored data, never a
-            # downstream index. SHA-256 of its raw bytes; null when absent.
-            "backfill_reviews_sha256": sp.backfill_reviews_sha256(adrs),
-            # ADR-0095 requirement 6: the projection declares the input
-            # domain it was built from, and a later regenerate refuses to
-            # rewrite it without every declared source (see main()).
-            "input_domain": sorted(input_domain),
-            # ADR-0095 requirement 4: the observations half of the input
-            # hash, mirroring adr_frontmatter_sha256's construction; null
-            # when the concern is not read.
-            "observations_sha256": (sp.observations_sha256(observations)
-                                    if observations is not None else None),
-            # ADR-0098 clause 2: the receipts' own digest, null when the tree
-            # has signed no batch. Schema "4" is this key's arrival.
-            "survey_receipts_sha256": (sp.survey_receipts_sha256(observations)
-                                       if observations is not None else None),
-            # Bumped 4 -> 5 when the resolver row gained `source_status`. The rule this
-        # followed, recorded here because it is reusable: bump a projection's
-        # declared schema where that value IDENTIFIES the output shape and no
-        # migration rung depends on it, additive or not. The tree manifest's
-        # "breaking changes only" convention does not govern here — that version
-        # gates a migration, this one only tells a reader which contract the file
-        # was written against.
-        "schema": "5",
-            "tool": "summarize-adrs.py",
-        },
-        sort_keys=True,
-        indent=2,
-    ) + "\n"
-
-    return {
-        summaries / "rule-table.md": rule_table,
-        summaries / "resolver.json": resolver,
-        summaries / "implementation-map.md": impl_map,
-        summaries / "_meta.json": meta,
-    }
+    refusal = sp.declared_domain_refusal(root, manifest, sp.adrs_dir(root) / "summaries")
+    sp._projection_require(refusal is None, "summaries declared input domain unavailable")
+    loaded, view, pending, actual = _load_summary_inputs(root, manifest)
+    plan = sp._plan_summary_outputs(loaded, view, pending)
+    proven = sp._committed_publication_ref(pending, actual) if pending is not None else None
+    return {path: content.decode("utf-8") for path, content in sp._materialize_summary_outputs(plan, proven).items()}
 
 
-def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(
-        description="Regenerate the summaries projection (adrs/summaries/) from ADR governs blocks + run snapshots."
-    )
-    ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--repo-root", default=".")
-    args = ap.parse_args(argv)
-    root = Path(args.repo_root).resolve()
-
+def _read_phase(root: Path) -> dict[Path, str] | int:
+    """Refuse or build without writing; an int is the exit code of a refusal."""
     # ADR-0095 requirement 6, fail-closed: BEFORE building, read the existing
     # projection's declared input domain and refuse — exit 2, nothing written,
     # --dry-run identical — when it names a member outside the known set or
@@ -285,9 +276,11 @@ def main(argv=None) -> int:
         return 1
     except Exception as exc:
         sys.stderr.write(f"summarize-adrs: {type(exc).__name__}: {exc}\n")
+        _print_remedy(exc)
         return 2
     if refusal is not None:
         sys.stderr.write(f"summarize-adrs: refusing to rewrite: {refusal}\n")
+        _print_remedy(refusal)    # a migration refusal's remedy rides on the reason
         return 2
 
     try:
@@ -297,7 +290,38 @@ def main(argv=None) -> int:
         return 1
     except Exception as exc:
         sys.stderr.write(f"summarize-adrs: {type(exc).__name__}: {exc}\n")
+        _print_remedy(exc)
         return 2
+    return wanted
+
+
+def _print_remedy(exc) -> None:
+    """Print a migration refusal's path-free next step on stderr, beside the unchanged code."""
+    remedy = getattr(exc, "remedy", None)
+    if isinstance(remedy, str) and remedy:
+        sys.stderr.write(json.dumps({"remedy": remedy}) + "\n")
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(
+        description="Regenerate the summaries projection (adrs/summaries/) from ADR governs blocks + run snapshots."
+    )
+    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--repo-root", default=".")
+    args = ap.parse_args(argv)
+    root = Path(args.repo_root).resolve()
+
+    # The read phase writes nothing, so its repeated authority reads share one proof.
+    try:
+        import implementation_migration as migration
+    except Exception as exc:
+        sys.stderr.write(f"summarize-adrs: {type(exc).__name__}: {exc}\n")
+        _print_remedy(exc)
+        return 2
+    with migration.read_scope():
+        wanted = _read_phase(root)
+    if isinstance(wanted, int):
+        return wanted
 
     if args.dry_run:
         drifted = []
@@ -332,6 +356,7 @@ def main(argv=None) -> int:
             written.append(str(path.relative_to(root)))
     except Exception as exc:
         sys.stderr.write(f"summarize-adrs: {type(exc).__name__}: {exc}\n")
+        _print_remedy(exc)
         return 2
     print(json.dumps({"written": written}, sort_keys=True))
     return 0

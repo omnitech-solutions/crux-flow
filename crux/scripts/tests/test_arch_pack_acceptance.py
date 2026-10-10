@@ -46,7 +46,7 @@ Which tests need the corpus cache:
     with no network and no cache.
 
 **The self-hosted entry, and why it is gated differently.** `crux-repo` carries
-`source: self` (ADR-0096 clause 12): it derives THIS checkout in place under a
+`source: self` (ADR-0096 clause 12): it derives a copy of THIS checkout under a
 forced `arch_stack: python`, with no clone and no network, so
 `ClauseEightSelfHostedTests` NEVER skips. It carries no `golden/<name>/`, and
 that is a decision rather than an omission — this checkout is not frozen at a

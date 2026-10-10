@@ -76,8 +76,11 @@ The observation widening (ADR-0095 requirement 5), additive over the above:
 from __future__ import annotations
 
 import hashlib
+import importlib.util
+import json
 import posixpath
 import re
+import stat
 from pathlib import Path
 
 import observation_evidence as oe
@@ -171,16 +174,19 @@ def _problem(problem: str, invariant=None, handle=None) -> dict:
 
 # ── tree resolution ────────────────────────────────────────────────────────
 
-def invariants_dir(root: Path) -> Path:
-    return sp.resolve_tree(root) / "invariants"
+def invariants_dir(root: Path, *, _source_io=None) -> Path:
+    options = {} if _source_io is None else {"_source_io": _source_io}
+    return sp.resolve_tree(root, **options) / "invariants"
 
 
-def doctrine_dir(root: Path) -> Path:
-    return sp.adrs_dir(root) / DOCTRINE_DIRNAME
+def doctrine_dir(root: Path, *, _source_io=None) -> Path:
+    options = {} if _source_io is None else {"_source_io": _source_io}
+    return sp.adrs_dir(root, **options) / DOCTRINE_DIRNAME
 
 
-def reconciliations_path(root: Path) -> Path:
-    return doctrine_dir(root) / RECONCILIATIONS_FILENAME
+def reconciliations_path(root: Path, *, _source_io=None) -> Path:
+    options = {} if _source_io is None else {"_source_io": _source_io}
+    return doctrine_dir(root, **options) / RECONCILIATIONS_FILENAME
 
 
 # ── invariant ledger reads ─────────────────────────────────────────────────
@@ -210,7 +216,7 @@ def invariant_section(text: str) -> str:
     return "\n".join(out).strip()
 
 
-def read_invariants(root: Path) -> list[dict]:
+def read_invariants(root: Path, *, _source_io=None) -> list[dict]:
     """Every invariant ledger page, sorted by id. Each record:
     {id, ratification, related_adrs (list[str]), invariant_text, path}.
 
@@ -222,14 +228,15 @@ def read_invariants(root: Path) -> list[dict]:
     enters `invariants_sha256` below, so an edit to an observed page's text
     still moves doctrine's freshness stamp.
     """
-    inv_dir = invariants_dir(root)
+    options = {} if _source_io is None else {"_source_io": _source_io}
+    inv_dir = invariants_dir(root, **options)
     out: list[dict] = []
-    if not inv_dir.is_dir():
+    if not sp._source_is_dir(inv_dir, _source_io):
         return out
-    for path in sorted(inv_dir.glob("*.md")):
-        if not path.is_file():
+    for path in sorted(sp._source_glob(inv_dir, "*.md", _source_io)):
+        if not sp._source_is_file(path, _source_io):
             continue
-        text = path.read_text(encoding="utf-8")
+        text = sp._source_text(path, _source_io)
         fm = sp.read_frontmatter(text)
         iid = str(fm.get("id") or "")
         if not _INV_ID_RE.match(iid):
@@ -472,7 +479,7 @@ def candidate_pairings(records: list[dict], invariants: list[dict],
 
 # ── reconciliation ledger reads ─────────────────────────────────────────────
 
-def read_reconciliations(root: Path) -> list[dict]:
+def read_reconciliations(root: Path, *, _source_io=None) -> list[dict]:
     """Read and shape-validate `adrs/doctrine/reconciliations.yml`.
 
     Returns the reconciliation records in document order:
@@ -496,12 +503,17 @@ def read_reconciliations(root: Path) -> list[dict]:
     non-empty rationale, a non-date `signed`, or a duplicate (invariant, handle)
     pair.
     """
-    path = reconciliations_path(root)
-    if not path.is_file():
+    options = {} if _source_io is None else {"_source_io": _source_io}
+    path = reconciliations_path(root, **options)
+    if not sp._source_is_file(path, _source_io):
         return []
+    return parse_reconciliations(sp._source_text(path, _source_io))
+
+
+def parse_reconciliations(text: str) -> list[dict]:
+    """Validate ledger text without reading sources or evaluating governing authority."""
     import yaml
-    text = path.read_text(encoding="utf-8")
-    from _yaml_min import CatalogYamlError, _refuse_catalog_duplicate_keys
+    from _yaml_min import CatalogYamlError, _refuse_duplicate_keys_bounded as _refuse_catalog_duplicate_keys
     try:
         _refuse_catalog_duplicate_keys(text, yaml)
     except CatalogYamlError as exc:
@@ -588,12 +600,14 @@ def read_reconciliations(root: Path) -> list[dict]:
     return records
 
 
-def reconciliations_sha256(root: Path) -> str | None:
+def reconciliations_sha256(root: Path, *, _source_io=None) -> str | None:
     """SHA-256 of the reconciliation ledger's raw bytes; None when absent."""
-    path = reconciliations_path(root)
-    if not path.is_file():
+    options = {} if _source_io is None else {"_source_io": _source_io}
+    path = reconciliations_path(root, **options)
+    if not sp._source_is_file(path, _source_io):
         return None
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    raw = path.read_bytes() if _source_io is None else _source_io.read_bytes(path)
+    return hashlib.sha256(raw).hexdigest()
 
 
 # ── per-pairing status + per-domain rollup ──────────────────────────────────
@@ -640,7 +654,7 @@ def domain_state(pairing_statuses: list[str], domain_records: list[dict],
     return STATE_NO_INVARIANT
 
 
-def evidence_resolves(evidence: str, repo_root: Path | None) -> bool:
+def evidence_resolves(evidence: str, repo_root: Path | None, *, _source_io=None) -> bool:
     """Whether one `path:line-range` evidence string resolves INSIDE the repo
     root: the grammar matches, the path is contained, and it names a file.
     The line range is not checked against the file's length — CHK-OBS-EVIDENCE
@@ -652,7 +666,9 @@ def evidence_resolves(evidence: str, repo_root: Path | None) -> bool:
     which follows symlinks — so a committed `link -> /etc` made
     `link/passwd:1-1` render `resolves: yes`. `observation_evidence` holds the
     one correct implementation; this is one of its two call sites."""
-    return oe.evidence_entry_resolves(repo_root, evidence)
+    if _source_io is None:
+        return oe.evidence_entry_resolves(repo_root, evidence)
+    return oe.evidence_entry_resolves(repo_root, evidence, _source_io=_source_io)
 
 
 def domain_authority(domain_records: list[dict]) -> str | None:
@@ -669,6 +685,18 @@ def build_domain_entries(records: list[dict], invariants: list[dict],
                          reconciliations: list[dict], bindings: dict,
                          governs_from: int | None, *, tree_name: str = "bionic",
                          repo_root: Path | None = None) -> list[dict]:
+    """Preserve the legacy interface; measure files before the pure core."""
+    evidence = {(row["handle"], ev): evidence_resolves(ev, repo_root)
+                for row in sp.live_records(records) if row.get("source_kind") == "observation"
+                for ev in row.get("evidence", [])}
+    return _build_domain_entries_loaded(records, invariants, reconciliations, bindings,
+        governs_from, tree_name=tree_name, evidence_facts=evidence)
+
+
+def _build_domain_entries_loaded(records: list[dict], invariants: list[dict],
+                                 reconciliations: list[dict], bindings: dict,
+                                 governs_from: int | None, *, tree_name: str,
+                                 evidence_facts: dict) -> list[dict]:
     """One entry per governs domain, sorted by domain name. Each entry carries
     its rules (sorted by `sp.record_sort_key`) with disposition + basis, its
     candidate pairings with per-pairing status, its provenance
@@ -716,7 +744,7 @@ def build_domain_entries(records: list[dict], invariants: list[dict],
         evidence_rows = []
         for rec in drecs:
             if rec.get("source_kind", "adr") == "observation":
-                resolved = [(ev, evidence_resolves(ev, repo_root))
+                resolved = [(ev, evidence_facts[(rec["handle"], ev)])
                             for ev in rec.get("evidence", [])]
                 basis = (BASIS_EVIDENCE_RESOLVES
                          if resolved and all(ok for _, ok in resolved)
@@ -936,7 +964,8 @@ def build_meta(digests: dict) -> str:
 
 
 def input_digests(root: Path, records: list[dict], invariants: list[dict],
-                  governs_from: int | None, observations: Path | None = None) -> dict:
+                  governs_from: int | None, observations: Path | None = None, *,
+                  _source_io=None) -> dict:
     """The deterministic input-digest map stamped into both the index and
     `_meta.json`. Covers ADR frontmatter (the rule source), the invariant
     ledger facets doctrine reads, the reconciliation ledger bytes, the
@@ -945,23 +974,327 @@ def input_digests(root: Path, records: list[dict], invariants: list[dict],
     survey receipts (`sp.observations_sha256`; the empty-corpus digest on an enabled
     concern with no records, null when the concern is not read). Every input
     the compile reads, and nothing that varies per run."""
-    adrs = sp.adrs_dir(root)
+    options = {} if _source_io is None else {"_source_io": _source_io}
+    adrs = sp.adrs_dir(root, **options)
     return {
-        "adr_frontmatter_sha256": sp.adr_frontmatter_sha256(adrs),
+        "adr_frontmatter_sha256": sp.adr_frontmatter_sha256(adrs, **options),
         "invariants_sha256": invariants_sha256(invariants),
-        "reconciliations_sha256": reconciliations_sha256(root),
-        "observations_sha256": (sp.observations_sha256(observations)
+        "reconciliations_sha256": reconciliations_sha256(root, **options),
+        "observations_sha256": (sp.observations_sha256(observations, **options)
                                 if observations is not None else None),
         # ADR-0098 clause 2: the per-batch survey receipts join the input
         # domain the doctrine compiles from, exactly as they join the
         # summaries one. Null when the tree has signed no batch.
-        "survey_receipts_sha256": (sp.survey_receipts_sha256(observations)
+        "survey_receipts_sha256": (sp.survey_receipts_sha256(observations, **options)
                                    if observations is not None else None),
         "governs_from": governs_from,
         # Bumped 3 -> 4 when the rule table gained its `source_status` column.
+        # The callers overwrite this literal with the published schema "5", which
+        # added the run-bindings digest and the implementation-migration input domain.
         # Same rule as the summaries projection's literal: a declared schema that
         # identifies output shape bumps on an additive change, because nothing
         # else tells a reader which contract the file was written against.
         "schema": "4",
         "tool": "compile-doctrine.py",
     }
+
+
+def _doctrine_source_models(data: dict) -> None:
+    """Validate every authority-bearing input before compiling output parts."""
+    sp._plain_summary_value(data)
+    rows = data["records"]
+    sp._projection_require(isinstance(rows, list), "doctrine records must be a list")
+    for row in rows:
+        sp._projection_require(isinstance(row, dict) and all(isinstance(row.get(k), str)
+            for k in ("handle", "source_adr", "domain", "rule", "scope", "provenance"))
+            and type(row.get("adr_num")) is int and row["adr_num"] == sp.adr_num(row["source_adr"])
+            and row["handle"].startswith(row["source_adr"] + "/") and "historical" not in row
+            and (sp._HANDLE_ANCHOR_RE.fullmatch(row["handle"]) or sp._OBS_HANDLE_ANCHOR_RE.fullmatch(row["handle"]))
+            and row["provenance"] in sp.PROVENANCE_ENUM
+            and row.get("source_kind", "adr") in ("adr", "observation")
+            and (row.get("source_status") is None or isinstance(row["source_status"], str))
+            and isinstance(row.get("retires", []), list) and all(isinstance(h, str)
+                and sp._HANDLE_ANCHOR_RE.fullmatch(h) for h in row.get("retires", []))
+            and isinstance(row.get("evidence", []), list) and all(isinstance(ev, str)
+                for ev in row.get("evidence", [])), "doctrine source model invalid")
+    sp._projection_require(isinstance(data["invariants"], list) and len({i["id"] for i in data["invariants"]})
+        == len(data["invariants"]), "doctrine duplicate invariant")
+    for inv in data["invariants"]:
+        sp._projection_require(isinstance(inv, dict) and set(inv) == {
+            "id", "ratification", "related_adrs", "invariant_text", "path"}
+            and isinstance(inv["id"], str) and _INV_ID_RE.fullmatch(inv["id"])
+            and isinstance(inv["ratification"], str) and isinstance(inv["invariant_text"], str)
+            and isinstance(inv["related_adrs"], list) and all(isinstance(a, str) for a in inv["related_adrs"])
+            and (inv["path"] is None or isinstance(inv["path"], str)), "doctrine invariant model invalid")
+    import yaml
+    sp._projection_require(isinstance(data["reconciliations"], list), "doctrine ledger model invalid")
+    parse_reconciliations(yaml.safe_dump(dict(config_version="1", reconciliations=data["reconciliations"])))
+    ledger = data["ledger"]
+    sp._projection_require(isinstance(ledger, dict) and set(ledger) == {"path", "text"}
+        and sp._summary_relative_path(ledger["path"]) and Path(ledger["path"]).parts[-3:] ==
+        ("adrs", "doctrine", RECONCILIATIONS_FILENAME) and
+        (ledger["text"] is None or isinstance(ledger["text"], str)), "doctrine raw ledger model invalid")
+    sp._projection_require(data["reconciliations"] ==
+        (parse_reconciliations(ledger["text"]) if ledger["text"] is not None else []),
+        "doctrine raw and normalized ledger disagree")
+    bindings = data["bindings"]
+    sp._projection_require(isinstance(bindings, dict), "doctrine bindings model invalid")
+    for source, binding in bindings.items():
+        sp._projection_require(isinstance(source, str) and re.fullmatch(r"(?:[A-Z][A-Z0-9]{1,9}-)?ADR-\d{4}", source)
+            and isinstance(binding, dict) and set(binding) == {"books", "runs"}
+            and all(isinstance(binding[k], list) and all(isinstance(s, str) for s in binding[k])
+                    for k in ("books", "runs")), "doctrine binding fields invalid")
+    sp._projection_require(isinstance(data["tree_name"], str) and isinstance(data["aliases"], dict)
+        and isinstance(data["removed"], dict) and isinstance(data["evidence_facts"], list)
+        and isinstance(data["exempt_entries"], list)
+        and (data["governs_from"] is None or type(data["governs_from"]) is int and data["governs_from"] >= 0),
+        "doctrine loaded fields invalid")
+    for ex in data["exempt_entries"]:
+        sp._projection_require(isinstance(ex, dict) and set(ex) == {"adr", "reason"}
+            and isinstance(ex["adr"], str) and (ex["reason"] is None or isinstance(ex["reason"], str)), "doctrine exemption invalid")
+    for handle, alias in data["aliases"].items():
+        sp._projection_require(isinstance(alias, dict) and set(alias) == {"alias_of", "alias_handles"}
+            and sp._OBS_HANDLE_ANCHOR_RE.fullmatch(handle) and isinstance(alias["alias_of"], str)
+            and isinstance(alias["alias_handles"], list) and all(h in {r["handle"] for r in rows}
+                and h.startswith(alias["alias_of"] + "/") for h in alias["alias_handles"]),
+            "doctrine alias model invalid")
+    sp._projection_require(isinstance(data["archived_handles"], list) and all(isinstance(h, str)
+        and sp._HANDLE_ANCHOR_RE.fullmatch(h) for h in data["archived_handles"]), "doctrine archived handles invalid")
+    signed = {row["handle"] for row in data["reconciliations"] if row["signed"] is not None}
+    problems = sp.retirement_problems(rows, data["removed"], signed, set(data["archived_handles"]))
+    if problems: raise sp.GovernsValidationError(problems)
+
+
+def _doctrine_migration_frame(facts: dict, pending: dict | None, overlay: dict,
+                            history: list) -> dict | None:
+    """Bind selected references and raw dependencies; defer provenance alone."""
+    sp._plain_summary_value(facts); sp._plain_summary_value(history)
+    fields = {"historical_handles", "historical_displacements", "retired_handles", "reserved_slugs",
+              "retained_handles", "source_refs", "dependency_fingerprints"}
+    sp._projection_require(fields <= set(facts) and isinstance(facts["historical_handles"], dict)
+        and all(isinstance(facts[k], list) for k in fields - {"historical_handles"}),
+        "doctrine migration facts invalid")
+    dependencies = {}
+    for ref in facts["dependency_fingerprints"]:
+        sp._projection_require(isinstance(ref, dict) and set(ref) == {"path", "sha256"}
+            and sp._summary_relative_path(ref["path"]) and isinstance(ref["sha256"], str)
+            and sp._DIGEST_RE.fullmatch(ref["sha256"]), "doctrine dependency invalid")
+        sp._projection_require(ref["path"] not in dependencies or dependencies[ref["path"]] == ref["sha256"],
+                              "doctrine conflicting dependencies")
+        dependencies[ref["path"]] = ref["sha256"]
+    selected = {}
+    for ref in facts["source_refs"]:
+        sp._projection_require(isinstance(ref, dict) and set(ref) == {
+            "path", "source_adr", "tier", "status", "source_identity", "clause_sha256"}
+            and sp._summary_relative_path(ref["path"]) and isinstance(ref["source_adr"], str)
+            and sp._ADR_ID_SHAPE_RE.fullmatch(ref["source_adr"]) and ref["tier"] in ("active", "archive")
+            and (ref["status"] is None or isinstance(ref["status"], str)) and all(isinstance(ref[k], str)
+                and sp._DIGEST_RE.fullmatch(ref[k]) for k in ("source_identity", "clause_sha256")),
+            "doctrine selected source invalid")
+        sp._projection_require(ref["source_identity"] not in selected, "doctrine duplicate selected identity")
+        selected[ref["source_identity"]] = ref
+    for fact in facts["historical_handles"].values():
+        source = selected.get(fact["source_identity"])
+        sp._projection_require(source is not None and fact["destination"] == {
+            k: source[k] for k in ("source_adr", "clause_sha256")}, "doctrine historical source mismatch")
+    for ref in history:
+        sp._projection_require(isinstance(ref, dict) and set(ref) == {"path", "sha256", "publication_commit"}
+            and sp._summary_relative_path(ref["path"]) and isinstance(ref["sha256"], str)
+            and sp._DIGEST_RE.fullmatch(ref["sha256"]) and isinstance(ref["publication_commit"], str)
+            and re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", ref["publication_commit"]),
+            "doctrine publication history invalid")
+    if pending is None:
+        sp._projection_require(not selected and not dependencies and not history and
+            not facts["historical_handles"] and not facts["historical_displacements"],
+            "doctrine migration facts lack publication provenance")
+        return None
+    sp._summary_pending_publication(pending)
+    batch = pending["close_identity"]["batch"]
+    sp._projection_require(dependencies.get(batch["path"]) == batch["sha256"], "doctrine batch snapshot missing")
+    publication = dict(path=pending["path"], sha256=pending["sha256"], publication_commit=sp._PublicationCommitSlot())
+    for group in overlay["historical_displacements"].values():
+        for edge in group:
+            source = selected.get(edge["source_identity"])
+            sp._projection_require(source is not None and edge["source_ref"] == {
+                k: source[k] for k in ("path", "source_adr", "clause_sha256")} and
+                edge["source_displacer"] in set(facts["historical_handles"]) | set(facts["retained_handles"]),
+                "doctrine displacement source mismatch")
+            if "publication_ref" in edge: sp._committed_publication_ref(pending, edge["publication_ref"])
+            edge["publication_ref"] = publication
+    return dict(publication=publication, close_identity=pending["close_identity"], publication_history=history,
+        source_refs=sorted(selected.values(), key=lambda s: s["source_identity"]),
+        dependency_fingerprints=[dict(path=p, sha256=s) for p, s in sorted(dependencies.items())],
+        historical_displacements=overlay["historical_displacements"], historical_slugs=overlay["historical_slugs"])
+
+
+class _DoctrineOutputPlan(tuple):
+    """Immutable compiled parts; every policy decision precedes materialization."""
+    __slots__ = ()
+
+
+def _plan_doctrine_outputs(loaded_inputs: dict, migration_facts: dict,
+                           pending_publication: dict | None) -> _DoctrineOutputPlan:
+    expected = {"tree", "paths", "records", "invariants", "reconciliations", "bindings", "governs_from",
+        "tree_name", "evidence_facts", "exempt_entries", "digests", "aliases", "removed", "publication_history", "ledger", "archived_handles"}
+    sp._projection_require(isinstance(loaded_inputs, dict) and set(loaded_inputs) == expected,
+                          "doctrine loaded shape invalid")
+    data = {k: v for k, v in loaded_inputs.items() if k not in ("tree", "paths")}
+    _doctrine_source_models(data)
+    tree, paths = loaded_inputs["tree"], loaded_inputs["paths"]
+    sp._plain_summary_value(str(tree))
+    sp._projection_require(isinstance(tree, Path) and tree.is_absolute() and isinstance(paths, dict)
+        and set(paths) == {"index.md", "_meta.json"} and all(isinstance(p, Path) and p.is_absolute()
+            and p == tree / "adrs/doctrine" / name and ".." not in p.parts for name, p in paths.items()),
+        "doctrine destinations invalid")
+    for path in paths.values(): sp._plain_summary_value(str(path))
+    sp._plain_summary_value(migration_facts)
+    fields = {"historical_handles", "historical_displacements", "retired_handles", "reserved_slugs",
+              "retained_handles", "source_refs", "dependency_fingerprints"}
+    sp._projection_require(isinstance(migration_facts, dict) and fields <= set(migration_facts)
+        and isinstance(migration_facts["historical_handles"], dict)
+        and all(isinstance(migration_facts[k], list) for k in fields - {"historical_handles"})
+        and all(isinstance(h, str) and sp._HANDLE_ANCHOR_RE.fullmatch(h)
+            for h in migration_facts["retired_handles"] + migration_facts["retained_handles"])
+        and all(isinstance(s, str) for s in migration_facts["reserved_slugs"]), "doctrine migration fields invalid")
+    overlay = sp._summary_authority_records(data["records"], migration_facts, data["removed"], data["aliases"])
+    signed = {row["handle"] for row in data["reconciliations"] if row["signed"] is not None}
+    sp._projection_require(not signed.intersection(edge["target_handle"] for edge in migration_facts["historical_displacements"]),
+                          "doctrine displacement would orphan a signed pairing")
+    evidence = {}
+    for ev in data["evidence_facts"]:
+        sp._projection_require(isinstance(ev, dict) and set(ev) == {"handle", "evidence", "resolves"}
+            and isinstance(ev["handle"], str) and isinstance(ev["evidence"], str) and type(ev["resolves"]) is bool
+            and (ev["handle"], ev["evidence"]) not in evidence, "doctrine evidence fact invalid")
+        evidence[ev["handle"], ev["evidence"]] = ev["resolves"]
+    needed = {(r["handle"], ev) for r in sp.live_records(overlay["records"])
+        if r.get("source_kind") == "observation" for ev in r.get("evidence", [])}
+    sp._projection_require(set(evidence) == needed, "doctrine evidence snapshot incomplete")
+    entries = _build_domain_entries_loaded(overlay["records"], data["invariants"], data["reconciliations"],
+        data["bindings"], data["governs_from"], tree_name=data["tree_name"], evidence_facts=evidence)
+    digests = dict(data["digests"])
+    sp._projection_require(set(digests) == {"adr_frontmatter_sha256", "invariants_sha256", "reconciliations_sha256",
+        "observations_sha256", "survey_receipts_sha256", "governs_from", "schema", "tool", "run_bindings_sha256",
+        "input_domain"} and digests["schema"] == "5" and digests["tool"] == "compile-doctrine.py"
+        and digests["governs_from"] == data["governs_from"] and isinstance(digests["input_domain"], list)
+        and len(set(digests["input_domain"])) == len(digests["input_domain"])
+        and set(digests["input_domain"]) <= {"adrs", "invariants", "reconciliations", "run-bindings", "observations", "survey-receipts"},
+        "doctrine digest model invalid")
+    for key, value in digests.items():
+        if key.endswith("_sha256"):
+            sp._projection_require(value is None and key in {"observations_sha256", "survey_receipts_sha256", "reconciliations_sha256"} or
+                isinstance(value, str) and sp._DIGEST_RE.fullmatch(value), "doctrine input digest invalid")
+    sp._projection_require(digests["invariants_sha256"] == invariants_sha256(data["invariants"])
+        and digests["run_bindings_sha256"] == hashlib.sha256(json.dumps(data["bindings"], sort_keys=True,
+            separators=(",", ":")).encode()).hexdigest(), "doctrine loaded input frame mismatch")
+    ledger_digest = hashlib.sha256(data["ledger"]["text"].encode()).hexdigest() if data["ledger"]["text"] is not None else None
+    sp._projection_require(digests["reconciliations_sha256"] == ledger_digest and
+        all(ref["sha256"] == ledger_digest for ref in migration_facts["dependency_fingerprints"]
+            if ref["path"] == data["ledger"]["path"]), "doctrine bound raw ledger frame mismatch")
+    frame = _doctrine_migration_frame(migration_facts, pending_publication, overlay, data["publication_history"])
+    index_parts = (build_index(entries, data["exempt_entries"], digests),)
+    if frame is not None:
+        fingerprint = sp._SummaryHashSlot(sp._compile_summary_json(frame, pretty=False))
+        digests.update(migration=frame, migration_inputs_sha256=fingerprint,
+            input_domain=sorted(set(digests["input_domain"]) | {"implementation-migration"}))
+        index_parts += ("\n- `migration_inputs_sha256`: `", fingerprint, "`\n")
+    parts = ((paths["index.md"], index_parts),
+             (paths["_meta.json"], sp._compile_summary_json(digests) + ("\n",)))
+    for _, chunks in parts:
+        for chunk in chunks:
+            if isinstance(chunk, str): chunk.encode("utf-8")
+    return _DoctrineOutputPlan(parts)
+
+
+def _materialize_doctrine_outputs(plan: _DoctrineOutputPlan,
+                                  committed_publication_ref: sp._CommittedPublicationRef | None) -> dict[Path, bytes]:
+    commit = committed_publication_ref.commit if committed_publication_ref is not None else None
+    return {path: sp._render_summary_parts(parts, commit).encode("utf-8") for path, parts in plan}
+
+
+def _load_doctrine_inputs(root: Path, manifest: dict) -> tuple[dict, dict, dict | None, dict | None]:
+    """Obtain fresh public proof, then preload all evidence and source facts."""
+    import implementation_migration as migration
+    root = Path(root).absolute()
+    view = migration.authority_view(root)
+    declared = sp.declared_input_domain(doctrine_dir(root))
+    sp._projection_require(declared is None or isinstance(declared, list) and
+        set(declared) <= {"adrs", "invariants", "reconciliations", "run-bindings", "observations", "survey-receipts", "implementation-migration"},
+        "doctrine declared input domain invalid")
+    sp._projection_require(not declared or "implementation-migration" not in declared or view["state"] == "published",
+                          "doctrine declared migration input unavailable")
+    sp._projection_require(not declared or "observations" not in declared or
+        sp.observations_source_problem(root, sp.read_manifest(root)) is None,
+        "doctrine declared observations input unavailable")
+    adrs = sp.adrs_dir(root); tree = sp.resolve_tree(root)
+    concerns = manifest.get("concerns_enabled") or []
+    if not adrs.is_dir() and not ("adrs" not in concerns and "observations" in concerns):
+        raise FileNotFoundError(f"{adrs} not found")
+    gf = sp.governs_from(manifest); observations = sp.observations_source(root, manifest)
+    records = sp.collect_records(adrs, governs_from=gf, observations=observations)
+    reviews = sp.read_reviews(adrs); removed = sp.removed_handles(reviews)
+    aliases = sp.collect_observation_alias_rows(observations, records)
+    overlay = sp._summary_authority_records(records, view, removed, aliases)
+    invariants = read_invariants(root)
+    ledger_path = reconciliations_path(root)
+    ledger_text = ledger_path.read_bytes().decode("utf-8") if ledger_path.is_file() else None
+    reconciliations = parse_reconciliations(ledger_text) if ledger_text is not None else []
+    bindings = {source: {key: sorted(value) for key, value in binding.items()} for source, binding
+                in sp.read_run_bindings(sp.runs_dir(root), repo_root=root).items()}
+    evidence = [dict(handle=row["handle"], evidence=ev, resolves=evidence_resolves(ev, root))
+        for row in sp.live_records(overlay["records"]) if row.get("source_kind") == "observation"
+        for ev in sorted(set(row.get("evidence", [])))]
+    digests = input_digests(root, records, invariants, gf, observations)
+    digests.update(schema="5", input_domain=["adrs", "invariants", "reconciliations", "run-bindings"] +
+        (["observations", "survey-receipts"] if observations is not None else []),
+        run_bindings_sha256=hashlib.sha256(json.dumps(bindings, sort_keys=True, separators=(",", ":")).encode()).hexdigest())
+    loaded = dict(tree=tree, paths={name: tree / "adrs/doctrine" / name for name in ("index.md", "_meta.json")},
+        records=records, invariants=[{**inv, "path": str(inv["path"]) if inv["path"] is not None else None} for inv in invariants],
+        reconciliations=reconciliations, bindings=bindings, governs_from=gf, tree_name=sp.tree_name(root),
+        evidence_facts=evidence, exempt_entries=sp.governs_exempt_entries(manifest), digests=digests,
+        aliases=aliases, removed=removed, ledger=dict(path=ledger_path.relative_to(root).as_posix(), text=ledger_text),
+        archived_handles=sorted(sp.archived_handles(adrs)),
+        publication_history=[{k: row[k] for k in ("path", "sha256", "publication_commit")}
+            for row in view["publications"][:-1]])
+    pending = actual = None
+    if view["state"] == "published":
+        # Reuse the accepted exact batch/selected-clause loader; no proof parser fork.
+        spec = importlib.util.spec_from_file_location("_doctrine_summary_inputs", Path(__file__).with_name("summarize-adrs.py"))
+        driver = importlib.util.module_from_spec(spec); spec.loader.exec_module(driver)
+        _, locator = driver._historical_summary_clauses(root, view)
+        actual = {k: view["publications"][-1][k] for k in ("path", "sha256", "publication_commit")}
+        pending = dict(path=actual["path"], sha256=actual["sha256"], close_identity={k: locator[k] for k in
+            ("batch", "book_id", "run_id", "book_content_hash", "slot", "gate_prompt")})
+        migration._unchanged_inputs(root, view["dependency_fingerprints"] +
+            [dict(path=actual["path"], sha256=actual["sha256"])])
+    return loaded, view, pending, actual
+
+
+def _doctrine_destinations(root: Path, *, _source_io=None) -> None:
+    """Read-only preflight of both outputs before the first mutation."""
+    options = {} if _source_io is None else {"_source_io": _source_io}
+    tree = sp.resolve_tree(root, **options)
+    for name in ("index.md", "_meta.json"):
+        path = tree / "adrs/doctrine" / name
+        if sp._source_resolve(tree, _source_io) not in sp._source_resolve(path.parent, _source_io).parents:
+            raise OSError("doctrine destination escapes the validated tree")
+        if _source_io is not None:
+            entry = _source_io.metadata(path)
+            temporary = _source_io.metadata(path.with_suffix(path.suffix + ".tmp"))
+            if (entry is not None and not stat.S_ISREG(entry["st_mode"])) or temporary is not None:
+                raise OSError("doctrine destination is symlinked or has an owned temporary path")
+            continue
+        if path.is_symlink() or path.exists() and not path.is_file() or \
+                path.with_suffix(path.suffix + ".tmp").exists() or path.with_suffix(path.suffix + ".tmp").is_symlink():
+            raise OSError("doctrine destination is symlinked or has an owned temporary path")
+
+
+def _bound_reconciliation_write_refusal(root: Path, proposed_text: str) -> str | None:
+    """Compare proposed raw ledger bytes to fresh binding before mkdir or write."""
+    import implementation_migration as migration
+    view = migration.authority_view(root)
+    relative = reconciliations_path(root).relative_to(root).as_posix()
+    bound = {ref["sha256"] for ref in view["dependency_fingerprints"] if ref["path"] == relative}
+    sp._projection_require(len(bound) <= 1, "doctrine conflicting bound ledger fingerprints")
+    if bound and hashlib.sha256(proposed_text.encode("utf-8")).hexdigest() not in bound:
+        return "reconciliation ledger is bound by a published migration; use the reviewed successor/disposition process before changing its bytes"
+    return None

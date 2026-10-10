@@ -59,6 +59,7 @@ Before invoking the script, confirm:
 1. The tree exists and `<docs_dir>/manifest.yml` is present.
 2. **`arch` is enabled** — `arch` appears in `manifest.yml`'s `concerns_enabled`. arch is **additive**; it is **default-on for new repos** (`init-docs` enrolls it) and **opt-in for existing trees that predate the default**. If `arch` is absent from `concerns_enabled`, enabling it is a one-line addition (no `schema_version` bump, no migration). If the user asked to build arch on a tree where it is not enabled, add `arch` to `concerns_enabled` first (a `schema` log op), then derive.
 3. The repo root is resolved (per §0 below).
+4. Git history is complete. A tree that has published a clause migration needs full Git history. In a shallow clone (the default `actions/checkout` depth of 1 in CI, for example) the governing readers (summaries, doctrine, rules catalog, arch and reviews index) refuse with `history-unavailable`. Set `fetch-depth: 0` in CI, or run `git fetch --unshallow` locally.
 
 If a prerequisite fails: tell the user what to fix and STOP. Do not silently write nothing.
 

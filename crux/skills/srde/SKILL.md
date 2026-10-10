@@ -29,6 +29,10 @@ This skill is portable across Claude Code, Codex, and OpenCode. This section ove
 
 The all-strategies-fail path is a feature, not an error: SRDE's job is to auto-resolve what it *can* and to make the residue visible — never to manufacture a resolution it doesn't have.
 
+## Evidence tool, never a gate
+
+SRDE is an evidence tool on the verify path of an `iterate` cycle. The patch path does not run it. A dissent it resolves enters the next council round's question. The gate stays blocked until a round converges without that dissent. SRDE never runs on the ADR path.[^srde] A RESOLVED status never settles a gate.
+
 ## File Locations
 ```
 crux/scripts/crux/srde/
@@ -195,3 +199,5 @@ class MyDomainResolver(ContextResolver):
 - **PARTIALLY_RESOLVED** — run targeted probe
 - **CANNOT_RESOLVE** — escalate or synthesize probe
 - **NEEDS_SANDBOX** / **NEEDS_HUMAN** — explicit escalation paths
+
+[^srde]: rule:de-wire-srde-from-adr-path, rule:blocking-finding-classification

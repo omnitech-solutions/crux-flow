@@ -1,0 +1,123 @@
+[
+  {
+    "scenario": "success",
+    "advance_exit": 0,
+    "stdout": "{\"run\": \"/private/tmp/crux-pb0140-policy2-oracle/fixtures/success/docs/promptbooks/runs/PB-0999-fixture/run-RUN-001.yaml\", \"current_prompt\": 5, \"status\": \"in_progress\", \"terminal\": \"4/13\", \"gate\": {\"class\": \"module-close\", \"module_tag\": \"implementation-1\", \"ordinal\": 4, \"phase\": null, \"cycle_fields\": \"run-start\", \"verdict\": \"pass\", \"stops\": [], \"reasons\": [\"docs/promptbooks/runs/PB-0999-fixture/council/round.json decides the gate\"], \"deciding_record\": \"docs/promptbooks/runs/PB-0999-fixture/council/round.json\", \"route_to\": null, \"holds\": [], \"changed_subjects\": [], \"withheld_subjects\": []}, \"withdrawn\": [], \"correction_notice\": null}\n",
+    "stderr": "",
+    "replay": "approved",
+    "profile": "2",
+    "binding": {
+      "slot": "implementation-1",
+      "book_id": "PB-0999",
+      "run_id": "RUN-001",
+      "book_content_hash": "sha256:cfc5c4d7ec024e2b761a9aebb76b0272c33838e339dd9dcd432c466bd48761b9",
+      "revision": {
+        "path": "docs/promptbooks/runs/PB-0999-fixture/implementations/RUN-001/strategy/revision-001.yaml",
+        "sha256": "079eaf2597e16fb8509f7043e732b5fb4bd8579fc627640db26481f7b2175ea0"
+      },
+      "gate_prompt": 4,
+      "deciding_record": {
+        "path": "docs/promptbooks/runs/PB-0999-fixture/council/round.json",
+        "sha256": "cb91966ae3d7d8b53a7f15cc9b16f273e554bb75ab1275fcb47e572989d54f3b"
+      },
+      "retained_subject": {
+        "path": "docs/promptbooks/runs/PB-0999-fixture/council/subjects/revision.yaml",
+        "sha256": "079eaf2597e16fb8509f7043e732b5fb4bd8579fc627640db26481f7b2175ea0"
+      },
+      "context": {
+        "path": "docs/promptbooks/runs/PB-0999-fixture/gate-contexts/RUN-001/implementation-1/context-4d2af73d910502a05e6ab22438be9e7ef9ffa965a52a8704f3d379e5cc1bd20a.json",
+        "sha256": "4d2af73d910502a05e6ab22438be9e7ef9ffa965a52a8704f3d379e5cc1bd20a"
+      }
+    },
+    "run_path": "/private/tmp/crux-pb0140-policy2-oracle/fixtures/success/docs/promptbooks/runs/PB-0999-fixture/run-RUN-001.yaml",
+    "revision_path": "docs/promptbooks/runs/PB-0999-fixture/implementations/RUN-001/strategy/revision-001.yaml",
+    "revision_sha256": "079eaf2597e16fb8509f7043e732b5fb4bd8579fc627640db26481f7b2175ea0",
+    "slot": "implementation-1"
+  },
+  {
+    "scenario": "held",
+    "advance_exit": 1,
+    "stdout": "{\"error\": \"the gate does not pass (stop): docs/promptbooks/runs/PB-0999-fixture/council/round.json holds: openai_top neither approved nor named a blocking finding; nothing was written\", \"gate\": {\"class\": \"module-close\", \"module_tag\": \"implementation-1\", \"ordinal\": 4, \"phase\": null, \"cycle_fields\": \"run-start\", \"verdict\": \"stop\", \"stops\": [1], \"reasons\": [\"docs/promptbooks/runs/PB-0999-fixture/council/round.json holds: openai_top neither approved nor named a blocking finding\"], \"deciding_record\": \"docs/promptbooks/runs/PB-0999-fixture/council/later.json\", \"route_to\": null, \"holds\": [\"docs/promptbooks/runs/PB-0999-fixture/council/round.json:openai_top\"], \"changed_subjects\": [], \"withheld_subjects\": []}, \"withdrawn\": [], \"correction_notice\": null}\n",
+    "stderr": "",
+    "replay": "refused-close",
+    "run_bytes_unchanged": true
+  },
+  {
+    "scenario": "third-place",
+    "advance_exit": 0,
+    "stdout": "{\"run\": \"/private/tmp/crux-pb0140-policy2-oracle/fixtures/third-place/docs/promptbooks/runs/PB-0999-fixture/run-RUN-001.yaml\", \"current_prompt\": 5, \"status\": \"in_progress\", \"terminal\": \"4/13\", \"gate\": {\"class\": \"module-close\", \"module_tag\": \"implementation-1\", \"ordinal\": 4, \"phase\": null, \"cycle_fields\": \"run-start\", \"verdict\": \"pass\", \"stops\": [], \"reasons\": [\"docs/promptbooks/runs/PB-0999-fixture/council/round.json decides the gate\"], \"deciding_record\": \"docs/promptbooks/runs/PB-0999-fixture/council/round.json\", \"route_to\": null, \"holds\": [], \"changed_subjects\": [], \"withheld_subjects\": []}, \"withdrawn\": [], \"correction_notice\": null}\n",
+    "stderr": "",
+    "replay": "approved",
+    "profile": "2",
+    "binding": {
+      "slot": "implementation-1",
+      "book_id": "PB-0999",
+      "run_id": "RUN-001",
+      "book_content_hash": "sha256:cfc5c4d7ec024e2b761a9aebb76b0272c33838e339dd9dcd432c466bd48761b9",
+      "revision": {
+        "path": "docs/promptbooks/runs/PB-0999-fixture/implementations/RUN-001/strategy/revision-001.yaml",
+        "sha256": "079eaf2597e16fb8509f7043e732b5fb4bd8579fc627640db26481f7b2175ea0"
+      },
+      "gate_prompt": 4,
+      "deciding_record": {
+        "path": "docs/promptbooks/runs/PB-0999-fixture/council/round.json",
+        "sha256": "09faa755e0e0371038d5231dc1bca9a5f8c20f7c80c97bcd43f6eb9f7e69abc2"
+      },
+      "retained_subject": {
+        "path": "docs/promptbooks/runs/PB-0999-fixture/council/subjects/revision.yaml",
+        "sha256": "079eaf2597e16fb8509f7043e732b5fb4bd8579fc627640db26481f7b2175ea0"
+      },
+      "context": {
+        "path": "docs/promptbooks/runs/PB-0999-fixture/gate-contexts/RUN-001/implementation-1/context-a94857dad4d7ef269ebf4e01b3d85bf48518789c62356099f9cd4054f64c4122.json",
+        "sha256": "a94857dad4d7ef269ebf4e01b3d85bf48518789c62356099f9cd4054f64c4122"
+      }
+    },
+    "run_path": "/private/tmp/crux-pb0140-policy2-oracle/fixtures/third-place/docs/promptbooks/runs/PB-0999-fixture/run-RUN-001.yaml",
+    "revision_path": "docs/promptbooks/runs/PB-0999-fixture/implementations/RUN-001/strategy/revision-001.yaml",
+    "revision_sha256": "079eaf2597e16fb8509f7043e732b5fb4bd8579fc627640db26481f7b2175ea0",
+    "slot": "implementation-1"
+  },
+  {
+    "scenario": "valid-exception",
+    "advance_exit": 0,
+    "stdout": "{\"run\": \"/private/tmp/crux-pb0140-policy2-oracle/fixtures/valid-exception/docs/promptbooks/runs/PB-0999-fixture/run-RUN-001.yaml\", \"current_prompt\": 5, \"status\": \"in_progress\", \"terminal\": \"4/13\", \"gate\": {\"class\": \"module-close\", \"module_tag\": \"implementation-1\", \"ordinal\": 4, \"phase\": null, \"cycle_fields\": \"run-start\", \"verdict\": \"pass\", \"stops\": [], \"reasons\": [\"docs/promptbooks/runs/PB-0999-fixture/council/round.json decides the gate\"], \"deciding_record\": \"docs/promptbooks/runs/PB-0999-fixture/council/round.json\", \"route_to\": null, \"holds\": [], \"changed_subjects\": [], \"withheld_subjects\": []}, \"withdrawn\": [], \"correction_notice\": null}\n",
+    "stderr": "",
+    "replay": "approved",
+    "profile": "2",
+    "binding": {
+      "slot": "implementation-1",
+      "book_id": "PB-0999",
+      "run_id": "RUN-001",
+      "book_content_hash": "sha256:cfc5c4d7ec024e2b761a9aebb76b0272c33838e339dd9dcd432c466bd48761b9",
+      "revision": {
+        "path": "docs/promptbooks/runs/PB-0999-fixture/implementations/RUN-001/strategy/revision-001.yaml",
+        "sha256": "079eaf2597e16fb8509f7043e732b5fb4bd8579fc627640db26481f7b2175ea0"
+      },
+      "gate_prompt": 4,
+      "deciding_record": {
+        "path": "docs/promptbooks/runs/PB-0999-fixture/council/round.json",
+        "sha256": "a905d74412ca97a6a98d8b53736653a722457533dd4e0eda8b0b672bd950db91"
+      },
+      "retained_subject": {
+        "path": "docs/promptbooks/runs/PB-0999-fixture/council/subjects/revision.yaml",
+        "sha256": "079eaf2597e16fb8509f7043e732b5fb4bd8579fc627640db26481f7b2175ea0"
+      },
+      "context": {
+        "path": "docs/promptbooks/runs/PB-0999-fixture/gate-contexts/RUN-001/implementation-1/context-f38cf8b5d609f74399e446d31a74d8352769b57d16ac4942845b3aa860e939f6.json",
+        "sha256": "f38cf8b5d609f74399e446d31a74d8352769b57d16ac4942845b3aa860e939f6"
+      }
+    },
+    "run_path": "/private/tmp/crux-pb0140-policy2-oracle/fixtures/valid-exception/docs/promptbooks/runs/PB-0999-fixture/run-RUN-001.yaml",
+    "revision_path": "docs/promptbooks/runs/PB-0999-fixture/implementations/RUN-001/strategy/revision-001.yaml",
+    "revision_sha256": "079eaf2597e16fb8509f7043e732b5fb4bd8579fc627640db26481f7b2175ea0",
+    "slot": "implementation-1"
+  },
+  {
+    "scenario": "wrong-exception",
+    "advance_exit": 1,
+    "stdout": "{\"error\": \"the gate does not pass (stop): docs/promptbooks/runs/PB-0999-fixture/council/round.json takes place 4, above the round bound; no owner exception authorizes it; nothing was written\", \"gate\": {\"class\": \"module-close\", \"module_tag\": \"implementation-1\", \"ordinal\": 4, \"phase\": null, \"cycle_fields\": \"run-start\", \"verdict\": \"stop\", \"stops\": [1], \"reasons\": [\"docs/promptbooks/runs/PB-0999-fixture/council/round.json takes place 4, above the round bound; no owner exception authorizes it\"], \"deciding_record\": \"docs/promptbooks/runs/PB-0999-fixture/council/round.json\", \"route_to\": null, \"holds\": [], \"changed_subjects\": [], \"withheld_subjects\": []}, \"withdrawn\": [], \"correction_notice\": null}\n",
+    "stderr": "",
+    "replay": "refused-close",
+    "run_bytes_unchanged": true
+  }
+]

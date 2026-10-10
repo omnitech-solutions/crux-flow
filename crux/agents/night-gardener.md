@@ -32,8 +32,11 @@ which shape to ask about.
 
 For a current-belief question — what the project currently holds to be true,
 and whether it is live or only on paper — read `docs/adrs/doctrine/` first,
-then `docs/adrs/summaries/`; the ADR body is the record and wins if they
-disagree.
+then `docs/adrs/summaries/`. For a live architectural clause, the ADR body wins
+a disagreement, within its lifecycle status and any validated migration
+disposition; a demoted clause is historical record and holds no live authority.
+A replaced Implementation Decision needs no lifecycle transition; never flag it
+for deprecation.
 
 ## Your lane
 

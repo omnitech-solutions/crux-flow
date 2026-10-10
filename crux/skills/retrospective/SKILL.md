@@ -168,7 +168,7 @@ For each in-scope forged skill, list its **raw accumulated `evaluated` evidence 
 
 ### Phase 4 — Council Gate
 
-Each proposal (up to 2) goes to the real 3-model council (invoke `council`). When the environment lacks LLM provider keys for full multi-model deliberation, use the sanctioned parallel-reviewer fallback: run two reviewer agents who independently re-grep the citations and evaluate the rubric, then aggregate their verdicts under the same fail-closed semantics.
+Each proposal (up to 2) goes to the real 3-model council, run through the `council` skill's async driver. When the council cannot run (no key, a refused assignment, fewer than three providers, or no quorum), the proposal is not built and defers to the owner as residue.[^defer] No reviewer agent takes the council's place.
 
 **The council prompt must:**
 - Frame the owner decisions and this rubric as **fixed inputs** — the council evaluates against the rubric; it does not relitigate the design.
@@ -195,7 +195,7 @@ R1–R4 are hard floors: a REVISE on any of them is not overridden by a strong R
 - `REVISE` — findings surface; fold them and re-convene (see loop mechanics below).
 - `REJECT-as-out-of-scope` — route as residue (naming the appropriate valve).
 
-**Split verdict:** an irreconcilable split (reviewers cannot reach a shared verdict AND there are no REVISE findings to fold) fails closed to the owner immediately, on any round — this is an independent exit condition, not gated behind the loop budget. Record the split, the positions, and surface to the owner for a decision. Do not proceed to build on a split. The ≤3-loop budget applies only to REVISE verdicts where findings exist to fold.
+**Split verdict:** an irreconcilable split (the council's seats cannot reach a shared verdict AND there are no REVISE findings to fold) fails closed to the owner immediately, on any round — this is an independent exit condition, not gated behind the loop budget. Record the split, the positions, and surface to the owner for a decision. Do not proceed to build on a split. The ≤3-loop budget applies only to REVISE verdicts where findings exist to fold.
 
 **Loop mechanics:** on `REVISE`, fold the findings into the proposal — narrow the scope, swap cited evidence within the frozen harvest set, rename the subject. Reconvene the full rubric. At most **3 revise loops per proposal**. After 3 non-converging loops, record the proposal as not-built with the loop count and final findings; surface to the owner. Do not exceed 3 loops.
 
@@ -331,6 +331,8 @@ No new `docs/log.md` op is written by the retrospective itself. The `log-work --
 
 - `forge-skill` — the skill this skill builds through; gates are binding; front-door handoff.
 - `council` — the deliberation primitive the council gate invokes; it applies the fixed rubric table given here exactly as written and never extends it.
-- `srde` — when council results are contradictory and need structured resolution before verdict.
+- `srde` — an evidence tool for contradictory council results; it never settles a verdict.
 - `cleanup-campsite` — the hygiene scan whose CLN-RETRO-1 rule fires the cadence nudge.
 - `log-work` — the journal write that creates the cadence anchor (`--silent --journal`).
+
+[^defer]: rule:only-a-preflight-refusal-is-retried

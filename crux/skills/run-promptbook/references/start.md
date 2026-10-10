@@ -33,6 +33,21 @@ This is a DIFFERENT act from a deliberate abandonment and the `kind` is what dis
 
 Walk `docs/promptbooks/runs/PB-NNNN-<slug>/`. Find the maximum existing `run-RUN-NNN.{md,yaml}` (enumerate both extensions to preserve monotonic ids across historical runs) and add 1 (or start at `001` if the directory does not exist). Per-book monotonic, zero-padded to 3 digits. Never reuse a historical Markdown run number.
 
+### Format-two creation boundary
+
+For a format-two book, invoke the thin start writer after allocating the run id:
+
+```bash
+uv run "${CRUX_PLUGIN_ROOT}/scripts/start-run.py" <book.yaml> --run-id RUN-NNN --output <run-RUN-NNN.yaml>
+```
+
+The writer validates the canonical book shape and frozen hash before publication.
+It creates format-two run state with `implementation_bindings: []`, records the
+required available full-history base commit, and refuses overwrites and unsafe paths.
+The skill still owns allocation, prior-run disposition, book pointers, indexes and log.
+Do not hand-create format-two bindings or duplicate the validator. The format-one
+creation route below remains unchanged. Preserve the chosen format throughout the run.
+
 ### 3. Write the structured YAML snapshot
 
 Path: `docs/promptbooks/runs/PB-NNNN-<slug>/run-RUN-NNN.yaml`.
@@ -72,6 +87,11 @@ prompts:
 - **`abandonment` is OMITTED at creation.** It is written later, once, either by mode `abandon` (`kind: deliberate`) or by a later run's start-path supersession (`kind: superseded`).
 - **`book_content_hash` (the binding — load-bearing, computed ONCE at start, immutable for the run's life):** compute it by calling the validator's hash function over the book's frozen-plan subset — `${CRUX_PLUGIN_ROOT}/scripts/validate-promptbook.py` (source checkout: `<checkout>/crux/scripts/validate-promptbook.py`) exposes `compute_book_hash(book_dict)` (which internally calls `frozen_plan_subset` and `canonical_json`). Pass the parsed `.yaml` book document; it returns `"sha256:" + sha256(canonical_plan_bytes).hexdigest()`. **Do NOT hand-roll a hash** and do NOT hash the raw file bytes — the hash is over the canonical-JSON of the frozen plan subset (`format_version`, `id`, `title`, `tags`, `total_prompts`, `goal`, `strategy`, plus `modules` and `blast_radius` when present, and each prompt's `n`/`title`/`purpose`/`prompt`/`expected_output` plus `side_effects`/`module_tag`/`phase` when present), EXCLUDING the mutable run-state fields `current_run`/`current_prompt`/`status`. `blast_radius` and `phase` are inside the subset deliberately: that is what fixes a `patch` book's declaration and its phase sequence once the run starts. This is exactly the subset the §4 abandon rule freezes, so the hash is stable across the run-state writes every advance makes; a later mismatch (`audit-docs` CHK-PB-BIND, and for a `patch` book `check-blast-radius.py` at archival) means the plan was edited in place instead of the run being abandoned and a successor book authored.
 - The per-prompt shape is validated by `run.schema.json` (audit invokes `validate-promptbook --kind run`); the lifecycle and archive-eligibility contract is **`docs/AGENTS.md` §11.B**.
+
+For format two, the canonical frozen subset additionally binds `cycle_kind` and
+all slot declarations, including scope, slug and constraint references. It never
+includes later revision selection. Do not compute a parallel hash or copy slot
+selectors into mutable run-start fields. Format-one hash bytes remain unchanged.
 
 On snapshot creation every prompt is `pending`; prompt 1 transitions to `running` on the first advance.
 

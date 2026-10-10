@@ -60,6 +60,7 @@ Before invoking the script, confirm:
 1. The tree exists and `<docs_dir>/manifest.yml` is present.
 2. The repo root is resolved (per step 0 below).
 3. The summaries projection is fresh — see step 1. A drifted summaries projection is a stop-and-fix-first condition, not something to compile over.
+4. Git history is complete. A tree that has published a clause migration needs full Git history. In a shallow clone (the default `actions/checkout` depth of 1 in CI, for example) the governing readers (summaries, doctrine, rules catalog, arch and reviews index) refuse with `history-unavailable`. Set `fetch-depth: 0` in CI, or run `git fetch --unshallow` locally.
 
 If a prerequisite fails: tell the user what to fix and STOP. Do not silently write nothing.
 

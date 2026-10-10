@@ -38,6 +38,60 @@ The record binds the **current live content digest** — a SHA-256 over the inva
 
 **Excluded from run-execution autonomy — a human gate.** Like `backfill-signoff` and `escalate-arch-runtime`, a running promptbook or dev-cycle must NOT invoke this skill unattended. Its writes are reversible in-repo edits, which a started run otherwise treats as pre-authorized — but that default does not reach here, because the authorization this skill needs is a human reading the two texts and choosing a verdict, and no run plan can pre-supply that. A run that reaches a reconciliation-sign-off step STOPS and hands the pairing to the user. This skill also carries `disable-model-invocation: true`, so the model never auto-selects it; the user invokes it by name.
 
+## Migration disposition for one signed historical pairing
+
+Use this explicit mode when a reviewed migration entry affects an existing
+signed pairing. Ordinary reconciliation commands and verdicts retain their
+existing meaning. A migration disposition preserves the signed history and
+records the human's instruction for this specific entry.[^migration-disposition]
+
+First render a concrete proposal without writing:
+
+```bash
+uv run "${CRUX_PLUGIN_ROOT}/scripts/signoff-reconciliation.py" \
+  --migration-disposition <batch-path> --source-identity <clause-identity> \
+  --invariant <slot-A> --handle <old-handle> --dry-run --repo-root <repo-root>
+```
+
+Read the proposal before asking the human. Show the member text, old rule text,
+old signed verdict, text digest, normalized row digest, and raw ledger digest.
+Show the complete migration entry and its digest, historical destination,
+surviving obligations, replacement texts, and each replacement's signature.
+Refusal requires repair before this proposal can be signed. A missing structural
+pairing seed requires the ordinary governing process; never invent a seed.
+
+Obtain a verbatim explicit human instruction to preserve this one signed
+historical pairing and migrate this specific entry. Obtain the human's rationale
+for that disposition. General run approval, council approval, OpenRouter consent,
+and a reconciliation rationale supply no migration verdict. Never infer the
+instruction from a rationale token or approve several pairings together.
+Replacement compatibility requires its own ordinary human verdict against its
+own texts. The old verdict never transfers to a replacement.
+
+After that human reading and instruction, record the receipt:
+
+```bash
+uv run "${CRUX_PLUGIN_ROOT}/scripts/signoff-reconciliation.py" \
+  --migration-disposition <batch-path> --source-identity <clause-identity> \
+  --invariant <slot-A> --handle <old-handle> \
+  --human-instruction <verbatim-human-instruction> --rationale <human-rationale> \
+  [--date YYYY-MM-DD] --repo-root <repo-root>
+```
+
+The writer creates one immutable content-addressed receipt under the configured
+`adrs/migrations/dispositions/` directory. It preserves ledger and projection
+bytes. Exact replay is a no-op; conflicting content refuses. Give the resulting
+path and SHA-256 to the migration batch author for its `signed_dispositions`
+references. Council reviews the final batch including those references; a
+receipt alone supplies no migration authority. Human instructions in the receipt
+are recorded local evidence, without a claim of cryptographic authentication.
+
+This mode remains a human gate. Implementing or testing the producer in synthetic
+fixtures supplies no real human disposition. A real migration waits for the
+specific instruction and rationale after the proposal is ready.
+
+[^migration-disposition]: rule:authority-migration-is-reviewed-and-source-bound
+
 ## When to use
 
 - The user says: "sign off the reconciliation", "reconcile INV-NNNN with ADR-NNNN", "record the reconciliation verdict", "this invariant is compatible with", "mark the collision between".

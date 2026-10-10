@@ -508,7 +508,7 @@ class S5MetaAndRefusalTests(_Base):
         # `survey_receipts_sha256` joins the digests. Null here, because this
         # tree has signed no batch.
         meta = self._meta()
-        self.assertEqual(meta["schema"], "5")
+        self.assertEqual(meta["schema"], "6")
         self.assertNotEqual(meta["schema"], "4")
         self.assertEqual(set(meta), {"adr_frontmatter_sha256", "backfill_reviews_sha256",
                                      "input_domain", "observations_sha256",
@@ -580,7 +580,7 @@ class S5MetaAndRefusalTests(_Base):
             {"schema": "2", "tool": "summarize-adrs.py"}), encoding="utf-8")
         rc, _out, _err = _run_main(["--repo-root", str(self.t.root)])
         self.assertEqual(rc, 0)
-        self.assertEqual(json.loads((self.t.summaries / "_meta.json").read_text())["schema"], "5")
+        self.assertEqual(json.loads((self.t.summaries / "_meta.json").read_text())["schema"], "6")
 
 
 # ── Requirement 6: observations without ADRs ────────────────────────────────

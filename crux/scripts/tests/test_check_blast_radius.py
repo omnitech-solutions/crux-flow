@@ -47,16 +47,32 @@ else:
     HAVE = False
 
 
-def _git(cwd: Path, *args: str) -> None:
-    env = dict(os.environ)
+def _redirect_vars() -> tuple[str, ...]:
+    """The shared list of variables that redirect git to another repository, loaded by path."""
+    spec = importlib.util.spec_from_file_location(
+        "council_records_for_blast_tests", REPO_ROOT / "crux" / "scripts" / "council_records.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod  # a dataclass resolves its module through sys.modules
+    spec.loader.exec_module(mod)
+    return mod.GIT_REDIRECT_VARS
+
+
+_GIT_REDIRECT_VARS = _redirect_vars()
+
+
+def _git(cwd: Path, *args: str) -> str:
+    """Run git with the ambient config and repository redirects neutralized, so a fixture commit
+    never lands in a repository an exported GIT_DIR names, and a verification read never reads one.
+    Returns stdout."""
+    env = {k: v for k, v in os.environ.items() if k not in _GIT_REDIRECT_VARS}
     env.update({
         "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_CONFIG_SYSTEM": os.devnull,
         "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
         "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid",
     })
-    subprocess.run(["git", "-C", str(cwd), *args], check=True,
-                   capture_output=True, text=True, env=env)
+    return subprocess.run(["git", "-C", str(cwd), *args], check=True,
+                          capture_output=True, text=True, env=env).stdout
 
 
 def _write(root: Path, rel: str, text: str = "x\n") -> None:
@@ -66,6 +82,34 @@ def _write(root: Path, rel: str, text: str = "x\n") -> None:
 
 
 @unittest.skipUnless(HAVE, "check-blast-radius.py or PyYAML unavailable")
+@unittest.skipUnless(HAVE_GIT, "git is required")
+class FixtureHarnessTests(unittest.TestCase):
+    """The fixture `_git` commits into the repository it names, whatever GIT_DIR says."""
+
+    def test_the_harness_commits_into_its_own_repository_under_an_ambient_git_dir(self):
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td).resolve()
+            decoy, own = tmp / "decoy", tmp / "own"
+            decoy.mkdir()
+            own.mkdir()
+            _git(decoy, "init", "-q", "-b", "main")
+            _write(decoy, "f")
+            _git(decoy, "add", "-A")
+            _git(decoy, "commit", "-q", "-m", "decoy")
+            head = _git(decoy, "rev-parse", "HEAD").strip()
+            ambient = {"GIT_DIR": str(decoy / ".git"), "GIT_WORK_TREE": str(decoy)}
+            with mock.patch.dict(os.environ, ambient):
+                _git(own, "init", "-q", "-b", "main")
+                _write(own, "g")
+                _git(own, "add", "-A")
+                _git(own, "commit", "-q", "-m", "own")
+            after = _git(decoy, "rev-parse", "HEAD").strip()
+            self.assertEqual(after, head, "a fixture commit landed in the decoy")
+            log = _git(own, "log", "--format=%s").split()
+            self.assertEqual(log, ["own"])
+
+
 class PurePredicateTests(unittest.TestCase):
     """The containment and exclusion predicates, isolated from git."""
 
@@ -147,9 +191,7 @@ class BlastRadiusCheckTests(unittest.TestCase):
         _write(self.root, "bionic/log.md", "log\n")
         _git(self.root, "add", "-A")
         _git(self.root, "commit", "-q", "-m", "base")
-        self.base = subprocess.run(
-            ["git", "-C", str(self.root), "rev-parse", "HEAD"],
-            capture_output=True, text=True, check=True).stdout.strip()
+        self.base = _git(self.root, "rev-parse", "HEAD").strip()
         self.addCleanup(self._td.cleanup)
 
     def _docs(self, blast_radius=("crux/scripts/target.py",), base=None,
@@ -368,8 +410,7 @@ class BlastRadiusCheckTests(unittest.TestCase):
         _write(self.root, "secret/x.py", "secret\n")
         _git(self.root, "add", "-A")
         _git(self.root, "commit", "-q", "-m", "add secret")
-        base = subprocess.run(["git", "-C", str(self.root), "rev-parse", "HEAD"],
-                              capture_output=True, text=True, check=True).stdout.strip()
+        base = _git(self.root, "rev-parse", "HEAD").strip()
         self.base = base
         book, run = self._docs(blast_radius=("crux/scripts",))
         _git(self.root, "mv", "secret/x.py", "crux/scripts/x.py")
@@ -435,8 +476,7 @@ class BaseCommitPinAtTheGateTests(unittest.TestCase):
         self.addCleanup(self._td.cleanup)
 
     def _head(self) -> str:
-        return subprocess.run(["git", "-C", str(self.root), "rev-parse", "HEAD"],
-                              capture_output=True, text=True, check=True).stdout.strip()
+        return _git(self.root, "rev-parse", "HEAD").strip()
 
     def _write_docs(self, base: str) -> None:
         import yaml as _y
@@ -558,15 +598,11 @@ class CrossFrameHostingTests(unittest.TestCase):
         _write(self.root, "crux/scripts/other.py", "original\n")
         _git(self.root, "add", "-A")
         _git(self.root, "commit", "-q", "-m", "base")
-        self.base = subprocess.run(
-            ["git", "-C", str(self.root), "rev-parse", "HEAD"],
-            capture_output=True, text=True, check=True).stdout.strip()
+        self.base = _git(self.root, "rev-parse", "HEAD").strip()
         _write(self.root, "crux/scripts/other.py", "overshoot\n")
         _git(self.root, "add", "-A")
         _git(self.root, "commit", "-q", "-m", "overshoot committed")
-        self.overshot_head = subprocess.run(
-            ["git", "-C", str(self.root), "rev-parse", "HEAD"],
-            capture_output=True, text=True, check=True).stdout.strip()
+        self.overshot_head = _git(self.root, "rev-parse", "HEAD").strip()
 
         # The book stays in the real tree, so the frozen-hash binding is genuine.
         import yaml as _y
@@ -648,8 +684,7 @@ class ExitLaneTests(unittest.TestCase):
         _write(self.root, "a.py")
         _git(self.root, "add", "-A")
         _git(self.root, "commit", "-q", "-m", "base")
-        self.base = subprocess.run(["git", "-C", str(self.root), "rev-parse", "HEAD"],
-                                   capture_output=True, text=True, check=True).stdout.strip()
+        self.base = _git(self.root, "rev-parse", "HEAD").strip()
         import yaml as _y
         self.book = self.root / "bionic/promptbooks/active/PB-0001-x.yaml"
         self.run = self.root / "bionic/promptbooks/runs/PB-0001-x/run-RUN-001.yaml"

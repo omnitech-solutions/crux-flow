@@ -1,6 +1,6 @@
 ---
 name: council
-description: "Convene multiple models to evaluate approaches, tradeoffs, or architectural decisions and return their judgments."
+description: "Convene a three-provider council to judge a decision (\"run the council\", \"ask the council\"); inside a cycle run, the council runner writes the council record that is the gate's evidence."
 context: fork
 model: opus
 metadata:
@@ -28,6 +28,48 @@ This skill is portable across Claude Code, Codex, and OpenCode. This section ove
 <!-- END GENERATED: runtime-compat -->
 
 
+## Gate council or ad-hoc council
+
+Council deliberation runs only through the council runner, and its council record is the only evidence a council gate accepts.[^council] Independent review is a reviewer's examination, and its reviewer report is the only evidence an independent-review gate accepts.[^review] Neither satisfies the other's gate.
+
+Inside a promptbook run, a council gate uses the council runner, `run-council.py`. Run it as a background command:
+
+```bash
+uv run "${CRUX_PLUGIN_ROOT}/scripts/run-council.py" <run-RUN-NNN.yaml> [--prompt N] --round N \
+  --question <question file> --subject <subject file> [--subject <subject file> ...] \
+  [--book <book file>] [--retain-subjects] [--max-tokens 64000] [--timeout 600]
+```
+
+Finish any open Git merge or other sequence before council. Both book formats
+use the current attempt-aware gate. An implementation module uses council kind
+`implementation`, including in a combined architectural book; `combined` is never
+a council kind. Verify and patch retain their existing kinds and dimensions.
+Select an exact formal revision with `--implementation-revision <decision-path>`
+or a migration batch with `--migration-batch <batch-path>`. These selectors are
+mutually exclusive. Also pass that exact path as `--subject` with `--retain-subjects`.
+Keep a batch's role, slot and digest distinct from a revision. Record each subject's
+write-time witness before committing it; never attribute dirty bytes after a refusal.
+New formal closes retain context three/profile four. Historical context two/profile three
+and context one/profile two remain immutable and replay-only, never selected from the book format.
+
+`--prompt` is optional and defaults to the run's current prompt. The run, `--round`, `--question` and at least one `--subject` are required.
+
+`--round` is the number of council records with outcome `ran` already in this module (in a patch book, this prompt), plus one. In an adr module a valid adjudicator refutation record fills place 3. A could-not-run record takes no place, so after you fix its cause you reconvene with the same number. `run-council.py` refuses a mismatch before any call: exit 1, a JSON error on stdout, `"record": null`, and no record written.
+
+The council runner commits the attempt record and the council record itself. Before any council request it commits an attempt record that claims the round. The claim begins a council attempt, one execution of the round, which is distinct from a seat's calls below. A round that began never vanishes: until its own council record resolves it, the gate stops on the open attempt.[^attempt] It verifies that the committed council record holds the bytes it computed.[^match] The gate check (`advance-run.py`) reads only a committed record. Do not commit, edit or delete either record yourself.
+
+The council runner exits with one of three codes. A council runner that ends without an exit code, with a signal or with a code other than 0, 1 and 2 stopped before it reported. Treat it as an exit 2 that names a claimed attempt, and follow the steps under `2` with `--prompt <n>`; never convene another round until recovery reports.[^recover]
+
+- `0`: it wrote, committed and verified a council record that ran.
+- `1`: it committed a council record the gate check stops on, or it refused the call and wrote no council record. The record is a could-not-run record, whose action is DEFER_TO_HUMAN, or a council record that ran but whose full write the secret scan refused: advance `--outcome blocked` with it attached. A refusal prints `"record": null` and leaves nothing to attach. `"refused": "round"` means correct `--round` and run again. `"refused": "prompt"` means `--prompt` is not the run's current prompt: run again with the current prompt or omit `--prompt`. `"refused": "preflight"` means a question or subject failed the input checks before any request: apply each cause's `repair` and run again at the same round. `retype` means correct the path. `commit-run-work` means commit the subject, the run's own witnessed work, with `run-work-witness.py commit <run> --path <path>`. The third preflight refusal at one convening prompt commits a `preflight-retries-spent` record instead, an escalation-loop stop.[^defer] `"refused": "attempt-open"` means an open attempt holds the module: recover it, never claim past it.
+- `2`: no council record was committed. Exit 2 never means nothing was written. When stderr names `timeout`, or names outside work the commit moved, the owner's remedy comes before recovery: report a contradicted-premise stop for the owner. The owner first restores the set-aside work (`git stash list`, or a pre-commit framework's backup patch) and then removes a stale `index.lock` in the git directory. Start recovery only after the owner reports both steps done. When stderr names a claimed attempt, run the process check, probe the lock with `run-council.py --recover <run> --prompt <n> --probe`, and once no live council runner holds it, run `run-council.py --recover <run> --prompt <n>`. Pass `--prompt`: without it recovery cannot recognise a record whose pending copy is already removed, and it reports `nothing-open`. Recovery makes no council request and commits or recognises only the original council record.[^recover] Route each recovery result by the recovery table in `run-promptbook`'s `references/gates.md`. Never convene another round over a claimed attempt. When stderr names no attempt, the prompt cannot advance, and the conductor reports why, as a contradicted-premise stop for the owner.
+
+A step that writes a file it later passes as a subject records a run-work witness after each write: `run-work-witness.py record <run> --prompt N --path <path>`. Never record a witness to repair a preflight refusal: a subject with no witness taken at its write goes to the owner. `run-promptbook`'s `references/gates.md` describes how a conductor issues and advances a gate prompt, repairs a preflight refusal and recovers an open attempt.
+
+The async driver below serves an ad-hoc council only, such as a design question outside a run. It satisfies no promptbook council gate. Outside a run (an ad-hoc council, the retrospective, the night gardener) council deliberation holds by prose only. No native agent and no reviewer ever casts a seat's vote.[^council] A council that cannot run defers to a human.[^defer]
+
+The council runner records the requested and the served model for each seat. Two gate-mode fault labels, `served-model` and `served-provider-mismatch`, mark a seat whose served model or served provider is absent or outside its registry entry's accepted set. The council runner never retries such a seat and never replaces its model.[^served]
+
 ## When to Use
 - Choosing between architectural approaches
 - Evaluating tradeoffs (cost vs accuracy, speed vs correctness)
@@ -45,7 +87,7 @@ A good council question is a genuine *fork* — two or more defensible approache
 ```
 crux/scripts/crux/council/
 ├── __init__.py
-├── async_council.py   ← ALWAYS USE THIS
+├── async_council.py   ← USE THIS for an ad-hoc council
 └── council.py         ← sync fallback only
 ```
 
@@ -82,7 +124,7 @@ from crux.council import create_async_council
 d=$(mktemp -d) && uv run "$d/driver.py"
 ```
 
-Each attempt at a seat has its own deadline, 600 s by default. A seat that fails with a
+Each call to a seat has its own deadline, 600 s by default. A seat that fails with a
 `timeout`, `provider`, `malformed-response` or `truncated` fault is called once more, so the
 worst case per seat is two deadlines, about 20 minutes. A Claude Code foreground shell call
 stops at 10 minutes, so **run the driver as a background command** and read its output when it
@@ -107,7 +149,7 @@ makes `uv` ignore any enclosing project.
 (https://docs.astral.sh/uv/). API keys are read from `~/.crux/env` via
 `crux_env`. One key backs every seat: `crux-env set OPENROUTER_API_KEY …`.
 
-## ALWAYS Use Async
+## ALWAYS Use Async for an Ad-Hoc Council
 
 ```python
 import asyncio
@@ -158,7 +200,7 @@ async def decide(question: str, context: str):
     # errored seat never contributes.
 
     if decision.dissent_count:
-        print(f"{decision.dissent_count} dissent(s) — feed into SRDE")
+        print(f"{decision.dissent_count} dissent(s) — srde output is evidence only")
         for v in decision.votes:                            # each vote is a CouncilVote
             for d in v.dissenting_points:                   # NOTE: dissenting_points, not dissent_points
                 print(f"  [{v.provider}/{v.model}] {d}")
@@ -168,8 +210,11 @@ async def decide(question: str, context: str):
     # from a closed set (stop, length, content_filter, tool_calls, error, other, missing; None
     # when the seat got no reply, such as a timeout). fault_label names an errored seat's cause
     # (one of timeout, provider, malformed-response, truncated, auth, rate-limit, client-config,
-    # refused, insufficient-credit, unexpected-status or unreachable, or unknown). retried marks a seat called a second time; recovered marks a seat that answered on
-    # that second call; first_fault_label and first_finish_reason describe its first attempt.
+    # refused, insufficient-credit, unexpected-status or unreachable, or unknown). A gate council
+    # adds served-model and served-provider-mismatch, which are never retried. retried marks
+    # a seat called a second time; recovered marks a seat that answered on that second call;
+    # first_fault_label and first_finish_reason describe its first call.
+    # attempts lists each call to the seat with what its reply reported.
     for v in decision.votes:
         print(v.provider, v.finish_reason, v.fault_label, v.retried, v.recovered)
 
@@ -217,15 +262,14 @@ results when you count failed checks: an errored seat is a missing check, not a 
 ## Sync Fallback (only if async is impossible)
 
 ```python
-from crux.council import council_vote, quick_council
+from crux.council import council_vote, quick_council, get_opinion, VotingMethod
+from crux.core.llm_caller import get_default_model
 
 # Full council with options
 decision = council_vote(
     question="Should we use approach A or B?",
     context="Full context here",
-    models=["claude-opus-5.5-xhigh", "gemini-3.1-pro-preview"],
-    voting_method=VotingMethod.ARBITER,
-    arbiter="claude-opus-5.5-xhigh",
+    voting_method=VotingMethod.ARBITER,   # models and arbiter default to the registry's assignment
     tracer=None,  # optional Tracer instance
 )
 
@@ -233,29 +277,32 @@ decision = council_vote(
 answer = quick_council("Should we cache at the API or DB layer?")
 
 # Get a single model's opinion
-opinion = get_opinion("claude-opus-5.5-xhigh", "question", context="...")
+opinion = get_opinion(get_default_model("council_arbiter"), "question", context="...")
 ```
 
 ## Model Config
 
-Models are configured in `crux/scripts/crux/_config/llm_router_config.json`:
-- `claude-opus-5.5-xhigh` — Anthropic council seats and arbiter at extra-high reasoning effort
-- `claude-opus-5.5` — Same SKU at high effort for release-document generation
-- `gemini-3.1-pro-preview` — 1M context, analysis
-- `gpt-6-astra` — OpenAI async text and visual council seat
-- `gpt-6.1-sol` — OpenAI synchronous council seat
+The router registry assigns each seat by role: `openai_top`, `anthropic_top` and `google_top`. The sync council reads `council_default` and `council_arbiter`. Read the assignments in `${CRUX_PLUGIN_ROOT}/scripts/crux/_config/llm_router_config.json`; this skill names no model.[^seats]
 
-The Anthropic seat in the default councils runs on `claude-opus-5.5-xhigh`.
-The async text and visual councils, sync member, and sync arbiter use this entry.
-The router reaches Anthropic through the OpenRouter gateway.
+The router reaches every provider through the OpenRouter gateway.
 
 API keys are read via `crux_env.require(...)` from `~/.crux/env` (managed by `crux-env`).
 
 ## Rules
-- ALWAYS prefer async for agent teams (parallel teammates = concurrent calls)
+- ALWAYS prefer async for an ad-hoc council and for agent teams (parallel teammates = concurrent calls)
 - ALWAYS check `dissent_count` (and each vote's `dissenting_points`) — never just read `consensus`
 - ALWAYS read `final_recommendation["conditioned"]` and `["nits"]`: a conditioned approval can read `UNANIMOUS_APPROVE` or `MAJORITY_APPROVE` but never routes to `AUTO_EXECUTE`
-- ALWAYS run a council driver in the background: the worst case per seat is about 20 minutes
+- ALWAYS run an ad-hoc council driver in the background (inside a cycle run, the council gate uses `run-council.py`): the worst case per seat is about 20 minutes
 - ALWAYS provide rich context — models deliberate better with specifics
-- Feed dissents into SRDE for automatic resolution (see srde skill)
+- Treat srde output as evidence: it never settles a gate and never runs on the ADR path (see srde skill)[^srde]
 - Register results on Semantic Bridge for cross-teammate visibility
+
+[^council]: rule:council-is-never-harness-native, rule:council-gate-needs-a-runner-record
+[^review]: rule:review-gate-needs-a-reviewer-report
+[^seats]: rule:every-seat-assesses-five-dimensions, rule:council-assignment-is-validated-before-spend
+[^served]: rule:seat-records-requested-and-served-model, rule:served-provider-matches-a-declared-set
+[^defer]: rule:only-a-preflight-refusal-is-retried
+[^attempt]: rule:an-open-council-attempt-stops-the-gate
+[^match]: rule:council-evidence-matches-its-attempt
+[^recover]: rule:recovery-never-deliberates-again
+[^srde]: rule:de-wire-srde-from-adr-path, rule:blocking-finding-classification

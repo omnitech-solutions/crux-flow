@@ -252,6 +252,24 @@ class CouncilVote:
     retried: bool = False
     first_fault_label: Optional[str] = None
     first_finish_reason: Optional[str] = None
+    # Seat provenance, set only by the council's seat wrapper. `role`,
+    # `registry_key` and `requested_model` say what the seat asked for;
+    # `served_model`, `served_provider` and `generation_id` are what the gateway
+    # reported in the reply (None when the seat got no reply or the reply
+    # omitted the field). `findings` holds the tagged findings of a gate seat.
+    role: Optional[str] = None
+    registry_key: Optional[str] = None
+    requested_model: Optional[str] = None
+    served_model: Optional[str] = None
+    served_provider: Optional[str] = None
+    generation_id: Optional[str] = None
+    findings: List[Dict[str, Any]] = field(default_factory=list)
+    # Every attempt the seat made, in order, set only by the council's seat
+    # wrapper. Each holds what that attempt's reply reported (served model,
+    # served provider, generation id, finish reason), the fault label it ended
+    # with, and, in a gate council, its served-model and served-provider match
+    # results. Empty for a vote no seat wrapper built.
+    attempts: List[Dict[str, Any]] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
 

@@ -87,24 +87,13 @@ def main(argv=None) -> int:
     root = Path(args.repo_root).resolve()
     try:
         manifest = sp.read_manifest(root)
-        adrs = sp.adrs_dir(root)
-        governs_from = sp.governs_from(manifest)
-        # ADR-0095 requirement 5: this gate and `compile-doctrine.py` are two
-        # readers of one projection, so they resolve the input domain through
-        # the same `sp.observations_source` and thread the same tree_name /
-        # repo_root into `build_domain_entries`. A gate reading a narrower
-        # domain than the regenerator reports clean on a tree the regenerator
-        # marks BROKEN.
-        observations = sp.observations_source(root, manifest)
-        records = sp.collect_records(adrs, governs_from=governs_from,
-                                     observations=observations)
-        invariants = dp.read_invariants(root)
-        reconciliations = dp.read_reconciliations(root)
-        bindings = sp.read_run_bindings(sp.runs_dir(root))
-        entries = dp.build_domain_entries(records, invariants, reconciliations,
-                                          bindings, governs_from,
-                                          tree_name=sp.tree_name(root),
-                                          repo_root=root)
+        loaded, view, pending, actual = dp._load_doctrine_inputs(root, manifest)
+        dp._plan_doctrine_outputs(loaded, view, pending)
+        records = sp._summary_authority_records(loaded["records"], view, loaded["removed"], loaded["aliases"])["records"]
+        invariants = loaded["invariants"]
+        evidence = {(r["handle"], r["evidence"]): r["resolves"] for r in loaded["evidence_facts"]}
+        entries = dp._build_domain_entries_loaded(records, invariants, loaded["reconciliations"],
+            loaded["bindings"], loaded["governs_from"], tree_name=loaded["tree_name"], evidence_facts=evidence)
     except (sp.GovernsValidationError, dp.DoctrineValidationError) as exc:
         print(json.dumps({"validation_errors": exc.problems}, sort_keys=True))
         return 1

@@ -735,12 +735,7 @@ class ObservationReaderContainmentTests(unittest.TestCase):
         resolved-containment leg, so a symlink planted in the concern is READ
         (and folded into `observations_sha256`) even though nothing of it is
         printed any more."""
-        import importlib.util
-        spec = importlib.util.spec_from_file_location(
-            "summaries_projection", SCRIPTS / "summaries_projection.py")
-        sp = importlib.util.module_from_spec(spec)
-        sys.modules["summaries_projection"] = sp
-        spec.loader.exec_module(sp)
+        import summaries_projection as sp
         self._plant_real_file()
         manifest = {"concerns_enabled": ["adrs", "observations", "arch"]}
         problem = sp.observations_source_problem(self.root, manifest)

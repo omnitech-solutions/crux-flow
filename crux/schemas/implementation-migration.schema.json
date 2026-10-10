@@ -1,0 +1,286 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_type",
+    "format_version",
+    "batch_id",
+    "approval_slot",
+    "authorizing_refs",
+    "entries",
+    "signed_dependencies",
+    "citation_dependencies"
+  ],
+  "properties": {
+    "record_type": {
+      "type": "string",
+      "const": "implementation-migration"
+    },
+    "format_version": {
+      "type": "string",
+      "enum": ["1", "2"]
+    },
+    "batch_id": {
+      "type": "string",
+      "pattern": "^implementation-pilot-001(?:-recovery-[0-9a-f]{64})?(?![\\s\\S])"
+    },
+    "approval_slot": {
+      "type": "string",
+      "pattern": "^implementation-[1-9][0-9]*(?![\\s\\S])"
+    },
+    "authorizing_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(?:[A-Z][A-Z0-9]{1,9}-)?ADR-[0-9]{4}/[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])"
+      },
+      "minItems": 1
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_adr",
+          "clause",
+          "affected_governs",
+          "source_identity",
+          "disposition",
+          "rationale",
+          "historical_destination",
+          "replacement_handles"
+        ],
+        "properties": {
+          "source_adr": {
+            "type": "string",
+            "pattern": "^(?:[A-Z][A-Z0-9]{1,9}-)?ADR-[0-9]{4}(?![\\s\\S])"
+          },
+          "clause": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "text",
+              "sha256"
+            ],
+            "properties": {
+              "text": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+              }
+            }
+          },
+          "affected_governs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "handle",
+                "domain",
+                "rule",
+                "scope",
+                "provenance"
+              ],
+              "properties": {
+                "handle": {
+                  "type": "string",
+                  "pattern": "^(?:[A-Z][A-Z0-9]{1,9}-)?ADR-[0-9]{4}/[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])"
+                },
+                "domain": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "rule": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "scope": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "provenance": {
+                  "type": "string",
+                  "enum": [
+                    "authored",
+                    "recovered",
+                    "reconstructed"
+                  ]
+                },
+                "anchor": {
+                  "type": [
+                    "string",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "retires": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^(?:[A-Z][A-Z0-9]{1,9}-)?ADR-[0-9]{4}/[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])"
+                  }
+                }
+              }
+            }
+          },
+          "source_identity": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+          },
+          "disposition": {
+            "type": "string",
+            "enum": [
+              "architecture-retained",
+              "historical-implementation",
+              "historical-fact",
+              "historical-authorization"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          },
+          "historical_destination": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_adr",
+              "clause_sha256"
+            ],
+            "properties": {
+              "source_adr": {
+                "type": "string",
+                "pattern": "^(?:[A-Z][A-Z0-9]{1,9}-)?ADR-[0-9]{4}(?![\\s\\S])"
+              },
+              "clause_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+              }
+            }
+          },
+          "replacement_handles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(?:[A-Z][A-Z0-9]{1,9}-)?ADR-[0-9]{4}/[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])"
+            }
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "signed_dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\\\x00-\\x1f\\x7f]+(?:/[^/\\\\\\x00-\\x1f\\x7f]+)*(?![\\s\\S])"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+          }
+        }
+      }
+    },
+    "signed_dispositions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\\\x00-\\x1f\\x7f]+(?:/[^/\\\\\\x00-\\x1f\\x7f]+)*(?![\\s\\S])"
+          },
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}(?![\\s\\S])"}
+        }
+      }
+    },
+    "recovery_from": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["witness", "batch", "source_identities"],
+      "properties": {
+        "witness": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\\\x00-\\x1f\\x7f]+(?:/[^/\\\\\\x00-\\x1f\\x7f]+)*(?![\\s\\S])"
+            },
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}(?![\\s\\S])"}
+          }
+        },
+        "batch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\\\x00-\\x1f\\x7f]+(?:/[^/\\\\\\x00-\\x1f\\x7f]+)*(?![\\s\\S])"
+            },
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}(?![\\s\\S])"}
+          }
+        },
+        "source_identities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "pattern": "^[0-9a-f]{64}(?![\\s\\S])"}
+        }
+      }
+    },
+    "citation_dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\\\x00-\\x1f\\x7f]+(?:/[^/\\\\\\x00-\\x1f\\x7f]+)*(?![\\s\\S])"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"format_version": {"const": "1"}}},
+      "then": {"properties": {
+        "batch_id": {"const": "implementation-pilot-001"},
+        "signed_dispositions": {"const": null},
+        "recovery_from": {"const": null}
+      }},
+      "else": {"required": ["signed_dispositions"]}
+    }
+  ]
+}

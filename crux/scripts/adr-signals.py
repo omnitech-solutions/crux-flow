@@ -1213,6 +1213,30 @@ def _git(root: Path, *args: str) -> list[str]:
     return lines
 
 
+NO_HISTORY_YET = "no history yet: the repository has no commits"
+
+
+def _unborn_head(root: Path) -> bool:
+    """True only when `root` is a repository with no commit and no ref at all.
+
+    Three fixed-argument probes. The first, `rev-parse --verify HEAD`, must
+    fail: that failure is the unborn signal. The second (HEAD names a branch)
+    and the third (no ref exists anywhere) must succeed. A probe that cannot
+    start, or a failure of the second or third, answers False, so a failed
+    lookup is never read as an unborn HEAD.
+    """
+    try:
+        try:
+            _git(root, "rev-parse", "--verify", "--quiet", "HEAD")
+            return False
+        except GitLegFailed:
+            pass
+        _git(root, "symbolic-ref", "--quiet", "HEAD")
+        return _git(root, "for-each-ref", "--count=1") == []
+    except (GitUnavailable, GitLegFailed):
+        return False
+
+
 class _GitLegs:
     """One CONTAINED git session over `root`, or the recorded reason it is not.
 
@@ -1232,12 +1256,15 @@ class _GitLegs:
 
     `reason` is None when the session is usable, and otherwise a
     script-authored sentence naming the condition, which a caller puts in its
-    own `basis`.
+    own `basis`. `unborn` is True when the HEAD probe failed because the
+    repository has no commits yet; `reason` is then `NO_HISTORY_YET` and
+    `usable` stays False.
     """
 
     def __init__(self, root: Path) -> None:
         self.root = root
         self.reason: str | None = None
+        self.unborn = False
         try:
             top = _git(root, "rev-parse", "--show-toplevel")
         except (GitUnavailable, GitLegFailed) as exc:
@@ -1250,8 +1277,13 @@ class _GitLegs:
         try:
             _git(root, "rev-list", "-n", "1", "--end-of-options", "HEAD")
         except (GitUnavailable, GitLegFailed) as exc:
-            self.reason = (f"git did not accept --end-of-options at a resolvable HEAD "
-                           f"in this work tree: {exc}")
+            self.unborn = _unborn_head(root)
+            if self.unborn:
+                self.reason = NO_HISTORY_YET
+            else:
+                self.reason = (f"the HEAD probe failed in this work tree: HEAD does not "
+                               f"resolve to a commit, or git does not accept "
+                               f"--end-of-options ({exc})")
 
     @property
     def usable(self) -> bool:
@@ -1715,7 +1747,9 @@ def signal_release_cadence(root: Path, tree: str,
     legs = _GitLegs(root)
     span_by_key: dict[str, int | None] = {_prep_key(v): None for v in versions}
     prep_by_key: dict[str, int | None] = {_prep_key(v): None for v in versions}
-    if not legs.usable:
+    if legs.unborn:
+        mark_note = "coverage not measured, because there is no history yet"
+    elif not legs.usable:
         mark_note = (f"coverage not measured, because the contained git session could "
                      f"not be established ({legs.reason})")
     else:
@@ -1795,8 +1829,9 @@ def signal_release_cadence(root: Path, tree: str,
             f"span_commits establishes only that its commits lie between two release "
             f"marks; it says nothing about whether any of them was preparation. "
             f"A null on either member means the interval is not bounded — the release "
-            f"has no previous release, either mark is unresolved or ambiguous, or the "
-            f"contained git session could not be established; a null is never rendered "
+            f"has no previous release, either mark is unresolved or ambiguous, the "
+            f"contained git session could not be established, or there is no history "
+            f"yet; a null is never rendered "
             f"as a 0. A 0 means the leg ran, the interval is bounded, and nothing of "
             f"that kind fell inside it.")
     return _record("release_cadence", "computed", value, basis, filt)
@@ -1824,8 +1859,10 @@ def signal_schema_growth(root: Path, docs: Path, tree: str) -> dict:
     THE ONE DELIVERY SIGNAL WHOSE MEASURABILITY RESTS ON THE GIT SESSION
     rather than on any one read. What forces `unmeasurable` is the
     `_GitLegs` precondition failing — git absent, the work tree not resolving,
-    containment refused, or the `--end-of-options` probe refused — reported as
-    `history-unavailable`, which takes precedence over every other condition.
+    containment refused, or the HEAD probe failing on a state that is not an
+    unborn HEAD — reported as `history-unavailable`, which takes precedence
+    over every other condition. An unborn HEAD is not that failure: it yields
+    `computed` with null members and "no history yet".
     A read failing at one end is a different case: that member is null with
     its condition named in `value["conditions"]`, and the verdict stays
     `computed`.
@@ -1844,7 +1881,7 @@ def signal_schema_growth(root: Path, docs: Path, tree: str) -> dict:
                f"work tree")
 
     legs = _GitLegs(root)
-    if not legs.usable:
+    if not legs.usable and not legs.unborn:
         return _record(
             "schema_growth", "unmeasurable", None,
             f"{surface}; history-unavailable: the HEAD leg did not run: {legs.reason}",
@@ -1875,7 +1912,7 @@ def signal_schema_growth(root: Path, docs: Path, tree: str) -> dict:
         _add("surface-not-comparable", surface_name="skills")
 
     def _read_surface(rev: str, path: str, surface_name: str, endpoint: str, parse):
-        if not_comparable[surface_name]:
+        if not_comparable[surface_name] or legs.unborn:
             return None
         listing = legs.lines("ls-tree", "--name-only", rev, "--", path)
         if listing is None:
@@ -1931,10 +1968,12 @@ def signal_schema_growth(root: Path, docs: Path, tree: str) -> dict:
         # "the single boundary used by the two signals that take one", so a
         # second implementation here could drift from release_cadence's and
         # give two answers for one repository.
-        marks_result = resolve_release_marks(legs)
+        marks_result = None if legs.unborn else resolve_release_marks(legs)
         if marks_result is None:
             _add("baseline-ref-unresolved",
-                detail="baseline-ref-unresolved: the changelog's touch-commit history leg "
+                detail=f"baseline-ref-unresolved: {NO_HISTORY_YET}, so no commit could be "
+                       f"checked against the mark predicate" if legs.unborn else
+                       "baseline-ref-unresolved: the changelog's touch-commit history leg "
                        "did not run, so no commit could be checked against the mark "
                        "predicate")
         else:
@@ -2036,6 +2075,10 @@ def signal_schema_growth(root: Path, docs: Path, tree: str) -> dict:
             f"only in the crux development repository, so its surface is "
             f"surface-not-comparable rather than surface-absent in a downstream target "
             f"repository.")
+    if legs.unborn:
+        filt = (f"{NO_HISTORY_YET}; every member is null because no measurement could be "
+                f"made. {condition_note}.{notes_note}")
+        surface = f"{NO_HISTORY_YET}; {surface}"
     return _record("schema_growth", "computed", value, surface, filt)
 
 

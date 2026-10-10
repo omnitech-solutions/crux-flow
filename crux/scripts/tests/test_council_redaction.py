@@ -71,6 +71,10 @@ ALLOWED_LABELS = {
     "refused",
     # A reply that stopped on its output budget (finish reason "length").
     "truncated",
+    # A gate council's reply named a served model the registry entry does not accept.
+    "served-model",
+    # A gate council's reply named a served provider the registry entry does not accept.
+    "served-provider-mismatch",
 }
 
 

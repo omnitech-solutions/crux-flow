@@ -1,0 +1,52 @@
+{
+  "aggregate": {
+    "action": "DEFER_TO_HUMAN",
+    "consensus": "NO_QUORUM"
+  },
+  "attempt": null,
+  "binding": {
+    "module_tag": "adr-1",
+    "prompt": 2
+  },
+  "book": {
+    "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "PB-0999"
+  },
+  "council_kind": "adr",
+  "degraded": false,
+  "errored_seats": [],
+  "format_version": "2",
+  "outcome": "could-not-run",
+  "question": {
+    "path": "docs/promptbooks/runs/PB-0999-fixture/council/question.md",
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "quorum_met": false,
+  "record_type": "council-record",
+  "refusal_reason": {
+    "code": "preflight-needs-owner",
+    "names": [
+      "subjects[0].path"
+    ]
+  },
+  "registry": {
+    "path": "crux/scripts/crux/_config/llm_router_config.json",
+    "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "version": "4.1.0"
+  },
+  "round": 1,
+  "run_id": "RUN-001",
+  "seal": "sha256:e9ef44baaf65863e2c91e270dbf0086d1d8f74da7f2d5bba8149a4adf870a39c",
+  "seats": [],
+  "subjects": [
+    {
+      "path": "docs/adrs/ADR-0001-fixture.md",
+      "retained_copy": null,
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  ],
+  "system_prompt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "vote_instruction_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "writer": "run-council",
+  "written_at": "2026-10-01T12:05:00.000001Z"
+}

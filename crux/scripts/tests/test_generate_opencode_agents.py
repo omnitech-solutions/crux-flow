@@ -291,7 +291,7 @@ AGENT_VERDICTS = {
         "subagent_roles": frozenset(),
     },
     "librarian": {
-        "allowed": {"read", "grep", "glob", "list", "skill"},
+        "allowed": {"read", "grep", "glob", "list", "shell", "skill"},
         "subagent_roles": frozenset(),
     },
     "night-gardener": {
@@ -532,10 +532,10 @@ class CatalogResolutionTests(unittest.TestCase):
         still holds.
         """
         expected = {
-            "architect":      ("opus",   "sol-latest",    "gpt-6.1-sol",     "high"),
-            "brainstormer":   ("opus",   "sol-latest",    "gpt-6.1-sol",     "high"),
-            "commander":      ("claude-opus-5-5", "glm-latest", "gpt-6-astra", "high"),
-            "dev-lead":       ("opus",   "sol-latest",    "gpt-6.1-sol",     "high"),
+            "architect":      ("claude-opus-5-5", "opus-latest",    "gpt-6.1-sol",     "high"),
+            "brainstormer":   ("claude-opus-5-5", "sol-latest",    "gpt-6.1-sol",     "high"),
+            "commander":      ("claude-opus-5-5", "kimi-latest", "gpt-6-astra", "high"),
+            "dev-lead":       ("claude-opus-5-5", "sol-latest",    "gpt-6.1-sol",     "high"),
             "developer":      ("claude-sonnet-5-5", "deepseek-flash", "gpt-6.1-sol",     "high"),
             "historian":      ("claude-sonnet-5-5", "glm-latest",    "gpt-6.1-sol",     "high"),
             "librarian":      ("claude-sonnet-5-5", "glm-latest",    "gpt-6.1-sol",     "high"),

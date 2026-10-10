@@ -193,6 +193,19 @@ _Last updated: YYYY-MM-DD_
 
 Now that the book file is durably on disk, re-read `docs/manifest.yml`, increment `promptbook.next_number`, write back. (If re-read shows a value higher than what we allocated, another author run got there first — abort and surface the collision to the user.)
 
+While a tester's window is open, commit nothing and run no regenerator. The window runs from the tester's dispatch until the tester returns; outside a run there is none.
+
+After the counter bump, commit the allocated file together with the bump. Never commit the counter bump without the file it allocated. Stage only these paths (`git add -- <paths>`) and commit only them (`git commit -- <paths>`), so no change already staged is included. If a regenerator still exits 2 with `migration-input-not-committed`, another uncommitted input is in the tree: stop and name it; never commit a file this skill did not write.
+
+Then regenerate the summaries projection, then the doctrine projection, because the bump changes their input hash:
+
+```
+uv run "${CRUX_PLUGIN_ROOT}/scripts/summarize-adrs.py" --repo-root <repo-root>
+uv run "${CRUX_PLUGIN_ROOT}/scripts/compile-doctrine.py" --repo-root <repo-root>
+```
+
+Confirm `--dry-run` of each exits 0, then commit the regenerated projections so none stays uncommitted.
+
 ### 6c. Update `docs/index.md`
 
 Read `docs/index.md`. In the `## Promptbooks (X active, Y archived)` section, bump active count by 1. Update `_Last updated:` to today. Save.

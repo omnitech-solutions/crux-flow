@@ -11,8 +11,8 @@ TWO CONSUMERS, ONE IMPLEMENTATION. The pin has to hold at both ends of the run:
   * `advance-run.py` refuses to WRITE a snapshot whose `base_commit` diverges from its
     committed record, on both the advance and the abandon path.
   * `check-blast-radius.py` refuses to PASS a snapshot whose `base_commit` diverges,
-    because a run can commit a hand-edited value without going through `advance-run.py`
-    at all. A writer-side guard alone left the reader trusting the field.
+    because a hand-edited value can reach the archive gate without going through
+    `advance-run.py` at all. A writer-side guard alone left the reader trusting the field.
 
 Both call `committed_base_commit` here. A second copy would let the two ends disagree
 about what the committed record is, and the gate is only worth what both ends enforce.
@@ -29,18 +29,26 @@ during its first prompt.
 would let a run that started outside a git work tree acquire a commit boundary after
 the fact, which is the same forward move by another route.
 
-HONEST LIMIT. The pin binds from the snapshot's first commit onward. In the window
-between run start and that commit there is no committed record, so nothing holds the
-value at either end.
+HONEST LIMIT. The pin compares the live value against the snapshot's version at HEAD
+(`HEAD:<path>`), so it holds only against an uncommitted edit. A rewrite committed to
+HEAD becomes the committed record, and both ends pass it. In the window between run
+start and the snapshot's first commit there is no committed record, so nothing holds
+the value at either end. Committed tampering with a run record lies outside the
+local-tool threat model; `advance-run.py`'s gate check reads `base_commit` from the
+snapshot's history instead, and states its own limits.
 """
 from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from council_records import git_isolated_env  # noqa: E402  (one list of redirecting variables)
 
 
 class NoRecord:
@@ -67,8 +75,11 @@ def committed_base_commit(run_path: Path) -> Any:
 
     def _git(*args: str) -> str | None:
         try:
+            # An ambient GIT_DIR or GIT_WORK_TREE would read another repository's HEAD, and a
+            # replace ref would read a commit the branch never made.
+            env = git_isolated_env()
             proc = subprocess.run(["git", "-C", str(parent), *args],
-                                  capture_output=True, text=True, check=False)
+                                  capture_output=True, text=True, check=False, env=env)
         except OSError:
             return None
         return proc.stdout if proc.returncode == 0 else None

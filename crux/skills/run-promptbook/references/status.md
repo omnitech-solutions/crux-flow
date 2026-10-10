@@ -23,6 +23,16 @@ Read the selected book and snapshot. Report the book id and title, run id and st
 
 Report the next action without executing it, after checking the book **and run** format. A YAML book with no `current_run` may start; a YAML `in_progress` run may advance; a completed or deliberately abandoned YAML run may archive; a superseded YAML run may start a new run. A Markdown book or run cannot start, advance, abandon, or archive in this version. For an `in_progress` Markdown run, name both paths and the pinned `v3.23.2` recovery route in `../SKILL.md`: finish and archive there only if every remaining prompt can be truthfully completed, then convert book before run. The tag has no verified Markdown-abandon route. If the run cannot finish, report it as stranded, readable, and non-retryable on the current distribution; preserve its `in_progress` state and original bytes, and offer separate YAML work. Never advise marking unfinished prompts terminal merely to migrate. For a completed or already archived Markdown record, give the eligible tagged conversion route without suggesting a current-version archive. Status never calls advance. Check the answer against the snapshot; book, run, index, artifact and log bytes remain unchanged.
 
+## Implementation intent, delivery and source state
+
+A format-two run's successful committed bindings establish reviewed intent only.
+Use `implementation-decisions.py query` to answer what was reviewed,
+what independent delivery evidence reports, and what the queried source proves.
+Do not infer current implementation from an approved proposal, completed prompt,
+latest timestamp or branch label. Unimplemented, reverted, diverged and unrelated-lineage
+source states remain distinct from a partial delivery; unavailable proof remains unobserved. Status itself
+writes no approval, result, lifecycle transition or current-state claim.
+
 ## Explicit Markdown progress
 
 Only when the user asks to persist progress as Markdown, invoke the renderer with `--markdown`. It writes or refreshes `run-RUN-NNN-progress.md` beside the snapshot. `--terminal --markdown` may also print the terminal view. The artifact is wholly regenerated in snapshot prompt order and byte-stable for the same book and run state. It has no timestamp; hand edits are replaced. The book and run remain unchanged.

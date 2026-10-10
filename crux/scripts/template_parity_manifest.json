@@ -442,12 +442,92 @@
       "pattern": "decision \\| implementation \\| bug \\| learning \\| blocker \\| refactor \\| meeting \\| review \\| misc \\| release"
     },
     {
+      "id": "guide-councils-upgrade-and-commit-guidance",
+      "section": "USER_GUIDE \u00a7Councils and independent reviews \u2014 the agent refresh after an upgrade and the commit duties before a gate prompt",
+      "canonical": "USER_GUIDE.md",
+      "twin": "crux/templates/USER_GUIDE.md",
+      "anchor": "#### Councils and independent reviews",
+      "pattern": "install-codex-agents|install-opencode-agents|Commit every council subject|The council runner commits the attempt record and the council record itself|run-work-witness\\.py commit|run-council\\.py --recover"
+    },
+    {
+      "id": "guide-councils-and-reviews-naming-block",
+      "section": "USER_GUIDE \u00a7Councils and independent reviews \u2014 the naming block, the council key, and the template caveat",
+      "canonical": "USER_GUIDE.md",
+      "twin": "crux/templates/USER_GUIDE.md",
+      "anchor": "#### Councils and independent reviews",
+      "pattern": "Neither satisfies the other's gate|OPENROUTER_API_KEY|It fixes no book that already exists|references/gates\\.md"
+    },
+    {
       "id": "log-op-release-timestamp-carries-its-zone",
       "section": "\u00a76 the `release` op body carries an explicit timezone, the heading date follows it, and a retrospective record names when it was recorded",
       "canonical": "bionic/AGENTS.md",
       "twin": "crux/templates/AGENTS.md.tmpl",
       "anchor": "#### Op-enum regex",
       "pattern": "the publication time carrying an explicit timezone|The heading date is the publication date in that same timezone|a winter release reads MST and a summer one MDT|also names when it was recorded"
+    },
+    {
+      "id": "run-autonomy-gate-stop-instances",
+      "section": "\u00a711 Run execution autonomy, Council and review gates, names which gate outcomes are instances of stop 1 and which of stop 4",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "#### Council and review gates",
+      "pattern": "are each an instance of stop 1|are each an instance of stop 4"
+    },
+    {
+      "id": "blast-radius-pin-refuses-uncommitted-only",
+      "section": "\u00a711.C the base_commit pin compares against HEAD, so it refuses an uncommitted edit only",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### The blast radius",
+      "pattern": "refuses an uncommitted edit only"
+    },
+    {
+      "id": "implementation-decisions-bullet",
+      "section": "\u00a74 promptbooks: the run-local Implementation Decisions bullet keeps its schema-ownership and no-authority clauses",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### promptbooks (mutable plan, immutable runs)",
+      "pattern": "The record schemas are the only definition of their shape|Writer and query results declare `authority: none`|Reviewed revisions are immutable|or of a patch verify phase with a patch slot"
+    },
+    {
+      "id": "user-guide-implementation-decisions",
+      "section": "User guide Implementation Decisions section keeps its history, revision and no-authority bullets",
+      "canonical": "USER_GUIDE.md",
+      "twin": "crux/templates/USER_GUIDE.md",
+      "anchor": "#### Implementation Decisions",
+      "pattern": "\\*\\*Preserved history\\.\\*\\*|\\*\\*A material revision needs a fresh council\\.\\*\\*|\\*\\*No authority\\.\\*\\*"
+    },
+    {
+      "id": "projection-schemas-version-independent",
+      "section": "adrs: projection schemas are independent of the tree-layout, plugin and book/run format versions",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "### adrs (append-only history)",
+      "pattern": "These projection schemas change neither the tree-layout schema `\"5\"`, plugin schema `\"4\"`, nor book/run `format_version`\\."
+    },
+    {
+      "id": "migration-provenance-proof-clauses",
+      "section": "adrs: the migration-provenance bullet keeps its publication-proof, refusal, no-governing-row and citation-resolution clauses",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "**Migration provenance in projections.**",
+      "pattern": "An applied flag, receipt or generated projection does not establish publication proof\\.|Missing, malformed or unsupported proof refuses before output\\.|Typed Implementation Decisions, results and annotations contribute no governing rows\\.|Mutable governing citations resolve surviving architectural rules|Shipped citations retain shipped-catalog precedence"
+    },
+    {
+      "id": "current-belief-routing-implementation-clauses",
+      "section": "adrs: current-belief routing keeps results and annotations separate, needs no revocation for a later conforming implementation, and denies a run binding current-state authority",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "**Current-belief read routing.**",
+      "pattern": "Implementation Results preserve delivery evidence separately|A later conforming implementation requires no revocation of earlier reasoning|a genuine architectural conflict follows the architectural decision process|Approved intent or a run binding alone never establishes current state"
+    },
+    {
+      "id": "promptbook-format-two-default",
+      "section": "\u00a73 directory layout: a run snapshot is not called immutable, and new cycle books use format two",
+      "canonical": "bionic/AGENTS.md",
+      "twin": "crux/templates/AGENTS.md.tmpl",
+      "anchor": "## 3. Directory layout",
+      "pattern": "Snapshot of one run \\(structured YAML; format versions \"1\" and \"2\"\\)|New cycle books use format two; each run inherits its book's format at start\\."
     }
   ]
 }

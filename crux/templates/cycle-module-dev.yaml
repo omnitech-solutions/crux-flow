@@ -47,6 +47,13 @@
   purpose: |
     Convert the architectural commitment(s) into ordered work units.
   prompt: |
+    Read governing architectural constraints and any selected formal implementation reasoning
+    separately. An Implementation Decision supplies no rule or current-state authority.
+    For a selected formal decision, compare delivery to the approved original and include annotations in
+    independent review scope. Report approval, delivery and queried source state separately.
+    Validate the committed approval binding and its retained context before
+    treating reasoning as reviewed intent. Use the context's supported profile;
+    book format supplies none. Preserve historical context bytes.
     Read the rules this loop implements: {RULE_REFS}. Resolve each citation
     through `docs/adrs/doctrine/index.md` to its rule and its ADR; read the
     ADR for the rationale. Produce an implementation plan scoped to {SCOPE}
@@ -70,6 +77,13 @@
   purpose: |
     Implement the plan with parallel agents where independent.
   prompt: |
+    Read governing architectural constraints and any selected formal implementation reasoning
+    separately. An Implementation Decision supplies no rule or current-state authority.
+    For a selected formal decision, compare delivery to the approved original and include annotations in
+    independent review scope. Report approval, delivery and queried source state separately.
+    Validate the committed approval binding and its retained context before
+    treating reasoning as reviewed intent. Use the context's supported profile;
+    book format supplies none. Preserve historical context bytes.
     Group the work units from this loop's planning prompt by independence.
     Dispatch one `Agent` per independent group in parallel. Each agent
     receives: the ADR(s), the implementation plan, its assigned work units,
@@ -90,6 +104,13 @@
 
     After all agents return, integrate. If two agents edited overlapping
     files (they should not have, given grouping), reconcile manually.
+
+    Integrate commits only outside the tester's window. The tester's window runs
+    from the tester's dispatch until the tester returns. The agent that dispatched
+    the tester holds the window. While it is open, that agent commits nothing to the main checkout, convenes no council, runs no live-tree tool, and dispatches no agent that does. Every dispatch you make while the window is open says so. The run has one commit
+    lane: no commit and no council while the tester's full suite or a live-tree
+    tool (compile-doctrine.py, summarize-adrs.py, derive-arch.py,
+    run-drift-gates.py, the council runner) runs.
   expected_output: |
     All work units implemented; per-agent reports collected.
   side_effects: []
@@ -99,6 +120,13 @@
   purpose: |
     Verify the implementation passes every gate before review.
   prompt: |
+    Read governing architectural constraints and any selected formal implementation reasoning
+    separately. An Implementation Decision supplies no rule or current-state authority.
+    For a selected formal decision, compare delivery to the approved original and include annotations in
+    independent review scope. Report approval, delivery and queried source state separately.
+    Validate the committed approval binding and its retained context before
+    treating reasoning as reviewed intent. Use the context's supported profile;
+    book format supplies none. Preserve historical context bytes.
     Run, in this order:
       - The repo's **full test suite** — the COMPLETE run (e.g.
         `python3 -m unittest discover -s crux/scripts/tests`, `mix test`,
@@ -135,6 +163,24 @@
     AND every subsequent gate. Repeat until all gates return clean. After
     3 full loops without convergence, STOP and escalate.
 
+    The run's designated tester runs the full suite. No agent other than the tester
+    or the dev-lead starts a full suite, and one full suite runs at a time. The
+    historian records the Tester record in the run notes under `Tester record`: gate
+    label, command, HEAD, clean-tree status at start and end, result tokens and wall
+    time. The quality-gate run carries the gate label `--gate
+    <book-id>/<run-id>/p<N>/quality-gate`. Gate labels come from the closed set
+    `integration`, `quality-gate`, `exit`. `<book-id>` is the book's `id` field (for
+    example `PB-0144`), and `<run-id>` is the run's `run_id` (for example
+    `RUN-001`). A cycle run labels its integration run `quality-gate`. `exit` labels the full suite at the exit
+    gate before merge is offered. `integration` labels an integration full suite in
+    a book that has no quality-gate prompt. Per-unit runs pass no `--gate` and are
+    never reusable. Before re-running a gate's full suite, the tester may pass
+    `--reuse` with that gate's label: the full-suite runner reports the matching
+    record and starts no second run, and otherwise runs the suites. A record for another gate never matches `--reuse` for this one. A project whose full-suite runner takes no `--gate` or
+    `--reuse` option still names the gate label in the Tester record and runs the
+    suite each time. While the tester's full suite or a live-tree tool runs, no
+    agent commits and no council convenes.
+
     **Record each gate in the run snapshot Notes with its exact command AND
     a concrete result token** (e.g. `validate-catalog --dry-run → exit 0`,
     `unittest → 149 OK`) — NOT a bare "all gates green". The review module's
@@ -151,6 +197,29 @@
   purpose: |
     First-pass self-review before external eyes.
   prompt: |
+    Read governing architectural constraints and any selected formal implementation reasoning
+    separately. An Implementation Decision supplies no rule or current-state authority.
+    For a selected formal decision, compare delivery to the approved original and include annotations in
+    independent review scope. Report approval, delivery and queried source state separately.
+    Validate the committed approval binding and its retained context before
+    treating reasoning as reviewed intent. Use the context's supported profile;
+    book format supplies none. Preserve historical context bytes.
+    Precondition: This review requires the Tester record from this module's
+    quality-gate prompt. It holds when
+    `git merge-base --is-ancestor <recorded HEAD> HEAD` exits 0, every path printed
+    by `git diff --name-only <recorded HEAD> HEAD` lies under a bookkeeping path,
+    and `git status --porcelain --untracked-files=all` is empty. The bookkeeping
+    paths are the run directory, the run's own book file, `<docs_dir>/log.md` and
+    `<docs_dir>/journal/`. The book file counts only while its frozen-plan hash
+    equals the run's `book_content_hash`; compare them with audit-docs CHK-PB-BIND,
+    or compute_book_hash from `${CRUX_PLUGIN_ROOT}/scripts/validate-promptbook.py`.
+    The frozen-plan subset excludes the run-state fields `current_run`,
+    `current_prompt`, `status` and every key outside the plan subset. Name the
+    result in the run notes. This is citation, never a substitute for the
+    integration run, the exit gate or a release gate. When any precondition check
+    fails, the run stays at this prompt: no advance-run route returns it to the
+    quality-gate prompt. When `git status --porcelain --untracked-files=all` is not empty, the conductor first commits the run's own changes. It names every other path to the owner and stops; it deletes nothing. Then the conductor has the tester re-run the full suite of this module's quality-gate prompt, the historian records the new Tester record, and
+    the checks run again.
     Invoke the `code-review` skill (use the default effort level, no
     `--comment` flag — this is a private dry-run). The skill produces a
     ranked list of findings scoped to the diff this dev loop produced.
@@ -158,7 +227,10 @@
     For each `CONFIRMED` finding, fix in place. For each `PLAUSIBLE`,
     evaluate and decide. Do NOT exit this module until every `CONFIRMED`
     finding is resolved or explicitly deferred with rationale captured in
-    the run snapshot Notes under `Dev loop {M} review deferrals`.
+    the run snapshot Notes under `Dev loop {M} review deferrals`. When the fixes in
+    this prompt touch any path outside the bookkeeping paths, the tester runs a new
+    full suite under this module's quality-gate label at the post-fix HEAD, and the
+    historian records it as a new Tester record, before the review module cites one.
   expected_output: |
     Internal-review findings list and resolutions.
   side_effects: []

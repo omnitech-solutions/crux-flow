@@ -3,10 +3,13 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Write one journal or log-only request with replayable, per-file commits.
+"""Write one journal or log-only request with replayable, per-file writes.
 
 The caller owns the narrative and keeps its timestamped request for retry.
-Each result reports the surfaces already committed when a later stage fails.
+The writer never runs version control: every file it touches stays modified and
+uncommitted. Each result reports `recorded` (surfaces holding the requested
+content on disk) and `written` (surfaces this run changed). A partial result
+lists the recorded surfaces when a later stage fails.
 """
 
 from __future__ import annotations
@@ -357,9 +360,9 @@ def _render_index(tree: Path, config_docs_dir: str) -> tuple[bytes | None, bytes
 
 
 def _result(status: str, mode: str, timestamp: str | None, warnings: list[str],
-            committed: list[str], pending: list[str], written: list[str], error: str | None) -> int:
+            recorded: list[str], pending: list[str], written: list[str], error: str | None) -> int:
     print(json.dumps({"status": status, "mode": mode, "timestamp": timestamp,
-                      "warnings": warnings, "committed": committed, "pending": pending,
+                      "warnings": warnings, "recorded": recorded, "pending": pending,
                       "written": written, "error": error}, sort_keys=True))
     return 0 if status == "complete" else 1
 
@@ -379,7 +382,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     warnings: list[str] = []
-    committed: list[str] = []
+    recorded: list[str] = []
     written: list[str] = []
     timestamp: str | None = None
     surfaces = ["log.md"] if args.mode == "log-only" else ["journal/{month}.md", "journal/index.md", "log.md"]
@@ -437,37 +440,37 @@ def main(argv: list[str] | None = None) -> int:
         log_done = _exact_record(log_text, log_heading, log_entry, LOG_HEADING,
                                  timestamp, args.mode)
         if args.mode == "journal" and month_done:
-            committed.append(surfaces[0])
+            recorded.append(surfaces[0])
             if not log_done:
                 warnings.append("offset unverified: the month entry has no offset and no matching log record confirms the supplied offset")
         if args.mode == "journal":
             _preflight(root, month, prospective)
         if log_done:
-            committed.append("log.md")
+            recorded.append("log.md")
         if args.mode == "journal" and not month_done:
             _atomic_replace(month_path, prospective.encode("utf-8"), old_month, tree, root)
             written.append(surfaces[0])
-            committed.append(surfaces[0])
+            recorded.append(surfaces[0])
         if args.mode == "journal":
             old_index, wanted_index = _render_index(tree, config.docs_dir)
             if old_index == wanted_index:
-                committed.append(surfaces[1])
+                recorded.append(surfaces[1])
             else:
                 _atomic_replace(tree / "journal" / "index.md", wanted_index, old_index, tree, root)
                 written.append(surfaces[1])
-                committed.append(surfaces[1])
+                recorded.append(surfaces[1])
         if not log_done:
             _atomic_replace(log_path, (log_preamble + log_entry + log_entries).encode("utf-8"),
                             old_log, tree, root)
             written.append("log.md")
-            committed.append("log.md")
+            recorded.append("log.md")
         return _result("complete", args.mode, timestamp, warnings,
                        surfaces, [], written, None)
     except (Refusal, BionicConfigError, OSError, UnicodeDecodeError, ValueError) as exc:
-        pending = [surface for surface in surfaces if surface not in committed]
-        status = "partial" if committed else "refused"
+        pending = [surface for surface in surfaces if surface not in recorded]
+        status = "partial" if recorded else "refused"
         return _result(status, args.mode, timestamp, warnings,
-                       committed, pending, written, str(exc))
+                       recorded, pending, written, str(exc))
 
 
 if __name__ == "__main__":

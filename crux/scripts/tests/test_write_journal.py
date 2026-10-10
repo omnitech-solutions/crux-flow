@@ -47,6 +47,23 @@ class WriterTests(unittest.TestCase):
                                    env={**os.environ, "UV_NO_CONFIG": "1"})
         return completed, json.loads(completed.stdout)
 
+    def test_report_claims_no_git_commit_for_files_left_modified(self):
+        """The writer never runs git: no report key may say a modified file was committed."""
+        git = ["git", "-C", str(self.root), "-c", "user.name=t", "-c", "user.email=t@t"]
+        subprocess.run([*git, "init", "-q"], check=True)
+        self.index.write_text("# Journal index\n")
+        self.log.write_text(LOG_HEADER)
+        subprocess.run([*git, "add", "-A"], check=True)
+        subprocess.run([*git, "commit", "-qm", "base"], check=True)
+        result, payload = self.invoke()
+        self.assertEqual((result.returncode, payload["status"]), (0, "complete"), result.stdout)
+        status = subprocess.run([*git, "status", "--porcelain"], capture_output=True,
+                                text=True, check=True).stdout
+        self.assertIn("log.md", status)
+        self.assertNotIn("committed", payload)
+        self.assertEqual(sorted(payload["recorded"]),
+                         sorted(["journal/2026-09.md", "journal/index.md", "log.md"]))
+
     def snapshot(self):
         return {p.name: p.read_bytes() for p in (self.month, self.index, self.log) if p.exists()}
 
@@ -118,7 +135,7 @@ raise SystemExit(writer.main(sys.argv[6:]))
         result, payload, outside, parked = self.swapped_during_temporary_create(
             mode="journal", stage=2)
         self.assertEqual((result.returncode, payload["status"]), (1, "partial"), result.stdout)
-        self.assertEqual(payload["committed"], ["journal/2026-09.md"])
+        self.assertEqual(payload["recorded"], ["journal/2026-09.md"])
         self.assertEqual(payload["pending"], ["journal/index.md", "log.md"])
         self.assertEqual(list(outside.iterdir()), [])
         self.assertTrue((parked / "2026-09.md").exists())
@@ -251,7 +268,7 @@ raise SystemExit(writer.main(sys.argv[6:]))
         self.log.symlink_to(self.root / "outside-log.md")
         unsafe, payload = self.invoke()
         self.assertEqual((unsafe.returncode, payload["status"]), (1, "refused"))
-        self.assertEqual(payload["committed"], [])
+        self.assertEqual(payload["recorded"], [])
         self.assertFalse(self.month.exists())
 
     def test_log_op_must_be_the_complete_canonical_token(self):
@@ -367,7 +384,7 @@ raise SystemExit(writer.main(sys.argv[2:]))
                                  capture_output=True, text=True)
         payload = json.loads(failure.stdout)
         self.assertEqual((failure.returncode, payload["status"]), (1, "partial"))
-        self.assertEqual(payload["committed"], ["journal/2026-09.md"])
+        self.assertEqual(payload["recorded"], ["journal/2026-09.md"])
         self.assertEqual(payload["pending"], ["journal/index.md", "log.md"])
         self.assertFalse(self.index.exists())
         self.assertFalse(self.log.exists())

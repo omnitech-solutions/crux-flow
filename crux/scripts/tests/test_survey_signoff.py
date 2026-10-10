@@ -48,7 +48,7 @@ def _load(name: str, filename: str | None = None):
 
 SS = _load("survey_sheet")
 SO = _load("signoff_survey", "signoff-survey.py")
-sp_module = _load("summaries_projection")
+import summaries_projection as sp_module  # noqa: E402
 from crux.arch.recover import (  # noqa: E402
     StateFile,
     candidate_id,
@@ -1355,6 +1355,16 @@ class WriterReaderClosureTests(_SignoffCase):
             with self.subTest(filename=filename):
                 self.setUp()
                 self._plant_predecessor(filename)
+                if filename in ("OBS-0100.md", "OBS-100-short-number.md"):
+                    before = _snapshot(self.root)
+                    proc = subprocess.run([sys.executable, str(SCAFFOLD),
+                        "--repo-root", str(self.root), "--date", DATE],
+                        capture_output=True, text=True)
+                    self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+                    self.assertIn("admission-context-or-source-refused", proc.stdout)
+                    self.assertEqual(_snapshot(self.root), before,
+                                     "canonical predecessor refusal changed draft inventory")
+                    continue
                 bid = self._prepare()
                 before = _snapshot(self.root)
                 proc = self._run("--batch", bid)
@@ -1423,6 +1433,16 @@ class WriterReaderClosureTests(_SignoffCase):
             with self.subTest(case=name):
                 self.setUp()
                 setup()
+                if name in ("predecessor OBS-0100.md", "predecessor OBS-100-short-number.md"):
+                    before = _snapshot(self.root)
+                    proc = subprocess.run([sys.executable, str(SCAFFOLD),
+                        "--repo-root", str(self.root), "--date", DATE],
+                        capture_output=True, text=True)
+                    self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+                    self.assertIn("admission-context-or-source-refused", proc.stdout)
+                    self.assertEqual(_snapshot(self.root), before)
+                    reached.add(proc.returncode)
+                    continue
                 bid = self._prepare()
                 proc = self._run("--batch", bid)
                 state = self._state(bid)
@@ -1789,10 +1809,12 @@ class StateFileContainmentTests(_SignoffCase):
         recovered.symlink_to(outside, target_is_directory=True)
         planted = (outside / "state.yml").read_bytes()
 
-        bid = self._prepare()
-        proc = self._run("--batch", bid)
-        self.assertEqual(proc.returncode, 1, proc.stdout)
-        self.assertIn("is a symlink", json.dumps(self._payload(proc)))
+        from test_survey_scaffold import _run as scaffold_run
+        before = _snapshot(self.root)
+        proc = scaffold_run("--repo-root", str(self.root))
+        self.assertNotEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertIn("admission-source-io-containment-refused", proc.stdout + proc.stderr)
+        self.assertEqual(_snapshot(self.root), before)
         self.assertEqual((outside / "state.yml").read_bytes(), planted,
                          "a disposition was written outside the tree")
         self.assertEqual(sorted(p.name for p in outside.iterdir()),
@@ -1912,11 +1934,18 @@ class CrossDevicePromotionTests(_SignoffCase):
     def test_the_cli_refuses_to_promote_across_a_device_boundary(self):
         bid = self._prepare()
         staged = SS.receipt_paths(self.obs, bid)["staged"]
-        real = SO.os
-        self.addCleanup(setattr, SO, "os", real)
-        SO.os = _OsWithForeignDevice(real, staged)
-
-        code, out = self._main(bid)
+        from unittest import mock
+        from admission_source_io import SourceIO
+        real, injected = SourceIO.metadata, []
+        def foreign(source_io, path):
+            result = real(source_io, path)
+            if Path(path) == staged.resolve() and result is not None:
+                injected.append(True)
+                return dict(result, st_dev=result["st_dev"] + 1)
+            return result
+        with mock.patch.object(SourceIO, "metadata", foreign):
+            code, out = self._main(bid)
+        self.assertTrue(injected, "the device fault never reached guarded metadata")
         self.assertEqual(code, 1, out)
         self.assertIn("different filesystems", out)
         # The batch stopped exactly at the commit point, with completion
@@ -1928,7 +1957,6 @@ class CrossDevicePromotionTests(_SignoffCase):
         # Positive control: the identical tree with the real `os` promotes the
         # same staged bytes and reaches S9, so the refusal above is the device
         # check and not a batch that had nothing to promote.
-        SO.os = real
         code, out = self._main(bid)
         self.assertEqual(code, 0, out)
         self.assertEqual(self._state(bid), "S9")
@@ -1943,16 +1971,23 @@ class CrossDevicePromotionTests(_SignoffCase):
         while self._state(bid) != "S5":
             SO.advance(ctx)
         staged = SS.receipt_paths(self.obs, bid)["staged"]
-        real = SO.os
-        self.addCleanup(setattr, SO, "os", real)
-        SO.os = _OsWithForeignDevice(real, staged)
-        with self.assertRaises(SS.SurveySheetError) as caught:
-            SO.advance(ctx)
+        from unittest import mock
+        from admission_source_io import SourceIO
+        real, injected = SourceIO.metadata, []
+        def foreign(source_io, path):
+            result = real(source_io, path)
+            if Path(path) == staged.resolve() and result is not None:
+                injected.append(True)
+                return dict(result, st_dev=result["st_dev"] + 1)
+            return result
+        with mock.patch.object(SourceIO, "metadata", foreign):
+            with self.assertRaises(SS.SurveySheetError) as caught:
+                SO.advance(ctx)
+        self.assertTrue(injected, "the device fault never reached guarded metadata")
         self.assertIn("different filesystems", str(caught.exception))
         self.assertEqual(self._state(bid), "S5")
         self.assertTrue((staged / "index.md").is_file())
         # Control: the real `os` completes cell 11 from the same state.
-        SO.os = real
         SO.advance(ctx)
         self.assertEqual(self._state(bid), "S6")
         self.assertFalse(staged.exists())

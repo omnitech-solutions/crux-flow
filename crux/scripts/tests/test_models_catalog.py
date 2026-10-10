@@ -172,10 +172,10 @@ class ShippedCatalogTests(unittest.TestCase):
         touching this test — which is the whole reason the alias table exists.
         """
         expected = {
-            "architect":      ("opus",   "sol-latest",    "gpt-6.1-sol",     "high"),
-            "brainstormer":   ("opus",   "sol-latest",    "gpt-6.1-sol",     "high"),
-            "commander":      ("claude-opus-5-5", "glm-latest", "gpt-6-astra", "high"),
-            "dev-lead":       ("opus",   "sol-latest",    "gpt-6.1-sol",     "high"),
+            "architect":      ("claude-opus-5-5", "opus-latest",    "gpt-6.1-sol",     "high"),
+            "brainstormer":   ("claude-opus-5-5", "sol-latest",    "gpt-6.1-sol",     "high"),
+            "commander":      ("claude-opus-5-5", "kimi-latest", "gpt-6-astra", "high"),
+            "dev-lead":       ("claude-opus-5-5", "sol-latest",    "gpt-6.1-sol",     "high"),
             "developer":      ("claude-sonnet-5-5", "deepseek-flash", "gpt-6.1-sol",     "high"),
             "historian":      ("claude-sonnet-5-5", "glm-latest",    "gpt-6.1-sol",     "high"),
             "librarian":      ("claude-sonnet-5-5", "glm-latest",    "gpt-6.1-sol",     "high"),
@@ -197,10 +197,10 @@ class ShippedCatalogTests(unittest.TestCase):
     def test_opencode_assignments_follow_the_owner_lineup(self):
         """The OpenCode column: flagship defaults to Sol, apex to Opus.
 
-        architect, brainstormer and dev-lead carry no override, so they inherit
-        the flagship default. night-gardener inherits the apex default. The
-        reviewer names Sol over the apex default. kimi-latest stays declared as
-        a parked alternate that no agent resolves through.
+        brainstormer and dev-lead carry no override, so they inherit the
+        flagship default; the architect names Opus over it. night-gardener
+        inherits the apex default. The reviewer names Sol and the commander
+        names Kimi over the apex default.
         """
         catalog = MC.load()
         self.assertEqual(catalog.aliases["opus-latest"], "openrouter/anthropic/claude-opus-5.5")
@@ -208,21 +208,23 @@ class ShippedCatalogTests(unittest.TestCase):
         self.assertEqual(catalog.aliases["kimi-latest"], "openrouter/moonshotai/kimi-k3")
         self.assertEqual(catalog.levels["flagship"].opencode, "sol-latest")
         self.assertEqual(catalog.levels["apex"].opencode, "opus-latest")
-        for name in ("architect", "brainstormer", "dev-lead"):
+        self.assertEqual(catalog.agents["architect"].level, "flagship")
+        self.assertEqual(catalog.agents["architect"].opencode, "opus-latest")
+        for name in ("brainstormer", "dev-lead"):
             with self.subTest(agent=name):
                 self.assertEqual(catalog.agents[name].level, "flagship")
                 self.assertIsNone(catalog.agents[name].opencode)
         self.assertEqual(catalog.agents["night-gardener"].level, "apex")
         self.assertIsNone(catalog.agents["night-gardener"].opencode)
         self.assertEqual(catalog.agents["reviewer"].opencode, "sol-latest")
-        self.assertNotIn("kimi-latest", {catalog.opencode_alias(n) for n in catalog.agents})
+        self.assertEqual(catalog.agents["commander"].opencode, "kimi-latest")
 
     def test_apex_uses_astra_while_flagship_keeps_sol_at_high_effort(self):
         catalog = MC.load()
         apex, flagship = catalog.levels["apex"], catalog.levels["flagship"]
-        # Apex pins Opus 5.5 on Claude; flagship retains its family alias.
+        # Apex and flagship both pin Opus 5.5 on Claude by full ID.
         self.assertEqual(apex.claude, "claude-opus-5-5")
-        self.assertEqual(flagship.claude, "opus")
+        self.assertEqual(flagship.claude, "claude-opus-5-5")
         self.assertEqual(apex.codex.model, "gpt-6-astra")
         self.assertEqual(flagship.codex.model, "gpt-6.1-sol")
         # GPT-6 has no Terra, so standard selects Sol too; the two rungs stay

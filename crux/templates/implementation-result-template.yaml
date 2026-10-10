@@ -1,0 +1,22 @@
+# Example shape only. Replace all hashes, commits and references with evidence.
+# Delivery evidence stays separate from approval and queried current source.
+record_type: implementation-result
+format_version: "1"
+decision:
+  path: docs/promptbooks/runs/DEMO-PB-0001-example/implementations/RUN-001/strategy/revision-001.yaml
+  sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+delivery_state: partial
+source_revision: "0000000000000000000000000000000000000000"
+preimage_revision: "1111111111111111111111111111111111111111"
+# scope lists delivered files, never a directory. A directory entry in the
+# decision's scope is covered by listing each file changed under it.
+scope:
+  - src/lookup.py
+sources:
+  - path: src/lookup.py
+    preimage: absent
+    delivered: "2222222222222222222222222222222222222222222222222222222222222222"
+reviews:
+  - path: docs/promptbooks/runs/DEMO-PB-0001-example/reviews/delivery.json
+    sha256: "3333333333333333333333333333333333333333333333333333333333333333"
+annotations: []

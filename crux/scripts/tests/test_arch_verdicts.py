@@ -582,11 +582,37 @@ class PopulatedHeaderPostconditionTests(unittest.TestCase):
 class TwoChannelTests(unittest.TestCase):
     """Clause 2: an annotation is reported and never recorded."""
 
+    def _scan_annotation_fixture(self, filename: str, content: str) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            arch = root / "arch"
+            arch.mkdir()
+            for n in range(21):
+                (arch / f"source-{n}.md").write_text("Committed source description.\n")
+            (arch / filename).write_text(content)
+            with unittest.mock.patch.multiple(sys.modules[__name__], REPO=root,
+                                               GOLDEN=arch, LIVE_ARCH=root / "absent"):
+                self.test_the_annotation_vocabulary_appears_nowhere_under_arch()
+
+    def test_committed_schema_field_is_not_runtime_annotation_metadata(self):
+        self._scan_annotation_fixture("data-model.md", "| `annotations` | array | yes |\n")
+
+    def test_nested_runtime_annotation_metadata_is_refused(self):
+        for content in ('{"concerns": [{"annotations": []}]}',
+                        r'{"concerns": [{"ann\u006ftations": []}]}'):
+            with self.subTest(content=content), self.assertRaisesRegex(AssertionError, "annotation vocabulary under arch"):
+                self._scan_annotation_fixture("coverage.json", content)
+
+    def test_reported_annotation_token_is_refused_in_spine(self):
+        with self.assertRaisesRegex(AssertionError, "annotation vocabulary under arch"):
+            self._scan_annotation_fixture("data-model.md", "possibly_stale\n")
+
     def test_the_annotation_vocabulary_appears_nowhere_under_arch(self):
         """The whole point of the split, asserted where it would show.
 
         Every committed arch tree is searched for every annotation token and for
-        the `annotations` key itself. A hit means an annotation reached the
+        the `annotations` key in recorded JSON. Schema field names describe
+        committed input. A metadata hit means an annotation reached the
         byte-compared set, which would make the drift gate depend on the commit
         graph — the one thing clause 2 exists to prevent.
 
@@ -597,7 +623,15 @@ class TwoChannelTests(unittest.TestCase):
         while the sibling correctly failed. The guards are what make the
         verdict name its own scope.
         """
-        tokens = list(core.ANNOTATIONS) + ["annotations"]
+        tokens = list(core.ANNOTATIONS)
+
+        def annotation_key(value):
+            if isinstance(value, dict):
+                return "annotations" in value or any(annotation_key(v) for v in value.values())
+            if isinstance(value, list):
+                return any(annotation_key(v) for v in value)
+            return False
+
         hits, scanned = [], 0
         roots = [p for p in (GOLDEN, LIVE_ARCH) if p.is_dir()]
         for root in roots:
@@ -609,8 +643,10 @@ class TwoChannelTests(unittest.TestCase):
                 for token in tokens:
                     if token in text:
                         hits.append(f"{path.relative_to(REPO)}: {token}")
+                if path.suffix == ".json" and annotation_key(json.loads(text)):
+                    hits.append(f"{path.relative_to(REPO)}: annotations metadata")
         self.assertGreater(scanned, 20, "no committed arch tree was searched")
-        self.assertGreater(len(tokens), 1, "the token set collapsed")
+        self.assertGreater(len(tokens), 0, "the annotation token set collapsed")
         self.assertEqual(hits, [], "annotation vocabulary under arch/: " + ", ".join(hits))
 
     def test_no_remediation_line_appears_anywhere_under_arch(self):

@@ -17,8 +17,9 @@
 #            Required UNLESS `source: self`, which must not carry it.
 #   sha      full 40-hex commit SHA; the fetch is fail-closed on a mismatch.
 #            Required UNLESS `source: self`, which must not carry it.
-#   source   OPTIONAL. Absent for a fetched clone. `self` derives THIS
-#            repository in place — no clone, no `.cache/<name>/` — and then
+#   source   OPTIONAL. Absent for a fetched clone. `self` derives a copy of
+#            THIS repository's working tree, without `.git` and without its
+#            configured docs tree — no clone, no `.cache/<name>/` — and then
 #            REQUIRES `arch_stack:` (see W5a below).
 #   arch_stack  REQUIRED when `source: self`, otherwise absent. The pack name
 #            `resolve_stack` is forced to answer, overriding this repository's

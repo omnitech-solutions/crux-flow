@@ -146,6 +146,15 @@ Add a `.gitkeep` file to each leaf directory that will otherwise be empty: `inbo
 - Write the result to `${REPO_ROOT}/${DOCS_DIR}/AGENTS.md`.
 - **Write no `CLAUDE.md` sibling.** A fresh tree carries one managed instruction
   filename; a second one would suppress it on a host reading the canonical name.
+- **Implementation Decisions need no init step.** Run-local Implementation
+  Decision records live under
+  `${DOCS_DIR}/promptbooks/runs/<id>-<slug>/implementations/<RUN-NNN>/<slug>/`.
+  The cycle that writes the first record creates that directory; init creates
+  none. The template carries the record location and the **Retained
+  demonstration holdings** rule, which prunes
+  `evidence/implementation-cycles/retained-repositories/` before discovery,
+  record parsing and recursive walking. A fresh tree inherits both from this
+  substitution, with no edit.
 - If the template file does not exist, **STOP** — the plugin is broken; tell the user to re-install.
 
 ### 6. Write `${DOCS_DIR}/manifest.yml`

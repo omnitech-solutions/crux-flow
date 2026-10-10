@@ -126,6 +126,36 @@ class RenderTests(unittest.TestCase):
             parsed = tomllib.loads(generated[agents.codex_agent_filename(source_name)])
             self.assertEqual(parsed["sandbox_mode"], "read-only")
 
+    def test_librarian_can_read_through_shell_without_write_permissions(self):
+        source = agents.parse_source(agents.SOURCE_DIR / "librarian.md")
+        self.assertIn("Bash", source.tools)
+        self.assertTrue(source.tools.isdisjoint({"Edit", "Write", "Agent"}))
+        parsed = tomllib.loads(agents.generate()["crux-librarian.toml"])
+        self.assertEqual(parsed["sandbox_mode"], "read-only")
+        instructions = parsed["developer_instructions"]
+        self.assertIn("Shell access is permitted only for read-only retrieval", instructions)
+        self.assertIn("Do not modify files", instructions)
+        self.assertIn("Do not request permission escalation", instructions)
+        self.assertNotIn("you have no shell", instructions)
+
+    def test_librarian_takes_authority_state_from_its_caller_in_a_sandbox(self):
+        # In a read-only sandbox `uv run` cannot initialize its cache, so the
+        # librarian cannot run authority-view.py there. Both sides of the
+        # hand-off must say so: the librarian takes the caller's output first and
+        # refuses without it, and query-docs tells the caller to supply it.
+        parsed = tomllib.loads(agents.generate()["crux-librarian.toml"])
+        self.assertEqual(parsed["sandbox_mode"], "read-only")
+        instructions = parsed["developer_instructions"]
+        self.assertIn("## Authority state", instructions)
+        self.assertIn("**Supplied by your caller.**", instructions)
+        self.assertIn("`uv run` fails because it must write its cache", instructions)
+        self.assertIn("**Neither:** refuse the answer.", instructions)
+        self.assertNotIn("route the question to a role", instructions)
+        skill = (agents.SOURCE_DIR.parent / "skills" / "query-docs" / "SKILL.md").read_text(
+            encoding="utf-8")
+        self.assertIn("When you delegate a question to the librarian, run "
+                      "`authority-view.py state` and `retained-roots` first", skill)
+
     @unittest.skipUnless(HAVE_TOMLLIB, "tomllib not available — Python 3.11+ (or uv) required")
     def test_writer_roles_default_to_workspace_write(self):
         generated = agents.generate()

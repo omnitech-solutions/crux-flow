@@ -56,9 +56,14 @@ def _load_dispatcher(path: Path = SCRIPT_PATH, modname: str = "extract_code_docs
 
 
 def _run(cwd: Path, *argv: str) -> subprocess.CompletedProcess:
+    env = dict(os.environ)
+    if "PYTHONPATH" in env:
+        env["PYTHONPATH"] = os.pathsep.join(
+            os.path.abspath(path) for path in env["PYTHONPATH"].split(os.pathsep)
+        )
     return subprocess.run(
         [sys.executable, str(SCRIPT_PATH), *argv],
-        cwd=str(cwd), capture_output=True, text=True, check=False,
+        cwd=str(cwd), capture_output=True, text=True, check=False, env=env,
     )
 
 
@@ -318,10 +323,7 @@ class ShadowModulesStayUnimportedTests(_Base):
         self.assertTrue(probe.with_suffix(".marker").exists())
         probe.with_suffix(".marker").unlink()
         cfg = self._cfg('    python:\n      glob: ["src/alpha.py"]\n')
-        r = subprocess.run(
-            [sys.executable, str(SCRIPT_PATH), "--config", str(cfg)],
-            cwd=str(cwd), capture_output=True, text=True, check=False,
-        )
+        r = _run(cwd, "--config", str(cfg))
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         for p in shadows:
             self.assertFalse(p.with_suffix(".marker").exists(), f"{p} was imported")

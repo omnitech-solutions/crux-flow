@@ -77,7 +77,7 @@ def _load(name: str, filename: str | None = None):
 SS = _load("survey_sheet")
 SO = _load("signoff_survey", "signoff-survey.py")
 CHECK = _load("check_observations")
-SP = _load("summaries_projection")
+import summaries_projection as SP  # noqa: E402
 from crux.arch.recover import StateFile, candidate_id  # noqa: E402
 
 try:
@@ -1058,7 +1058,7 @@ class CorpusDocsDirTests(_SurveyCorpusCase):
 # ── unit 5: the corpus-mined batch, end to end ──────────────────────────────
 
 @unittest.skipUnless(HAVE_YAML, "PyYAML required (run under uv)")
-class CorpusBatchTests(_TreeCase):
+class _CorpusBatchCase(_TreeCase):
     """The frozen corpus candidate sets, driven end to end in a temp tree.
 
     Each fixture holds a `state.yml` mined from a real repository at a pinned
@@ -1089,16 +1089,9 @@ class CorpusBatchTests(_TreeCase):
             self._source(root, rel)
         return root
 
-    def test_a_corpus_mined_batch_publishes_records_and_check_observations_sees_them(self):
-        """The end-to-end publish, over a real mined candidate set.
-
-        Every verdict here is synthetic (module docstring), and the count it
-        asserts is this temporary tree's, never the corpus survey's.
-        """
-        fixture = CORPUS_FIXTURES / "rubygems-org"
-        self.assertTrue((fixture / "state.yml").is_file(), fixture)
-        root = self._seed_from_fixture(fixture, "corpus")
-
+    def _assert_first_publication(self, root: Path) -> str:
+        """Publish once, then check records, receipt digest, and the corruption control."""
+        self.assertIsNone(SP.survey_receipts_sha256(self._obs(root)))
         payload = self._scaffold(root)
         rows = payload["rows"]
         self.assertGreaterEqual(rows, 5, payload)
@@ -1109,6 +1102,9 @@ class CorpusBatchTests(_TreeCase):
         published = json.loads(proc.stdout)
         self.assertEqual(published["state"], "S9")
         self.assertEqual(len(published["records"]), rows)
+        digest = SP.survey_receipts_sha256(self._obs(root))
+        self.assertIsNotNone(digest)
+        self.assertRegex(digest, r"^[0-9a-f]{64}$")
 
         result = self._check(root)
         self.assertGreaterEqual(result["records"], 5, result)
@@ -1121,6 +1117,7 @@ class CorpusBatchTests(_TreeCase):
         # BROKEN. Without it, `broken == []` is equally true of a checker
         # pointed at an empty concern.
         victim = sorted(self._obs(root).glob("OBS-*.md"))[0]
+        original = victim.read_bytes()
         victim.unlink()
         after = self._check(root)
         bijection = [b for b in after["broken"]
@@ -1131,43 +1128,49 @@ class CorpusBatchTests(_TreeCase):
         self.assertIn(victim.stem.split("-")[0] + "-" + victim.stem.split("-")[1],
                       " ".join(bijection))
         self.assertEqual(after["records"], rows - 1, after)
+        victim.write_bytes(original)
+        return payload["batch_id"]
 
-    def test_a_corpus_batch_moves_the_summaries_receipt_digest(self):
-        """The receipts manifest is a declared input to the summaries
-        projection, so a published batch must move its hash off `None`."""
-        root = self._tree("digest")
-        self.assertIsNone(SP.survey_receipts_sha256(self._obs(root)))
+    def _exercise_fixture(self, fixture):
+        """Publish the entire mined candidate set of each discovered repository."""
+        root = self._seed_from_fixture(fixture, f"multi-{fixture.name}")
+        # The original record/corruption/digest checks exercised the Ruby fixture.
+        if fixture.name == "rubygems-org":
+            self._assert_first_publication(root)
+        else:
+            self._publish(root)
 
-        fixture = CORPUS_FIXTURES / "rubygems-org"
-        root = self._seed_from_fixture(fixture, "digest-published")
-        self._publish(root)
-        digest = SP.survey_receipts_sha256(self._obs(root))
-        self.assertIsNotNone(digest)
-        self.assertRegex(digest, r"^[0-9a-f]{64}$")
 
-    def test_every_corpus_fixture_publishes_under_a_distinct_batch_id(self):
-        """Batch ids are per-tree and monotonic, so two batches signed in one
-        tree never share a number — which is what makes a receipt directory
-        name an identity rather than a content hash.
+class CorpusBatchTests(_CorpusBatchCase):
+    def test_corpus_fixtures_are_present(self):
+        self.assertTrue((CORPUS_FIXTURES / "rubygems-org" / "state.yml").is_file())
+        self.assertTrue(self._fixtures(), f"no corpus fixture under {CORPUS_FIXTURES}")
 
-        Runs over every fixture present, so a second corpus repository landing
-        beside `rubygems-org` is covered without editing this test."""
-        fixtures = self._fixtures()
-        self.assertTrue(fixtures, f"no corpus fixture under {CORPUS_FIXTURES}")
-
-        seen = []
-        for fixture in fixtures:
-            root = self._seed_from_fixture(fixture, f"multi-{fixture.name}")
-            first = self._publish(root)
-            # A second batch in the SAME tree, over one fresh candidate.
+    def test_successive_batches_have_distinct_monotonic_ids(self):
+        """Allocation needs two batches; corpus payload size does not change its counter."""
+        root = self._tree("allocation")
+        batches = []
+        for name in ("first", "second"):
             self._add_candidate(root, self._spec(
-                root, "a-second-claim", "The tree carries one more claim",
-                "runtime", "src/second.py"))
-            second = self._publish(root)
-            self.assertNotEqual(first, second, fixture.name)
-            self.assertLess(first, second, "batch ids are not monotonic")
-            seen.append((fixture.name, first, second))
-        self.assertTrue(seen)
+                root, name, f"The tree carries the {name} claim", "runtime", f"src/{name}.py"))
+            batches.append(self._publish(root))
+        self.assertNotEqual(*batches)
+        self.assertLess(*batches, "batch ids are not monotonic")
+
+
+def _corpus_batch_class(fixture):
+    """One scheduling unit per discovered repository, preserving the full candidate set."""
+    def test_publish_mined_batch(self):
+        self._exercise_fixture(fixture)
+    name = "CorpusBatch_" + fixture.name.replace("-", "_") + "Tests"
+    return type(name, (_CorpusBatchCase,), {
+        "__module__": __name__, "test_publish_mined_batch": test_publish_mined_batch})
+
+
+for _fixture_path in sorted(CORPUS_FIXTURES.glob("*/state.yml")):
+    _fixture_class = _corpus_batch_class(_fixture_path.parent)
+    globals()[_fixture_class.__name__] = _fixture_class
+    del _fixture_class  # unittest must not discover an alias of the last class.
 
 
 # ── unit 4b: the miner's domain contract ────────────────────────────────────

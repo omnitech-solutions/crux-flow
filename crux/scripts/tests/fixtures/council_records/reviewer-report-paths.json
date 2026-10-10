@@ -1,0 +1,24 @@
+{
+  "record_type": "reviewer-report",
+  "format_version": "1",
+  "written_at": "2026-10-01T13:00:00.000001Z",
+  "book": {
+    "id": "PB-0999",
+    "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "run_id": "RUN-001",
+  "prompt": 13,
+  "reviewer_role": "reviewer",
+  "reviewer": "reviewer subagent",
+  "subject": {
+    "form": "paths",
+    "paths": [
+      {
+        "path": "crux/scripts/example.py",
+        "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+      }
+    ]
+  },
+  "verdict": "APPROVE",
+  "findings": []
+}

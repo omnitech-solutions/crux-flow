@@ -7,28 +7,42 @@
 Usage:
 
     python3 crux/scripts/tests/parallel_suite.py START [-p PATTERN]
-        [-t TOP] [-w N] [--records PATH]
+        [-t TOP] [-w N] [--records PATH] [--timings PATH]
+    python3 crux/scripts/tests/parallel_suite.py --write-timings RECORDS
+        [--timings-out PATH]
 
 The driver runs the tests that `python -m unittest discover -s START` runs,
 through the same loader call, and prints the same summary lines. The literal
-`unittest discover` command stays the serial reference, and CI runs it.
+`unittest discover` command stays the serial reference. CI uses this driver.
 
 How a run works:
 
 1. The coordinator sets `sys.path[0]` to the working directory, as
    `python -m unittest` does, and snapshots `sys.path`. It then discovers the
    suite once. The discovered suite has one top-level child per module.
-2. It assigns the children to bins by position, never by test id. Each group
-   in `AFFINITY` is one task that one bin runs whole. The assignment is
+2. It cuts the children into units. A unit is the smallest group of tests the
+   driver schedules. A module is one unit, except that a module splits into
+   one unit per test class (named `module.Class`) when the split is safe: the
+   module defines no `setUpModule` or `tearDownModule`, defines no `load_tests`,
+   never calls `addModuleCleanup`, is in no `AFFINITY` group, and every one of
+   its tests belongs to a class whose defining module is likewise free of those
+   fixtures (a class a module imports runs the fixtures of its own module). A
+   failed import, a module-level skip and any other shape stay one unit. The
+   units hold exactly the discovered tests, each once, in discovery order.
+3. It assigns the units to bins by position, never by test id. Each group in
+   `AFFINITY` is one task that one bin runs whole. The assignment is
    longest-processing-time first: weight descending, then discovery order,
-   with ties going to the lowest bin. A bin runs its modules in discovery
-   order.
-3. One spawned worker process runs each bin. A worker leads a process group
+   with ties going to the lowest bin. A bin runs its units in discovery
+   order. A unit weighs the seconds that the committed timings file holds for
+   it (see below). Weights decide which bin runs a unit and never which tests
+   run or in what order inside a module.
+4. One spawned worker process runs each bin. A worker leads a process group
    of its own, restores the snapshot of `sys.path`, points fd 0 at /dev/null,
-   repeats the identical discovery, and runs its positions as one `TestSuite`,
-   so class and module fixtures behave as in a serial run. It sends one
-   message as each module begins and one result payload at the end.
-4. The coordinator reconciles every payload against its own discovery. Any
+   repeats the identical discovery and the identical cut into units, and runs
+   its positions as one `TestSuite`, so class and module fixtures behave as in
+   a serial run. It sends one message as each unit begins and one result
+   payload at the end.
+5. The coordinator reconciles every payload against its own discovery. Any
    discrepancy fails the run closed with exit 2, naming the bin, and the test
    id where one applies. The discrepancies are: a manifest position that no
    bin holds or that two bins hold, a missing record, a duplicate
@@ -37,6 +51,26 @@ How a run works:
    the coordinator's, a test neither started nor covered by a class or module
    fixture record, and zero tests. A worker that exits before its payload, or
    exits non-zero, also fails the run closed.
+
+The timings file. `suite_timings.json` beside this driver maps a unit key to
+seconds. A key is the last dotted part of the module name, plus `.ClassName`
+for a class unit. A module unit weighs the sum of its class entries. A unit
+with no entry weighs the median of all entries, or 1 when there are none.
+`--timings PATH` reads another file, and a path that does not exist is
+refused. When the default file is absent, every unit weighs 1 and the header
+says so. A file that is not a JSON object of non-negative numbers fails the
+run closed with exit 2 before discovery, because a half-read table would skew
+the bins without a sign. A stale entry costs speed and nothing else.
+
+`--write-timings RECORDS` regenerates the file from a `--records` JSONL, and
+needs no START. It adds up the `duration` of each `test` record under its key
+(`module.Class`, taken from the record id), ignores a record with no
+duration, rounds to 0.01 s, and writes sorted keys with a trailing newline, so
+equal input gives equal bytes. `--timings-out PATH` names the output file. Run
+it after a full run: `parallel_suite.py crux/scripts/tests --records r.jsonl`,
+then `parallel_suite.py --write-timings r.jsonl`. The first test record in each
+unit also carries `fixture_duration`: elapsed unit time outside test methods,
+including class setup. The timing writer includes it in the scheduling weight.
 
 The interpreter check. When START is this driver's own directory, the driver
 first imports `PLUGIN_SUITE_MODULES` in a child started with the argv prefix
@@ -59,17 +93,18 @@ failed-import test. A signal the driver inherited as ignored stays ignored, as
 it does for the serial run.
 
 When a run stops early, on a signal or a fail-closed discrepancy, the
-coordinator names the module each unfinished worker was running. It then stops
+coordinator names the unit each unfinished worker was running. It then stops
 each such worker's process group, which holds every process that worker's
 tests started. A worker that delivered its payload and exited 0 is left alone.
 
 The header on stderr names the interpreter, `sys.executable`, `sys.prefix`,
 where `crux` resolves, the discovered count, the worker and bin counts, and
-each bin's weight and modules, so a red test can be traced to its bin. The
-driver prints no reproduction command. The serial reference for the whole
+each bin's weight and units, and the timings source, so a red test can be
+traced to its bin. The driver prints no reproduction command. The serial reference for the whole
 suite is `python -m unittest discover -s START`, run from the same directory.
 
-The driver writes no file except the `--records` JSONL. Those records keep
+The driver writes no file except the `--records` JSONL and, under
+`--write-timings`, the timings file. Those records keep
 every subtest's parameters, passing or not, so treat the file as test output.
 The driver is stdlib-only.
 """
@@ -77,11 +112,14 @@ The driver is stdlib-only.
 import argparse
 import collections
 import importlib.util
+import json
+import math
 import multiprocessing
 import multiprocessing.spawn
 import os
 import re
 import signal
+import statistics
 import subprocess
 import sys
 import time
@@ -90,9 +128,9 @@ import unittest
 import warnings
 from multiprocessing.connection import wait as _wait_ready
 
-# Measured on an 8-core M3 (4 performance, 4 efficiency cores) at matching thermal
-# state: the dev suite took a median 85.1 s at 8 workers, 89.3 s at 6 and 106.5 s at 4.
-DEFAULT_WORKERS = 8
+# Use larger hosts while keeping the CPU cap in effective_workers. The full
+# checkout command divides its own budget between plugin and tool suites.
+DEFAULT_WORKERS = 16
 DEFAULT_PATTERN = "test*.py"
 
 # Modules that share on-disk state (the corpus derive's scratch directory)
@@ -101,37 +139,20 @@ DEFAULT_PATTERN = "test*.py"
 # when a module that calls the corpus derive sits outside every group.
 AFFINITY = (("test_arch_corpus", "test_arch_pack_acceptance", "test_swift_app_gate"),)
 
-# Scheduling weights: each module's seconds in one serial profile on 3.13,
-# rounded up. Every module not listed weighs 1. The weights bear on wall time
-# only, never on which tests run or on their outcomes, so a stale weight
-# costs speed and nothing else, and no drift gate checks this list.
-HEAVY = {
-    "test_survey_signoff": 50,
-    "test_derive_arch": 41,
-    "test_swift_pack": 33,
-    "test_survey_postconditions": 24,
-    "test_arch_runtime_negative": 16,
-    "test_adr_signals": 12,
-    "test_generate_reviews_index": 12,
-    "test_survey_scaffold": 11,
-    "test_install_opencode_agents": 9,
-    "test_extract_code_docs_repairs": 9,
-    "test_extract_code_docs_ownership": 8,
-    "test_arch_pack_acceptance": 8,
-    "test_swift_xcode": 7,
-    "test_survey": 7,
-    "test_survey_claim_binding": 7,
-    "test_survey_slug_cell": 6,
-    "test_check_blast_radius": 5,
-    "test_arch_corpus": 5,
-    "test_survey_receipts_projection": 5,
-    "test_generate_journal_index": 5,
-    "test_regenerator_scope": 5,
-    "test_xcode_fixture_harness": 4,
-    "test_swift_app_gate": 3,
-}
+# The measured seconds per scheduling unit. Absent from a checkout means uniform weights.
+# `--write-timings` regenerates the file from a `--records` run.
+DEFAULT_TIMINGS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "suite_timings.json")
+# Decimal places the file keeps (0.01 s). MIN_WEIGHT is the least a unit weighs: a unit always
+# costs a process turn, so a unit that rounds to zero still counts when the bins fill.
+TIMINGS_ROUND = 2
+MIN_WEIGHT = 0.01
 
 Bin = collections.namedtuple("Bin", "index weight positions")
+# One scheduling unit: `module` is the dotted module name, `name` is the module or
+# `module.Class`, `ids` are its test ids in discovery order, `suite` is what a worker runs,
+# and `key` is its timings key (the short module name, plus `.Class` for a class unit; a
+# class a module imports keys under the module that defines it, as its test ids do).
+Unit = collections.namedtuple("Unit", "module name ids suite key")
 
 _PREFIX = "parallel_suite:"
 
@@ -369,6 +390,176 @@ def build_manifest(suite):
             for position, child in enumerate(suite)]
 
 
+def _module_hazard(module):
+    """Why a module's tests must run together, or None when its classes may be
+    scheduled apart. Module fixtures and module cleanups tie every class to one
+    process; `load_tests` builds a suite the driver cannot cut safely."""
+    for attr in ("setUpModule", "tearDownModule", "load_tests"):
+        if hasattr(module, attr):
+            return attr
+    try:
+        with open(module.__file__, encoding="utf-8", errors="replace") as fh:
+            if "addModuleCleanup" in fh.read():
+                return "addModuleCleanup"
+    except (AttributeError, OSError, TypeError):
+        # A module with no readable source cannot be shown safe.
+        return "no readable source"
+    return None
+
+
+def _class_units(module, child):
+    """The per-class units of a module's suite, or None when the module stays
+    one unit."""
+    if getattr(child, "_parallel_suite_module", None) != module:
+        return None
+    loaded = sys.modules.get(module)
+    if loaded is None or _module_hazard(loaded) is not None:
+        return None
+    units = []
+    for part in child:
+        if not isinstance(part, unittest.TestSuite):
+            return None
+        leaves = list(_leaves(part))
+        if not leaves:
+            continue
+        classes = {type(leaf) for leaf in leaves}
+        if len(classes) != 1:
+            return None
+        (cls,) = classes
+        # A class the module imports runs its module fixtures with the module that defines
+        # it, so that module needs the same clearance.
+        owner = sys.modules.get(cls.__module__)
+        if not issubclass(cls, unittest.TestCase) or owner is None or (
+                owner is not loaded and _module_hazard(owner) is not None):
+            return None
+        units.append(Unit(module, "%s.%s" % (module, cls.__name__),
+                          tuple(leaf.id() for leaf in leaves), part,
+                          "%s.%s" % (cls.__module__.rpartition(".")[2], cls.__name__)))
+    return units if len(units) > 1 else None
+
+
+def build_units(suite, affinity=AFFINITY):
+    """The scheduling units of a discovered suite, in discovery order. Call it
+    after discovery: it reads the imported module objects. The coordinator and
+    every worker call it on their own identical discovery."""
+    pinned = {name for group in affinity for name in group}
+    units = []
+    for position, child in enumerate(suite):
+        module = _module_name(position, child)
+        split = None if module.rpartition(".")[2] in pinned else _class_units(module, child)
+        if split is None:
+            units.append(Unit(module, module, tuple(leaf.id() for leaf in _leaves(child)), child,
+                              module.rpartition(".")[2]))
+        else:
+            units.extend(split)
+    return units
+
+
+def unit_manifest(units):
+    """One (unit name, test ids) entry per unit, in order."""
+    return [(unit.name, unit.ids) for unit in units]
+
+
+# ---------------------------------------------------------------------------
+# Timings
+# ---------------------------------------------------------------------------
+
+
+def record_key(test_id):
+    """The timings key of a test id, or None when the id has no module and class."""
+    parts = test_id.split(".")
+    return ".".join(parts[-3:-1]) if len(parts) >= 3 else None
+
+
+def _is_seconds(value):
+    return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and math.isfinite(value) and value >= 0)
+
+
+def read_timings(path):
+    """The timings mapping in `path`. Raise LedgerError("malformed-timings")
+    when the file is unreadable, not JSON, or not an object of non-negative
+    numbers."""
+    def refuse(why):
+        raise LedgerError("malformed-timings", "%s: %s" % (path, why))
+
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError) as exc:
+        refuse("%s: %s" % (type(exc).__name__, exc))
+    if not isinstance(data, dict):
+        refuse("the file is not a JSON object")
+    for key, value in data.items():
+        if not _is_seconds(value):
+            refuse("%r maps to %r, not a non-negative number" % (key, value))
+    return data
+
+
+def load_timings(explicit):
+    """(timings, note) for a run. An explicit path must exist. The default file
+    may be absent, which gives uniform weights."""
+    path = explicit or DEFAULT_TIMINGS
+    if not explicit and not os.path.exists(path):
+        return {}, "none (%s absent): every unit weighs 1" % path
+    timings = read_timings(path)
+    return timings, "%s (%d entries)" % (path, len(timings))
+
+
+def unit_weights(units, timings):
+    """The weight of each unit, in seconds. A module unit weighs the sum of its
+    class entries; a unit with no entry weighs the median of all entries, or 1
+    when there are none."""
+    median = statistics.median(timings.values()) if timings else 1
+    weights = []
+    for unit in units:
+        key = unit.key
+        if unit.name == unit.module:
+            parts = [v for k, v in timings.items() if k.startswith(key + ".")]
+            weight = math.fsum(parts) if parts else median
+        else:
+            weight = timings.get(key, median)
+        weights.append(max(weight, MIN_WEIGHT))
+    return weights
+
+
+def timings_from_records(path):
+    """Seconds per timings key from a `--records` JSONL: the sum of the
+    `duration` of each `test` record. Records with no duration are ignored."""
+    sums = collections.defaultdict(list)
+    with open(path, encoding="utf-8") as fh:
+        for number, line in enumerate(fh, 1):
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except ValueError as exc:
+                raise LedgerError("malformed-records", "%s line %d: %s" % (path, number, exc)) from None
+            if not isinstance(record, dict) or record.get("kind") != "test":
+                continue
+            key = record_key(record["id"]) if isinstance(record.get("id"), str) else None
+            if key is not None and _is_seconds(record.get("duration")):
+                sums[key].append(record["duration"])
+                if _is_seconds(record.get("fixture_duration")):
+                    sums[key].append(record["fixture_duration"])
+    return {key: round(math.fsum(values), TIMINGS_ROUND) for key, values in sorted(sums.items())}
+
+
+def format_timings(timings):
+    """The committed bytes of a timings mapping: sorted keys, one per line."""
+    return json.dumps(timings, indent=1, sort_keys=True) + "\n"
+
+
+def write_timings(records_path, out_path):
+    """Regenerate the timings file. Return the number of entries."""
+    timings = timings_from_records(records_path)
+    if not timings:
+        raise LedgerError("malformed-records", "%s holds no test record with a duration" % records_path)
+    with open(out_path, "w", encoding="utf-8") as fh:
+        fh.write(format_timings(timings))
+    return len(timings)
+
+
 # ---------------------------------------------------------------------------
 # Running one bin
 # ---------------------------------------------------------------------------
@@ -385,7 +576,16 @@ class _Announced(unittest.TestSuite):
     def run(self, result, debug=False):
         if self._announce is not None:
             self._announce(self._name)
-        return super().run(result, debug)
+        first = len(result.records)
+        started = time.perf_counter()
+        try:
+            return super().run(result, debug)
+        finally:
+            elapsed = time.perf_counter() - started
+            tests = [r for r in result.records[first:] if r["kind"] == "test"]
+            if tests:
+                tests[0]["fixture_duration"] = round(max(
+                    0.0, elapsed - math.fsum(r.get("duration") or 0.0 for r in tests)), 6)
 
 
 def run_positions(children, positions, bin_index, names=None, announce=None):
@@ -425,8 +625,9 @@ def _position_of(test, positions):
 
     Known limit: when one test id sits at two positions, which happens when
     one TestCase class is imported into two test modules, the row takes the
-    first of them. The summary blocks then sort by that first position. No
-    such shape exists in crux/scripts/tests.
+    first of them. The summary blocks then sort by that first position.
+    Import fixture modules instead of their TestCase classes to avoid running
+    the imported tests twice.
     """
     if isinstance(test, _CrSubTest):
         test = test.test_case
@@ -672,7 +873,7 @@ def _check_coverage(manifest, bins):
             holders[position].append(b.index)
     for position in sorted(holders):
         if not 0 <= position < len(manifest):
-            raise LedgerError("bin-coverage", "position %d is outside the manifest of %d modules"
+            raise LedgerError("bin-coverage", "position %d is outside the manifest of %d units"
                               % (position, len(manifest)), bin=holders[position][0])
     for position, (name, _) in enumerate(manifest):
         held = holders.get(position, [])
@@ -728,13 +929,14 @@ def exit_code(summary):
 # ---------------------------------------------------------------------------
 
 
-def assign_bins(names, workers, affinity=AFFINITY, heavy=HEAVY):
-    """Assign module positions to at most `workers` bins. Deterministic.
+def assign_bins(units, workers, affinity=AFFINITY, timings=None):
+    """Assign unit positions to at most `workers` bins. Deterministic.
 
-    AFFINITY and HEAVY name a module by its last dotted part, so a run under
-    a top-level directory, whose modules are named `pkg.test_x`, matches the
-    same entries. Two groups that share a name are refused: a position would
-    land in two bins."""
+    `units` are `Unit`s. AFFINITY and the timings name a module by its last
+    dotted part, so a run under a top-level directory, whose modules are named
+    `pkg.test_x`, matches the same entries. Two groups that share a name are
+    refused: a position would land in two bins. Every unit of a module in a
+    group joins the group's one task."""
     group_of = {}
     for number, group in enumerate(affinity):
         for name in sorted(set(group)):
@@ -742,7 +944,7 @@ def assign_bins(names, workers, affinity=AFFINITY, heavy=HEAVY):
                 raise LedgerError("affinity-overlap", "%s sits in affinity groups %d and %d"
                                   % (name, group_of[name], number), module=name)
             group_of[name] = number
-    short = [name.rpartition(".")[2] for name in names]
+    short = [unit.module.rpartition(".")[2] for unit in units]
     grouped = set()
     tasks = []
     for group in affinity:
@@ -750,13 +952,14 @@ def assign_bins(names, workers, affinity=AFFINITY, heavy=HEAVY):
         if members:
             tasks.append(members)
             grouped.update(members)
-    tasks.extend([position] for position in range(len(names)) if position not in grouped)
+    tasks.extend([position] for position in range(len(units)) if position not in grouped)
     if not tasks:
         return []
-    weight = {id(task): sum(heavy.get(short[p], 1) for p in task) for task in tasks}
+    each = unit_weights(units, timings or {})
+    weight = {id(task): math.fsum(each[p] for p in task) for task in tasks}
     tasks.sort(key=lambda task: (-weight[id(task)], task[0]))
     count = max(1, min(workers, len(tasks)))
-    loads = [0] * count
+    loads = [0.0] * count
     members = [[] for _ in range(count)]
     for task in tasks:
         target = min(range(count), key=lambda i: (loads[i], i))
@@ -794,14 +997,14 @@ def _worker_main(conn, bin_index, positions, start, pattern, top, snapshot, expe
         os.dup2(devnull, 0)
         os.close(devnull)
     sys.path[:] = snapshot
-    suite = discover(start, pattern, top)
-    manifest = build_manifest(suite)
+    units = build_units(discover(start, pattern, top))
+    manifest = unit_manifest(units)
     discovered_path = list(sys.path)
     if _normal(manifest) != _normal(expected):
         # The coordinator refuses this payload; running other positions
         # would only cost time.
         positions = ()
-    children = list(suite)
+    children = [unit.suite for unit in units]
     names = [name for name, _ in manifest]
     result = run_positions(children, positions, bin_index, names,
                            lambda name: conn.send(("begin", name)))
@@ -1006,7 +1209,7 @@ def _refuse_incapable_interpreter(args):
     return None
 
 
-def _header(args, manifest, bins, workers):
+def _header(args, manifest, bins, workers, timings_note):
     requested = args.workers if args.workers is not None else "default %d" % DEFAULT_WORKERS
     origin = _crux_origin()
     lines = [
@@ -1014,13 +1217,14 @@ def _header(args, manifest, bins, workers):
         "executable %s" % sys.executable,
         "prefix %s" % sys.prefix,
         "crux %s" % origin if origin else "crux not importable",
-        "discovered %d tests in %d modules (start %s, pattern %s, top %s)"
+        "discovered %d tests in %d units (start %s, pattern %s, top %s)"
         % (sum(len(ids) for _, ids in manifest), len(manifest), args.start, args.pattern, args.top),
+        "timings %s" % timings_note,
         "workers %d (%d bins; requested %s, process_cpu_count %s)"
         % (workers, len(bins), requested, os.process_cpu_count()),
     ]
     for b in bins:
-        lines.append("bin %d weight %d: %s" % (b.index, b.weight,
+        lines.append("bin %d weight %.1f: %s" % (b.index, b.weight,
                                                " ".join(manifest[p][0] for p in b.positions)))
     sys.stderr.write("".join("%s %s\n" % (_PREFIX, line) for line in lines))
     sys.stderr.flush()
@@ -1037,7 +1241,9 @@ def _parse(argv):
     parser = argparse.ArgumentParser(
         prog="parallel_suite.py",
         description="Run `unittest discover` across worker processes; fail closed on any discrepancy.")
-    parser.add_argument("start", help="the start directory, as for unittest discover -s")
+    parser.add_argument("start", nargs="?", default=None,
+                        help="the start directory, as for unittest discover -s "
+                             "(required unless --write-timings)")
     parser.add_argument("-p", "--pattern", default=DEFAULT_PATTERN,
                         help="the test file pattern (default %s)" % DEFAULT_PATTERN)
     parser.add_argument("-t", "--top-level-directory", dest="top", default=None,
@@ -1047,11 +1253,39 @@ def _parse(argv):
                              % DEFAULT_WORKERS)
     parser.add_argument("--records", default=None,
                         help="write the canonical JSONL records to this path")
-    return parser.parse_args(argv)
+    parser.add_argument("--timings", default=None,
+                        help="read unit weights from this file (default: suite_timings.json "
+                             "beside the driver)")
+    parser.add_argument("--write-timings", dest="write_timings", default=None, metavar="RECORDS",
+                        help="write the timings file from a --records JSONL and exit")
+    parser.add_argument("--timings-out", dest="timings_out", default=None,
+                        help="the file --write-timings writes (default: the committed file)")
+    args = parser.parse_args(argv)
+    if args.write_timings is None and args.start is None:
+        parser.error("the following arguments are required: start")
+    return args
+
+
+def _write_timings_main(args):
+    out = args.timings_out or DEFAULT_TIMINGS
+    try:
+        count = write_timings(args.write_timings, out)
+    except (LedgerError, OSError) as err:
+        sys.stderr.write("%s FAILED CLOSED: %s\n" % (_PREFIX, err))
+        return 2
+    sys.stderr.write("%s wrote %d timings entries to %s\n" % (_PREFIX, count, out))
+    return 0
 
 
 def main(argv=None):
     args = _parse(argv)
+    if args.write_timings is not None:
+        return _write_timings_main(args)
+    try:
+        timings, timings_note = load_timings(args.timings)
+    except LedgerError as err:
+        sys.stderr.write("%s FAILED CLOSED: %s\n" % (_PREFIX, err))
+        return 2
     refusal = _refuse_incapable_interpreter(args)
     if refusal:
         sys.stderr.write("%s FAILED CLOSED: %s\n" % (_PREFIX, refusal))
@@ -1069,7 +1303,8 @@ def main(argv=None):
         for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
             if signal.getsignal(signum) is not signal.SIG_IGN:
                 saved[signum] = signal.signal(signum, _deferring(pending))
-        manifest = build_manifest(discover(args.start, args.pattern, args.top))
+        units = build_units(discover(args.start, args.pattern, args.top))
+        manifest = unit_manifest(units)
         # Install the raising handler before reading `pending`, so a signal
         # between the two either is already recorded or raises.
         for signum in saved:
@@ -1078,8 +1313,8 @@ def main(argv=None):
             raise _Interrupted(pending[0])
         discovered_path = list(sys.path)
         workers = effective_workers(args.workers)
-        bins = assign_bins([name for name, _ in manifest], workers)
-        _header(args, manifest, bins, workers)
+        bins = assign_bins(units, workers, AFFINITY, timings)
+        _header(args, manifest, bins, workers, timings_note)
         if not any(ids for _, ids in manifest):
             reconcile(manifest, bins, {}, discovered_path)
         began = time.perf_counter()

@@ -86,6 +86,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import summaries_projection as sp  # noqa: E402
+import implementation_migration as migration  # noqa: E402
 
 _SCRIPTS = Path(__file__).resolve().parent
 
@@ -148,6 +149,12 @@ def _validate(root: Path, adrs: Path, manifest: dict, reviews: dict,
     """Every pre-sign check, all fail-closed. Returns (findings, ctx); ctx
     carries the computed views the renderer and the write planner reuse."""
     findings: list[dict] = []
+    view = migration.authority_view(root)
+    if view["state"] == "published":
+        sp._summary_authority_records(records, view, sp.removed_handles(reviews), {})
+    for handle in batch["handles"]:
+        if handle in view["historical_handles"]:
+            findings.append(_finding("historical implementation handle cannot receive a backfill disposition", handle=handle))
     adr_cfg = manifest.get("adr") or {}
     raw_cohort = adr_cfg.get("governs_backfill_cohort")
     if raw_cohort is not None and not isinstance(raw_cohort, list):
@@ -332,6 +339,7 @@ def _validate(root: Path, adrs: Path, manifest: dict, reviews: dict,
                 f"red tree ({detail})"))
 
     ctx = {
+        "migration_view": view,
         "ledger": ledger, "records_by_handle": records_by_handle,
         "records_by_adr": records_by_adr, "receipts": receipts,
         "no_rule": no_rule, "receipt_by_handle": receipt_by_handle,
@@ -339,6 +347,40 @@ def _validate(root: Path, adrs: Path, manifest: dict, reviews: dict,
         "kinds": kinds, "cohort": cohort,
     }
     return findings, ctx
+
+
+def _migration_write_findings(root: Path, tree: Path, adrs: Path, plan: dict,
+                             view: dict, date: str) -> list[dict]:
+    """Refuse edits to proved dependencies before any signature or ledger write."""
+    mutations = set()
+    if plan["flip"]: mutations.add(sp.reviews_path(adrs))
+    if plan["appends"] or plan["set_marker"]: mutations.add(tree / "manifest.yml")
+    if plan["log"] == "write": mutations.add(tree / "log.md")
+    if plan["journal"] == "write": mutations.add(tree / "journal" / (date[:7] + ".md"))
+    bound = {root / item["path"] for item in view["dependency_fingerprints"]}
+    return [_finding("bound migration dependency cannot change during backfill sign-off; "
+        "a separately reviewed recovery and specific human disposition are required: " + str(path.relative_to(root)))
+        for path in sorted(mutations.intersection(bound))]
+
+
+def _preflight_write_paths(tree: Path, paths: tuple[Path, ...]) -> None:
+    for path in paths:
+        parent = path.parent.resolve()
+        if parent != tree.resolve() and tree.resolve() not in parent.parents:
+            raise OSError(f"refusing to write {path}: parent is not contained under the validated tree")
+        if path.is_symlink():
+            raise OSError(f"refusing to write {path}: target is a symlink")
+
+
+def _preflight_summary_plan(root: Path, manifest: dict, simulated_reviews: dict) -> None:
+    # This loads the input boundary separately from the post-write gate driver.
+    spec = importlib.util.spec_from_file_location("_backfill_summary_inputs", _SCRIPTS / "summarize-adrs.py")
+    summaries = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(summaries)
+    loaded, view, pending, _actual = summaries._load_summary_inputs(root, manifest)
+    loaded["reviews"] = simulated_reviews
+    sp._plan_summary_outputs(loaded, view, pending)
+    migration._unchanged_inputs(root, view["dependency_fingerprints"])
 
 
 # ── simulated marker arithmetic ──────────────────────────────────────────────
@@ -1033,6 +1075,10 @@ def _post_gates(root: Path) -> tuple[int | None, list[str]]:
 # ── main ─────────────────────────────────────────────────────────────────────
 
 def main(argv=None) -> int:
+    supplied = list(sys.argv[1:] if argv is None else argv)
+    if any(arg == "--migration-disposition" or arg.startswith("--migration-disposition=") for arg in supplied):
+        from migration_disposition import main as disposition_main
+        return disposition_main("backfill-receipt", supplied)
     ap = argparse.ArgumentParser(
         description="Owner sign-off for one backfill batch: render the "
         "enumerated receipts, validate fail-closed, write the four surfaces "
@@ -1058,6 +1104,11 @@ def main(argv=None) -> int:
         # the three sibling summaries drivers use — never an exit-1 traceback.
         adr_cfg = manifest.get("adr") or {}
         gf = sp.governs_from(manifest)
+        _preflight_write_paths(tree_dir, (tree_dir / "manifest.yml", sp.reviews_path(adrs)))
+        migration.authority_view(root)
+    except migration.Refused as exc:
+        print(json.dumps({"findings": [_finding(str(exc))]}, sort_keys=True))
+        return 1
     except sp.GovernsValidationError as exc:
         print(json.dumps({"validation_errors": exc.problems}, sort_keys=True))
         return 1
@@ -1115,8 +1166,11 @@ def main(argv=None) -> int:
         sys.stderr.write(f"signoff-backfill: {type(exc).__name__}: {exc}\n")
         return 2
 
-    findings, ctx = _validate(root, adrs, manifest, reviews, records,
-                              batch, bid, mode)
+    try:
+        findings, ctx = _validate(root, adrs, manifest, reviews, records, batch, bid, mode)
+    except (migration.Refused, sp.GovernsValidationError) as exc:
+        print(json.dumps({"findings": [_finding(str(exc))]}, sort_keys=True))
+        return 1
     _rsim, _lsim, counts, set_marker = _marker_report(ctx, batch, bid, date, reviews)
     # The completion marker is terminal: a batch whose simulated post-sign
     # arithmetic leaves any cohort ADR pending cannot sign while the marker
@@ -1134,6 +1188,15 @@ def main(argv=None) -> int:
     plan, plan_findings = _plan_writes(tree_dir, adrs, manifest, reviews,
                                        batch, bid, mode, date, ctx, set_marker)
     findings += plan_findings
+    findings += _migration_write_findings(root, tree_dir, adrs, plan, ctx["migration_view"], date)
+    if not findings:
+        try:
+            _preflight_summary_plan(root, manifest, _rsim)
+        except OSError as exc:
+            sys.stderr.write(f"signoff-backfill: projection destination is not contained under the validated tree or is unavailable: {exc}\n")
+            return 2
+        except (migration.Refused, sp.GovernsValidationError, ValueError) as exc:
+            findings.append(_finding("post-sign projection preflight refused: " + str(exc)))
 
     rendering = _render(batch, bid, mode, date, ctx, counts, set_marker)
 

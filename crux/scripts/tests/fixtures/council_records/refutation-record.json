@@ -1,0 +1,33 @@
+{
+  "record_type": "refutation-record",
+  "format_version": "1",
+  "written_at": "2026-10-01T12:10:00.000001Z",
+  "book": {
+    "id": "PB-0999",
+    "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "run_id": "RUN-001",
+  "module_tag": "adr-1",
+  "council_record": {
+    "path": "docs/promptbooks/runs/PB-0999-fixture/council/RUN-001-p2-r1.json",
+    "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+  },
+  "recorder": "conductor-session-1",
+  "recorder_role": "conductor",
+  "subjects": [
+    {
+      "path": "docs/adrs/ADR-0001-fixture.md",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  ],
+  "entries": [
+    {
+      "finding_id": "openai_top:F1",
+      "check": "uv run python3 -m unittest tests.test_fixture",
+      "expect": "exit:0",
+      "result_token": "exit:0",
+      "artifact": "docs/promptbooks/runs/PB-0999-fixture/checks/F1.txt",
+      "result": "refuted"
+    }
+  ]
+}

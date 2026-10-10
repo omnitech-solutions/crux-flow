@@ -1,0 +1,18 @@
+{
+  "record_type": "owner-exception",
+  "format_version": "1",
+  "book": {
+    "id": "PB-0999",
+    "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "run_id": "RUN-001",
+  "module_tag": "adr-1",
+  "prompt": null,
+  "owner": "Fixture Owner",
+  "date": "2026-10-01",
+  "reason": "fixture: the runner was killed after its claim and no result survived",
+  "void_attempt": {
+    "path": "docs/promptbooks/runs/PB-0999-fixture/council/RUN-001-adr-1-r1-a1.attempt.json",
+    "sha256": "c7e0a816d430aa50316e838429b850361094f57d4f78ae88a81402c7289ca15e"
+  }
+}

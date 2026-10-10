@@ -5,7 +5,9 @@ any ledger discrepancy. These tests cover four layers:
 
 - the recorder and the summary, run in-process against `TextTestRunner`;
 - `reconcile`, the pure ledger, with one synthetic case per fail-closed branch;
-- the bin assignment and the affinity list;
+- the cut into units, the measured weights and the bin assignment;
+- the timings file and its writer;
+- the affinity list;
 - the whole driver, run in subprocesses with `--workers 2` over synthetic trees
   built in temporary directories.
 
@@ -17,6 +19,7 @@ the staged artifact carries.
 from __future__ import annotations
 
 import contextlib
+import inspect
 import io
 import json
 import os
@@ -462,7 +465,7 @@ class LedgerTests(unittest.TestCase):
     def test_bin_coverage_a_position_outside_the_manifest_is_refused(self):
         err = self._refused(_clean_payloads(), bins=[ps.Bin(0, 4, (0,)), ps.Bin(1, 1, (1, 5))])
         self.assertEqual((err.branch, err.bin), ("bin-coverage", 1))
-        self.assertIn("position 5 is outside the manifest of 2 modules", str(err))
+        self.assertIn("position 5 is outside the manifest of 2 units", str(err))
 
 
 class _FakeConn:
@@ -525,75 +528,290 @@ def _affinity_gaps(tests_dir: Path, affinity) -> list[str]:
     return gaps
 
 
-def _weight_gaps(tests_dir: Path, heavy) -> list[str]:
-    """Every name in `heavy` must be a module in `tests_dir`. A weight for a
-    renamed module would silently fall back to 1."""
-    return [f"weight for missing module {name}.py" for name in sorted(heavy)
-            if not (tests_dir / f"{name}.py").is_file()]
+def _cls(name, tests=1, body=""):
+    """Source for one TestCase class with `tests` passing tests."""
+    methods = "".join("    def test_%d(self):\n        pass\n" % i for i in range(tests)) or "    pass\n"
+    return "class %s(unittest.TestCase):\n%s%s\n" % (name, body, methods)
+
+
+def _module(*classes, extra=""):
+    return "import unittest\n\n" + extra + "\n".join(classes)
+
+
+@contextlib.contextmanager
+def _discovered(files, affinity=ps.AFFINITY):
+    """Discover a synthetic tree in this process and yield (units, suite).
+    The modules and the import path it added are removed afterwards."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tree = _write_tree(Path(tmp), files)
+        saved_path = list(sys.path)
+        before = set(sys.modules)
+        try:
+            suite = ps.discover(str(tree), "test*.py", None)
+            yield ps.build_units(suite, affinity), suite
+        finally:
+            sys.path[:] = saved_path
+            for name in set(sys.modules) - before:
+                sys.modules.pop(name, None)
+
+
+SPLIT_FILES = {"test_unitcut_split.py": _module(_cls("Alpha", 2), _cls("Beta"), _cls("Gamma"))}
+
+
+class UnitCutTests(unittest.TestCase):
+    """The cut of a discovered suite into scheduling units."""
+
+    def _names(self, files, affinity=ps.AFFINITY):
+        with _discovered(files, affinity) as (units, _):
+            return [unit.name for unit in units]
+
+    def test_a_module_splits_into_one_unit_per_class(self):
+        with _discovered(SPLIT_FILES) as (units, _):
+            self.assertEqual([(u.module, u.name, u.ids) for u in units], [
+                ("test_unitcut_split", "test_unitcut_split.Alpha",
+                 ("test_unitcut_split.Alpha.test_0", "test_unitcut_split.Alpha.test_1")),
+                ("test_unitcut_split", "test_unitcut_split.Beta", ("test_unitcut_split.Beta.test_0",)),
+                ("test_unitcut_split", "test_unitcut_split.Gamma", ("test_unitcut_split.Gamma.test_0",)),
+            ])
+
+    def test_the_classes_of_a_split_module_can_land_in_different_bins(self):
+        with _discovered(SPLIT_FILES) as (units, _):
+            bins = ps.assign_bins(units, 2, (), {})
+        holding = [b.index for b in bins for p in b.positions if units[p].module == "test_unitcut_split"]
+        self.assertEqual(sorted(set(holding)), [0, 1])
+
+    def test_a_module_hazard_keeps_the_module_one_unit(self):
+        hazards = {
+            "setUpModule": "def setUpModule():\n    pass\n\n",
+            "tearDownModule": "def tearDownModule():\n    pass\n\n",
+            "load_tests": "def load_tests(loader, tests, pattern):\n    return tests\n\n",
+        }
+        for label, extra in hazards.items():
+            with self.subTest(label):
+                files = {"test_unitcut_hazard.py": _module(_cls("A"), _cls("B"), extra=extra)}
+                self.assertEqual(self._names(files), ["test_unitcut_hazard"])
+        with self.subTest("addModuleCleanup"):
+            cleanup = ("    @classmethod\n    def setUpClass(cls):\n"
+                       "        unittest.addModule" + "Cleanup(lambda: None)\n\n")
+            files = {"test_unitcut_hazard.py": _module(_cls("A", body=cleanup), _cls("B"))}
+            self.assertEqual(self._names(files), ["test_unitcut_hazard"])
+        with self.subTest("positive control: the same module without the hazard splits"):
+            files = {"test_unitcut_hazard.py": _module(_cls("A"), _cls("B"))}
+            self.assertEqual(self._names(files), ["test_unitcut_hazard.A", "test_unitcut_hazard.B"])
+
+    def test_one_class_is_one_unit_named_for_the_module(self):
+        files = {"test_unitcut_single.py": _module(_cls("Only", 3))}
+        self.assertEqual(self._names(files), ["test_unitcut_single"])
+
+    def test_an_affinity_module_stays_one_unit(self):
+        files = {"test_unitcut_split.py": SPLIT_FILES["test_unitcut_split.py"],
+                 "test_unitcut_pinned.py": _module(_cls("A"), _cls("B"))}
+        names = self._names(files, (("test_unitcut_pinned", "test_other"),))
+        self.assertEqual(names, ["test_unitcut_pinned", "test_unitcut_split.Alpha",
+                                 "test_unitcut_split.Beta", "test_unitcut_split.Gamma"])
+
+    def test_the_shipped_affinity_list_is_the_default_of_the_cut_and_the_bins(self):
+        for function in (ps.build_units, ps.assign_bins):
+            self.assertIs(inspect.signature(function).parameters["affinity"].default, ps.AFFINITY)
+
+    def test_the_units_of_an_affinity_module_share_a_task_even_when_whole(self):
+        files = {"test_unitcut_pinned.py": _module(_cls("A"), _cls("B")),
+                 "test_unitcut_pinned2.py": _module(_cls("C"), _cls("D")),
+                 "test_unitcut_split.py": SPLIT_FILES["test_unitcut_split.py"]}
+        group = (("test_unitcut_pinned", "test_unitcut_pinned2"),)
+        with _discovered(files, group) as (units, _):
+            pinned = {i for i, u in enumerate(units) if u.module in group[0]}
+            self.assertEqual(len(pinned), 2)
+            for workers in range(1, 6):
+                bins = ps.assign_bins(units, workers, group, {})
+                self.assertEqual(len([b for b in bins if pinned & set(b.positions)]), 1)
+
+    def test_failed_imports_and_skips_stay_one_unit(self):
+        files = {
+            "test_unitcut_broken.py": "import nothing_by_this_name_exists\n",
+            "test_unitcut_skipped.py": "import unittest\nraise unittest.SkipTest('whole module')\n",
+            "test_unitcut_ok.py": _module(_cls("A"), _cls("B")),
+        }
+        with _discovered(files) as (units, _):
+            self.assertEqual([u.name for u in units], [
+                "test_unitcut_broken", "test_unitcut_ok.A", "test_unitcut_ok.B", "test_unitcut_skipped"])
+            self.assertEqual(units[0].ids, ("unittest.loader._FailedTest.test_unitcut_broken",))
+
+    def test_an_imported_class_splits_off_with_the_timings_key_of_its_own_module(self):
+        helper = "import unittest\n\nclass Shared(unittest.TestCase):\n    def test_shared(self):\n        pass\n"
+        files = {"unitcut_helper.py": helper,
+                 "test_unitcut_foreign.py": "from unitcut_helper import Shared\n" + _module(_cls("Local"))}
+        with _discovered(files) as (units, _):
+            self.assertEqual([(u.name, u.key, u.ids) for u in units], [
+                ("test_unitcut_foreign.Local", "test_unitcut_foreign.Local",
+                 ("test_unitcut_foreign.Local.test_0",)),
+                ("test_unitcut_foreign.Shared", "unitcut_helper.Shared",
+                 ("unitcut_helper.Shared.test_shared",)),
+            ])
+
+    def test_an_imported_class_whose_module_has_a_module_fixture_keeps_the_module_one_unit(self):
+        helper = ("import unittest\n\ndef setUpModule():\n    pass\n\n"
+                  "class Shared(unittest.TestCase):\n    def test_shared(self):\n        pass\n")
+        files = {"unitcut_helper.py": helper,
+                 "test_unitcut_foreign.py": "from unitcut_helper import Shared\n" + _module(_cls("Local"))}
+        self.assertEqual(self._names(files), ["test_unitcut_foreign"])
+
+    def test_empty_classes_are_not_units(self):
+        files = {"test_unitcut_empty.py": _module(_cls("A"), _cls("B"), _cls("Empty", 0))}
+        with _discovered(files) as (units, _):
+            self.assertEqual([u.name for u in units], ["test_unitcut_empty.A", "test_unitcut_empty.B"])
+
+    def test_the_units_hold_exactly_the_discovered_tests_in_order(self):
+        files = dict(SPLIT_FILES)
+        files.update({
+            "test_unitcut_alias.py": _module(_cls("A", 2), "Again = A\n", _cls("B")),
+            "test_unitcut_fixture.py": _module(_cls("A"), _cls("B"),
+                                               extra="def setUpModule():\n    pass\n\n"),
+            "test_unitcut_broken.py": "import nothing_by_this_name_exists\n",
+            "test_unitcut_empty.py": "import unittest\n",
+        })
+        with _discovered(files) as (units, suite):
+            discovered = [leaf.id() for leaf in ps._leaves(suite)]
+            self.assertEqual([i for u in units for i in u.ids], discovered)
+            self.assertGreater(len(units), len(list(suite)))
+            self.assertEqual(ps.unit_manifest(units), [(u.name, u.ids) for u in units])
+            # The units reference the discovered tests themselves, so a worker runs them.
+            self.assertEqual([leaf for u in units for leaf in ps._leaves(u.suite)],
+                             list(ps._leaves(suite)))
+
+
+def _unit(module, cls=None):
+    name = module if cls is None else "%s.%s" % (module, cls)
+    key = module.rpartition(".")[2] + ("" if cls is None else "." + cls)
+    return ps.Unit(module, name, (), None, key)
+
+
+class MeasuredWeightTests(unittest.TestCase):
+    """A unit weighs its timings entry; the median stands in for a missing one."""
+
+    TIMINGS = {"test_a.X": 5.0, "test_a.Y": 1.0, "test_a_b.Z": 100.0}
+
+    def _weights(self, units, timings=None):
+        return ps.unit_weights(units, self.TIMINGS if timings is None else timings)
+
+    def test_a_class_unit_weighs_its_entry(self):
+        self.assertEqual(self._weights([_unit("test_a", "X"), _unit("test_a", "Y")]), [5.0, 1.0])
+
+    def test_a_unit_without_an_entry_weighs_the_median_of_all_entries(self):
+        self.assertEqual(self._weights([_unit("test_a", "Unknown")]), [5.0])
+        self.assertEqual(self._weights([_unit("test_new")]), [5.0])
+        self.assertEqual(self._weights([_unit("test_a", "Unknown")], {"a.X": 1.0, "a.Y": 2.0}), [1.5])
+
+    def test_a_module_unit_weighs_the_sum_of_its_class_entries(self):
+        # `test_a_b.Z` shares a prefix with `test_a` and is not one of its classes.
+        self.assertEqual(self._weights([_unit("test_a")]), [6.0])
+
+    def test_entries_are_read_by_the_short_module_name(self):
+        self.assertEqual(self._weights([_unit("pkg.test_a", "X"), _unit("pkg.test_a")]), [5.0, 6.0])
+
+    def test_no_timings_weigh_one_and_a_zero_entry_weighs_the_floor(self):
+        self.assertEqual(self._weights([_unit("test_a", "X")], {}), [1])
+        self.assertEqual(self._weights([_unit("test_a", "X")], {"test_a.X": 0.0}), [ps.MIN_WEIGHT])
+
+    def test_weights_decide_the_bins_from_the_file_not_from_a_module_table(self):
+        units = [_unit("test_a", "X"), _unit("test_a", "Y"), _unit("test_a", "W")]
+        heavy_w = ps.assign_bins(units, 2, (), {"test_a.W": 9.0, "test_a.X": 1.0, "test_a.Y": 1.0})
+        self.assertEqual(heavy_w, [ps.Bin(0, 9.0, (2,)), ps.Bin(1, 2.0, (0, 1))])
+        heavy_x = ps.assign_bins(units, 2, (), {"test_a.W": 1.0, "test_a.X": 9.0, "test_a.Y": 1.0})
+        self.assertEqual(heavy_x, [ps.Bin(0, 9.0, (0,)), ps.Bin(1, 2.0, (1, 2))])
 
 
 class BinningTests(unittest.TestCase):
-    """LPT assignment is deterministic, never splits a module, and keeps
-    each affinity group in one bin."""
+    """LPT assignment is deterministic, loses no unit, and keeps each affinity
+    group in one bin."""
 
-    NAMES = ["test_a", "test_heavy", "test_g1", "test_b", "test_g2", "test_c", "test_d", "test_g3"]
+    MODULES = ["test_a", "test_heavy", "test_g1", "test_b", "test_g2", "test_c", "test_d", "test_g3"]
     AFFINITY = (("test_g1", "test_g2", "test_g3"),)
-    HEAVY = {"test_heavy": 10, "test_g1": 2, "test_g3": 2}
+    TIMINGS = {"test_heavy.H": 10, "test_g1.G": 2, "test_g3.G": 2}
 
-    def _assign(self, workers, names=None):
-        return ps.assign_bins(names or self.NAMES, workers, self.AFFINITY, self.HEAVY)
+    def _units(self, modules=None):
+        return [_unit(m, "H" if m == "test_heavy" else "G" if m in ("test_g1", "test_g3") else None)
+                for m in modules or self.MODULES]
+
+    def _assign(self, workers, modules=None):
+        return ps.assign_bins(self._units(modules), workers, self.AFFINITY, self.TIMINGS)
 
     def test_assignment_is_deterministic(self):
         first = self._assign(3)
         for _ in range(5):
             self.assertEqual(self._assign(3), first)
         # Heaviest task first, ties to the lowest bin, discovery order inside a bin.
-        self.assertEqual(first, [ps.Bin(0, 10, (1,)),
-                                 ps.Bin(1, 5, (2, 4, 7)),
-                                 ps.Bin(2, 4, (0, 3, 5, 6))])
+        # Units with no entry weigh the median, 2: the group weighs 6 and each other unit 2.
+        self.assertEqual(first, [ps.Bin(0, 10.0, (1,)),
+                                 ps.Bin(1, 8.0, (2, 4, 6, 7)),
+                                 ps.Bin(2, 6.0, (0, 3, 5))])
 
-    def test_no_module_is_split_and_none_is_lost(self):
+    def test_no_unit_is_lost_and_each_bin_runs_in_discovery_order(self):
         for workers in range(1, 10):
             with self.subTest(workers=workers):
                 bins = self._assign(workers)
                 positions = [p for b in bins for p in b.positions]
-                self.assertEqual(sorted(positions), list(range(len(self.NAMES))))
+                self.assertEqual(sorted(positions), list(range(len(self.MODULES))))
                 for b in bins:
                     self.assertEqual(list(b.positions), sorted(b.positions))
 
     def test_the_affinity_group_shares_one_bin_at_every_worker_count(self):
-        group = {self.NAMES.index(n) for n in self.AFFINITY[0]}
+        group = {self.MODULES.index(n) for n in self.AFFINITY[0]}
         for workers in range(1, 10):
             with self.subTest(workers=workers):
                 holding = [b.index for b in self._assign(workers) if group & set(b.positions)]
                 self.assertEqual(len(holding), 1)
 
+    def test_every_unit_of_an_affinity_module_joins_the_group_task(self):
+        units = [_unit("test_g1", "A"), _unit("test_g1", "B"), _unit("test_x"), _unit("test_g2")]
+        for workers in range(1, 6):
+            bins = ps.assign_bins(units, workers, self.AFFINITY, {})
+            self.assertEqual(len([b for b in bins if {0, 1, 3} & set(b.positions)]), 1)
+
     def test_the_real_affinity_group_shares_one_bin(self):
-        names = ["test_x"] + list(ps.AFFINITY[0]) + ["test_derive_arch", "test_y"]
+        modules = ["test_x"] + list(ps.AFFINITY[0]) + ["test_derive_arch", "test_y"]
         group = set(range(1, 1 + len(ps.AFFINITY[0])))
         for workers in range(1, 10):
-            bins = ps.assign_bins(names, workers)
+            bins = ps.assign_bins([_unit(m) for m in modules], workers)
             self.assertEqual(len([b for b in bins if group & set(b.positions)]), 1)
 
     def test_overlapping_affinity_groups_are_refused(self):
+        units = [_unit("a"), _unit("b"), _unit("c")]
         with self.assertRaises(ps.LedgerError) as caught:
-            ps.assign_bins(["a", "b", "c"], 3, affinity=(("a", "b"), ("b", "c")), heavy={})
+            ps.assign_bins(units, 3, affinity=(("a", "b"), ("b", "c")))
         err = caught.exception
         self.assertEqual((err.branch, err.module), ("affinity-overlap", "b"))
         self.assertIn("affinity groups 0 and 1", str(err))
         # Positive control: disjoint groups over the same names are accepted.
-        bins = ps.assign_bins(["a", "b", "c"], 3, affinity=(("a", "b"), ("c",)), heavy={})
+        bins = ps.assign_bins(units, 3, affinity=(("a", "b"), ("c",)))
         self.assertEqual(sorted(p for b in bins for p in b.positions), [0, 1, 2])
 
     def test_affinity_and_weights_match_the_short_module_name(self):
         # Discovery under a top-level directory names modules `pkg.test_x`.
-        names = ["pkg.test_a", "pkg.test_g1", "pkg.test_b", "pkg.test_g2", "pkg.test_heavy"]
-        bins = ps.assign_bins(names, 3, (("test_g1", "test_g2"),), {"test_heavy": 10, "test_g1": 2})
-        self.assertEqual(bins, [ps.Bin(0, 10, (4,)), ps.Bin(1, 3, (1, 3)), ps.Bin(2, 2, (0, 2))])
+        units = [_unit("pkg." + m, c) for m, c in [("test_a", None), ("test_g1", None), ("test_b", None),
+                                                    ("test_g2", None), ("test_heavy", "H")]]
+        timings = {"test_heavy.H": 10, "test_g1.A": 2, "test_g2.B": 1}
+        bins = ps.assign_bins(units, 3, (("test_g1", "test_g2"),), timings)
+        # test_a and test_b have no entry and weigh the median, 2.
+        self.assertEqual(bins, [ps.Bin(0, 10.0, (4,)), ps.Bin(1, 3.0, (1, 3)), ps.Bin(2, 4.0, (0, 2))])
 
     def test_bins_never_exceed_the_task_count(self):
         self.assertEqual(len(self._assign(50)), 6)
         self.assertEqual(ps.assign_bins([], 4), [])
+
+    def test_changing_weights_changes_the_bins_and_never_the_units(self):
+        with _discovered(SPLIT_FILES) as (units, _):
+            # Beta has no entry and weighs the median, 25.5.
+            by_gamma = ps.assign_bins(units, 2, (), {"test_unitcut_split.Gamma": 50.0,
+                                                     "test_unitcut_split.Alpha": 1.0})
+            by_alpha = ps.assign_bins(units, 2, (), {"test_unitcut_split.Gamma": 1.0,
+                                                     "test_unitcut_split.Alpha": 50.0})
+            before = ps.unit_manifest(units)
+        self.assertNotEqual(by_gamma, by_alpha)
+        for bins in (by_gamma, by_alpha):
+            self.assertEqual(sorted(p for b in bins for p in b.positions), list(range(len(before))))
+        self.assertEqual([b.positions for b in by_gamma], [(2,), (0, 1)])
+        self.assertEqual([b.positions for b in by_alpha], [(0,), (1, 2)])
 
     def test_the_cap_is_the_cpus_this_process_may_use(self):
         # An affinity mask narrower than the host: os.cpu_count counts the host.
@@ -614,9 +832,7 @@ class BinningTests(unittest.TestCase):
         self.assertEqual(ps.DEFAULT_PATTERN, "test*.py")
         self.assertIsInstance(ps.DEFAULT_WORKERS, int)
         self.assertGreaterEqual(ps.DEFAULT_WORKERS, 1)
-        for name, weight in ps.HEAVY.items():
-            self.assertIsInstance(weight, int)
-            self.assertTrue(name.startswith("test_"))
+        self.assertFalse(hasattr(ps, "HEAVY"), "the hand-kept weight table is replaced by the timings file")
 
     def test_the_manifest_is_one_entry_per_module_in_discovery_order(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -640,6 +856,133 @@ class BinningTests(unittest.TestCase):
         ])
 
 
+def _records(*rows):
+    """JSONL text of `--records` rows given as (id, kind, duration)."""
+    return "".join(json.dumps({"id": i, "kind": k, "duration": d, "bin": 0, "outcome": "ok"}) + "\n"
+                   for i, k, d in rows)
+
+
+RECORD_ROWS = [
+    ("test_a.X.test_1", "test", 1.004),
+    ("test_a.X.test_2", "test", 2.0),
+    ("test_a.X.test_2", "subtest", 99.0),
+    ("test_a.Y.test_1", "test", 0.5),
+    ("test_a.Y.test_2", "test", None),
+    ("setUpClass (test_a.Y)", "holder", None),
+    ("pkg.test_b.Z.test_1", "test", 0.004),
+    ("unittest.loader._FailedTest.test_broken", "test", 0.1),
+]
+
+
+class TimingsFileTests(unittest.TestCase):
+    """The timings reader, the writer and the committed file."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+
+    def _file(self, text, name="timings.json"):
+        path = self.dir / name
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def test_the_writer_sums_test_durations_by_module_and_class(self):
+        path = self._file(_records(*RECORD_ROWS), "records.jsonl")
+        self.assertEqual(ps.timings_from_records(path), {
+            "loader._FailedTest": 0.1, "test_a.X": 3.0, "test_a.Y": 0.5, "test_b.Z": 0.0})
+
+    def test_class_setup_contributes_to_weight_without_changing_test_duration(self):
+        clock = [0.0]
+
+        class CostlyFixture(unittest.TestCase):
+            @classmethod
+            def setUpClass(cls):
+                clock[0] += 20.0
+
+            def test_work(self):
+                clock[0] += 1.0
+
+        child = unittest.defaultTestLoader.loadTestsFromTestCase(CostlyFixture)
+        with mock.patch.object(ps.time, "perf_counter", side_effect=lambda: clock[0]):
+            result = ps.run_positions([child], (0,), 0)
+        self.assertEqual(result.testsRun, 1)
+        record = result.records[0]
+        self.assertEqual(record["duration"], 1.0)
+        self.assertEqual(record["fixture_duration"], 20.0)
+        path = self.dir / "records.jsonl"
+        result.write_jsonl(path)
+        self.assertEqual(sum(ps.timings_from_records(path).values()), 21.0)
+
+    def test_the_writer_is_deterministic_whatever_the_record_order(self):
+        forward = self._file(_records(*RECORD_ROWS), "forward.jsonl")
+        backward = self._file(_records(*reversed(RECORD_ROWS)), "backward.jsonl")
+        out_a, out_b = self.dir / "a.json", self.dir / "b.json"
+        self.assertEqual(ps.write_timings(forward, out_a), 4)
+        ps.write_timings(backward, out_b)
+        self.assertEqual(out_a.read_bytes(), out_b.read_bytes())
+        text = out_a.read_text(encoding="utf-8")
+        self.assertTrue(text.endswith("}\n"))
+        keys = list(json.loads(text))
+        self.assertEqual(keys, sorted(keys))
+        # The bytes are the reader's input: reading and formatting them changes nothing.
+        self.assertEqual(ps.format_timings(ps.read_timings(out_a)), text)
+
+    def test_the_writer_refuses_records_without_a_timed_test(self):
+        path = self._file(_records(("test_a.X.test_1", "test", None), ("test_a.X.test_1", "subtest", 3.0)))
+        with self.assertRaises(ps.LedgerError) as caught:
+            ps.write_timings(path, self.dir / "out.json")
+        self.assertEqual(caught.exception.branch, "malformed-records")
+        self.assertFalse((self.dir / "out.json").exists())
+        bad = self._file("{not json\n", "bad.jsonl")
+        with self.assertRaises(ps.LedgerError):
+            ps.timings_from_records(bad)
+
+    def test_a_malformed_file_is_refused(self):
+        cases = {
+            "not json": "{nope",
+            "not an object": "[1, 2]",
+            "a string value": '{"a.B": "slow"}',
+            "a boolean value": '{"a.B": true}',
+            "a negative value": '{"a.B": -1}',
+            "a null value": '{"a.B": null}',
+            "a non-finite value": '{"a.B": NaN}',
+        }
+        for label, text in cases.items():
+            with self.subTest(label), self.assertRaises(ps.LedgerError) as caught:
+                ps.read_timings(self._file(text))
+            self.assertEqual(caught.exception.branch, "malformed-timings")
+        with self.subTest("positive control"):
+            self.assertEqual(ps.read_timings(self._file('{"a.B": 1, "c.D": 2.5}')), {"a.B": 1, "c.D": 2.5})
+
+    def test_a_missing_default_file_gives_uniform_weights_and_says_so(self):
+        gone = str(self.dir / "absent.json")
+        with mock.patch.object(ps, "DEFAULT_TIMINGS", gone):
+            timings, note = ps.load_timings(None)
+        self.assertEqual(timings, {})
+        self.assertIn("every unit weighs 1", note)
+        self.assertIn(gone, note)
+
+    def test_a_missing_explicit_file_is_refused(self):
+        with self.assertRaises(ps.LedgerError) as caught:
+            ps.load_timings(str(self.dir / "absent.json"))
+        self.assertEqual(caught.exception.branch, "malformed-timings")
+
+    def test_a_malformed_default_file_is_refused(self):
+        bad = self._file("[]")
+        with mock.patch.object(ps, "DEFAULT_TIMINGS", str(bad)), self.assertRaises(ps.LedgerError):
+            ps.load_timings(None)
+
+    def test_the_committed_file_is_valid_and_in_the_writers_format(self):
+        committed = Path(ps.DEFAULT_TIMINGS)
+        self.assertEqual(committed.parent, HERE)
+        timings = ps.read_timings(committed)
+        self.assertTrue(timings)
+        self.assertEqual(committed.read_text(encoding="utf-8"), ps.format_timings(timings))
+        for key in timings:
+            self.assertEqual(len(key.split(".")), 2, key)
+
+
 class AffinityCompletenessTests(unittest.TestCase):
     """The affinity list names real modules, and every module that calls the
     corpus derive sits in an affinity group."""
@@ -651,17 +994,6 @@ class AffinityCompletenessTests(unittest.TestCase):
                    if _CALL_RE.search(p.read_text(encoding="utf-8", errors="replace"))}
         self.assertTrue(callers)
         self.assertLessEqual(callers, {n for g in ps.AFFINITY for n in g})
-
-    def test_every_weight_names_a_real_module(self):
-        self.assertEqual(_weight_gaps(HERE, ps.HEAVY), [])
-        self.assertTrue(ps.HEAVY)
-
-    def test_positive_control_a_weight_for_a_missing_module_is_a_gap(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            tree = Path(tmp)
-            (tree / "test_kept.py").write_text("x = 1\n")
-            gaps = _weight_gaps(tree, {"test_kept": 2, "test_renamed": 5})
-        self.assertEqual(gaps, ["weight for missing module test_renamed.py"])
 
     def test_positive_control_an_ungrouped_caller_is_a_gap(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -985,8 +1317,8 @@ PACKAGE_TREE.update({
     for name in ("test_arch_corpus", "test_arch_pack_acceptance", "test_other", "test_swift_app_gate")
 })
 
-# Four modules of weight 1 over two workers: bin 0 runs a and c, bin 1 runs b
-# and d, so merging in bin order would put c's blocks before b's.
+# Five units of weight 1 over two workers: bin 0 runs a, c and d's DSetup, bin 1
+# runs b and d's D, so merging in bin order would put c's blocks before b's.
 _ORDER_MODULE = """
     import unittest
 
@@ -1087,6 +1419,12 @@ class DriverEndToEndTests(unittest.TestCase):
 
     def _env(self, **extra):
         env = dict(os.environ)
+        # Keep the parent's import roots when a fixture changes the child cwd.
+        # An empty PYTHONPATH entry names that launch directory too.
+        if "PYTHONPATH" in env:
+            env["PYTHONPATH"] = os.pathsep.join(
+                os.path.abspath(path) for path in env["PYTHONPATH"].split(os.pathsep)
+            )
         env.update(extra)
         return env
 
@@ -1162,6 +1500,13 @@ class DriverEndToEndTests(unittest.TestCase):
         self.assertEqual(dumps["driver"], dumps["serial"])
         self.assertNotIn(str(self.cwd), dumps["serial"])
 
+    def test_child_import_roots_keep_the_parent_launch_directory(self):
+        external = str(self.root / "external")
+        inherited = os.pathsep.join(("", "crux/scripts", external))
+        with mock.patch.dict(os.environ, {"PYTHONPATH": inherited}):
+            actual = self._env()["PYTHONPATH"].split(os.pathsep)
+        self.assertEqual(actual, [os.getcwd(), os.path.abspath("crux/scripts"), external])
+
     def test_the_header_names_the_run(self):
         tree = self._tree(MIXED_TREE)
         run = self._run(tree)
@@ -1170,11 +1515,13 @@ class DriverEndToEndTests(unittest.TestCase):
         self.assertIn("parallel_suite: executable %s" % sys.executable, err)
         self.assertIn("parallel_suite: prefix %s" % sys.prefix, err)
         self.assertIn("parallel_suite: crux %s" % (tree / "_extra" / "crux" / "__init__.py"), err)
-        self.assertIn("parallel_suite: discovered 16 tests in 7 modules", err)
+        self.assertRegex(err, r"parallel_suite: discovered 16 tests in \d+ units")
+        self.assertRegex(err, r"parallel_suite: timings .*suite_timings\.json \(\d+ entries\)")
         self.assertRegex(err, r"parallel_suite: workers 2 \(2 bins; requested 2, process_cpu_count \d+\)")
-        bins = re.findall(r"^parallel_suite: bin (\d+) weight (\d+): (.+)$", err, re.M)
+        bins = re.findall(r"^parallel_suite: bin (\d+) weight ([\d.]+): (.+)$", err, re.M)
         self.assertEqual([b[0] for b in bins], ["0", "1"])
-        modules = sorted(m for b in bins for m in b[2].split())
+        # A unit is a module or `module.Class`; every module appears at least once.
+        modules = sorted({m.split(".")[0] for b in bins for m in b[2].split()})
         self.assertEqual(modules, sorted(Path(f).stem for f in MIXED_TREE if f.startswith("test_")))
 
     def test_the_header_says_when_crux_is_not_importable(self):
@@ -1287,22 +1634,162 @@ class DriverEndToEndTests(unittest.TestCase):
 
     def test_under_a_top_level_directory_the_affinity_group_shares_one_bin(self):
         tree = self._tree(PACKAGE_TREE)
-        run = self._run(tree / "ps_pkg", "-t", str(tree))
+        empty = self.root / "empty-timings.json"
+        empty.write_text("{}\n", encoding="utf-8")
+        run = self._run(tree / "ps_pkg", "-t", str(tree), "--timings", str(empty))
         self.assertEqual(run.returncode, 0, run.stderr)
         # Five modules: the package's own `__init__` is one, with no tests.
-        self.assertIn("parallel_suite: discovered 4 tests in 5 modules", run.stderr)
-        bins = re.findall(r"^parallel_suite: bin (\d+) weight (\d+): (.+)$", run.stderr, re.M)
+        self.assertIn("parallel_suite: discovered 4 tests in 5 units", run.stderr)
+        bins = re.findall(r"^parallel_suite: bin (\d+) weight ([\d.]+): (.+)$", run.stderr, re.M)
         self.assertEqual(len(bins), 2, run.stderr)
         group = {"ps_pkg." + name for name in ps.AFFINITY[0]}
         holding = [b for b in bins if group & set(b[2].split())]
         self.assertEqual(len(holding), 1, bins)
         self.assertLessEqual(group, set(holding[0][2].split()))
-        # The group weighs its HEAVY entries, read by the short module name.
-        self.assertEqual(int(holding[0][1]), sum(ps.HEAVY.get(n, 1) for n in ps.AFFINITY[0]))
+        # With no timings entry for ps_pkg, each unit weighs 1 and the group sums its members.
+        self.assertEqual(float(holding[0][1]), float(len(ps.AFFINITY[0])))
+
+    # -- units and measured weights --------------------------------------------
+
+    WIDE_TREE = {
+        "test_wide.py": _module(_cls("A", 2), _cls("B", 2), _cls("C", 2)),
+        "test_fixture.py": _module(_cls("F1", 2), _cls("F2", 2),
+                                   extra="def setUpModule():\n    pass\n\n"),
+    }
+
+    @staticmethod
+    def _header_bins(stderr):
+        rows = re.findall(r"^parallel_suite: bin (\d+) weight [\d.]+: (.+)$", stderr, re.M)
+        return {int(index): units.split() for index, units in rows}
+
+    def _timings(self, name, data):
+        path = self.root / name
+        path.write_text(json.dumps(data), encoding="utf-8")
+        return path
+
+    def test_the_classes_of_a_split_module_run_in_different_bins(self):
+        tree = self._tree(self.WIDE_TREE)
+        timings = self._timings("t.json", {"test_wide.A": 10, "test_wide.B": 10, "test_wide.C": 1,
+                                           "test_fixture.F1": 1, "test_fixture.F2": 1})
+        run = self._run(tree, "--timings", str(timings))
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn("Ran 10 tests", run.stderr)
+        self.assertIn("discovered 10 tests in 4 units", run.stderr)
+        bins = self._header_bins(run.stderr)
+        self.assertEqual(bins, {0: ["test_fixture", "test_wide.A"], 1: ["test_wide.B", "test_wide.C"]})
+
+    def test_changing_the_weights_changes_the_bins_and_never_the_tests(self):
+        tree = self._tree(self.WIDE_TREE)
+        first = self._timings("a.json", {"test_wide.A": 50, "test_wide.B": 1, "test_wide.C": 1})
+        second = self._timings("b.json", {"test_wide.A": 1, "test_wide.B": 1, "test_wide.C": 50})
+        results = []
+        for label, timings in (("first", first), ("second", second)):
+            records = self.root / (label + ".jsonl")
+            run = self._run(tree, "--timings", str(timings), "--records", str(records))
+            self.assertEqual(run.returncode, 0, run.stderr)
+            results.append((self._header_bins(run.stderr), _canonical(records), _status_lines(run.stderr)))
+        (bins_a, records_a, status_a), (bins_b, records_b, status_b) = results
+        self.assertNotEqual(bins_a, bins_b)
+        self.assertEqual(records_a, records_b)
+        self.assertEqual(status_a, status_b)
+        self.assertEqual(len(records_a), 10)
+
+    def test_the_units_of_a_split_module_match_the_serial_run(self):
+        files = {"test_cls.py": _module(
+            _cls("Plain", 2),
+            _cls("Fixture", 2, body=("    @classmethod\n    def setUpClass(cls):\n        pass\n\n"
+                                     "    @classmethod\n    def tearDownClass(cls):\n        pass\n\n")),
+            _cls("Broken", 1, body=("    @classmethod\n    def setUpClass(cls):\n"
+                                    "        raise RuntimeError('class setup broke')\n\n")),
+        )}
+        tree = self._tree(files)
+        records = self.root / "driver.jsonl"
+        serial_records = self.root / "serial.jsonl"
+        driver = self._run(tree, "--records", str(records))
+        serial = subprocess.run(
+            [sys.executable, "-m", "unittest", "discover", "-s", str(tree)],
+            cwd=self.cwd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=RUN_TIMEOUT)
+        recorder = subprocess.run(
+            [sys.executable, "-c", SERIAL_RECORDER, str(DRIVER), str(tree), str(serial_records)],
+            cwd=self.cwd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=RUN_TIMEOUT)
+        self.assertEqual(recorder.returncode, 0, recorder.stderr)
+        self.assertEqual((driver.returncode, serial.returncode), (1, 1), driver.stderr)
+        self.assertIn("discovered 5 tests in 3 units", driver.stderr)
+        self.assertEqual(_canonical(records), _canonical(serial_records))
+        self.assertEqual(_status_lines(driver.stderr), _status_lines(serial.stderr))
+        self.assertEqual(_BLOCK_RE.findall(driver.stderr), _BLOCK_RE.findall(serial.stderr))
+        self.assertIn("setUpClass (test_cls.Broken)", {r[0] for r in _canonical(records)})
+
+    def test_a_package_module_in_the_affinity_group_stays_whole(self):
+        two = _module(_cls("A"), _cls("B"))
+        files = {"ps_pkg/__init__.py": ""}
+        files.update({"ps_pkg/%s.py" % name: two
+                      for name in ("test_arch_corpus", "test_swift_app_gate", "test_other")})
+        tree = self._tree(files)
+        run = self._run(tree / "ps_pkg", "-t", str(tree))
+        self.assertEqual(run.returncode, 0, run.stderr)
+        units = sorted(u for us in self._header_bins(run.stderr).values() for u in us)
+        # `ps_pkg` is the package's own `__init__`, a unit with no tests.
+        self.assertEqual(units, ["ps_pkg", "ps_pkg.test_arch_corpus", "ps_pkg.test_other.A",
+                                 "ps_pkg.test_other.B", "ps_pkg.test_swift_app_gate"])
+
+    def test_a_malformed_timings_file_exits_2_before_discovery(self):
+        tree = self._tree(self.WIDE_TREE)
+        bad = self.root / "bad.json"
+        bad.write_text('{"test_wide.A": "slow"}', encoding="utf-8")
+        run = self._run(tree, "--timings", str(bad))
+        self.assertEqual(run.returncode, 2, run.stderr)
+        self.assertIn("FAILED CLOSED", run.stderr)
+        self.assertIn("malformed-timings", run.stderr)
+        self.assertNotIn("discovered", run.stderr)
+        self.assertNotIn("Ran ", run.stderr)
+
+    def test_a_missing_timings_file_that_was_named_exits_2(self):
+        tree = self._tree(self.WIDE_TREE)
+        run = self._run(tree, "--timings", str(self.root / "absent.json"))
+        self.assertEqual(run.returncode, 2, run.stderr)
+        self.assertIn("malformed-timings", run.stderr)
+        self.assertNotIn("Ran ", run.stderr)
+
+    def test_write_timings_regenerates_the_file_from_a_records_run(self):
+        tree = self._tree(self.WIDE_TREE)
+        records = self.root / "run.jsonl"
+        run = self._run(tree, "--records", str(records))
+        self.assertEqual(run.returncode, 0, run.stderr)
+        outputs = []
+        for name in ("one.json", "two.json"):
+            out = self.root / name
+            write = subprocess.run(
+                [sys.executable, str(DRIVER), "--write-timings", str(records), "--timings-out", str(out)],
+                cwd=self.cwd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=RUN_TIMEOUT)
+            self.assertEqual(write.returncode, 0, write.stderr)
+            self.assertIn("wrote 5 timings entries", write.stderr)
+            outputs.append(out.read_bytes())
+        self.assertEqual(outputs[0], outputs[1])
+        self.assertEqual(sorted(json.loads(outputs[0])), [
+            "test_fixture.F1", "test_fixture.F2", "test_wide.A", "test_wide.B", "test_wide.C"])
+        # The file it wrote is the file a run reads.
+        again = self._run(tree, "--timings", str(self.root / "one.json"))
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertIn("one.json (5 entries)", again.stderr)
+
+    def test_write_timings_with_unusable_records_exits_2_and_writes_nothing(self):
+        empty = self.root / "empty.jsonl"
+        empty.write_text("", encoding="utf-8")
+        out = self.root / "out.json"
+        write = subprocess.run(
+            [sys.executable, str(DRIVER), "--write-timings", str(empty), "--timings-out", str(out)],
+            cwd=self.cwd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=RUN_TIMEOUT)
+        self.assertEqual(write.returncode, 2, write.stderr)
+        self.assertIn("FAILED CLOSED", write.stderr)
+        self.assertFalse(out.exists())
 
     def test_failure_blocks_print_in_discovery_order(self):
         tree = self._tree(ORDER_TREE)
-        driver = self._run(tree)
+        # An empty timings file makes every unit weigh 1, so the bins below do not
+        # depend on the committed timings.
+        uniform = self._timings("uniform.json", {})
+        driver = self._run(tree, "--timings", str(uniform))
         serial = subprocess.run(
             [sys.executable, "-m", "unittest", "discover", "-s", str(tree)],
             cwd=self.cwd, stdin=subprocess.DEVNULL, capture_output=True, text=True,
@@ -1310,8 +1797,9 @@ class DriverEndToEndTests(unittest.TestCase):
         self.assertEqual(driver.returncode, 1, driver.stderr)
         self.assertEqual(serial.returncode, 1, serial.stderr)
         # Positive control: the bins interleave, so bin order is not discovery order.
-        bins = re.findall(r"^parallel_suite: bin (\d+) weight \d+: (.+)$", driver.stderr, re.M)
-        self.assertEqual(bins, [("0", "test_a_order test_c_order"), ("1", "test_b_order test_d_order")])
+        bins = re.findall(r"^parallel_suite: bin (\d+) weight [\d.]+: (.+)$", driver.stderr, re.M)
+        self.assertEqual(bins, [("0", "test_a_order test_c_order test_d_order.DSetup"),
+                                ("1", "test_b_order test_d_order.D")])
         blocks = _BLOCK_RE.findall(serial.stderr)
         self.assertEqual([b.split(":")[0] for b in blocks],
                          ["ERROR"] * 6 + ["FAIL"] * 5 + ["UNEXPECTED SUCCESS"] * 2)
@@ -1544,12 +2032,14 @@ def _can_import(python, module: str, *flags: str) -> bool:
                           env=_clean_env()).returncode == 0
 
 
-def third_party_imports(entries, scripts_dir: Path, count_guarded: bool = True) -> dict:
+def third_party_imports(entries, scripts_dir: Path, count_guarded: bool = True,
+                        local_dirs: tuple[Path, ...] = ()) -> dict:
     """Map each third-party module imported at module level to the `path:line` sites.
 
     Reads `entries` and, transitively, every module under `scripts_dir` (or its `tests/`) that
     they import. Imports inside a function or a class body are not read. A module is third party
-    when it is neither stdlib nor resolvable under `scripts_dir`.
+    when it is neither stdlib nor resolvable under `scripts_dir` or the
+    explicitly supplied repository helper directories in `local_dirs`.
 
     An import is guarded when it sits under a module-level `if`, or in the body, a handler or
     the `else` of a `try` that catches ImportError (a handler naming ImportError,
@@ -1560,7 +2050,7 @@ def third_party_imports(entries, scripts_dir: Path, count_guarded: bool = True) 
     """
     import ast
 
-    bases = [scripts_dir, scripts_dir / "tests"]
+    bases = [scripts_dir, scripts_dir / "tests", *local_dirs]
     sites: dict = {}
     seen: set = set()
 
@@ -1795,7 +2285,8 @@ class SuiteDependencyInventoryTests(unittest.TestCase):
     def test_every_module_level_third_party_import_of_the_suite_is_probed(self):
         entries = sorted(HERE.glob("test_*.py"))
         self.assertGreater(len(entries), 50)
-        found = third_party_imports(entries, HERE.parent, count_guarded=False)
+        found = third_party_imports(entries, HERE.parent, count_guarded=False,
+                                    local_dirs=(REPO / "tools" / "tests",))
         missing = sorted(set(found) - set(ps.PLUGIN_SUITE_MODULES))
         self.assertEqual(missing, [], "suite imports missing from PLUGIN_SUITE_MODULES: "
                          + "; ".join(f"{m} at {found[m][:2]}" for m in missing))
@@ -1821,6 +2312,18 @@ class SuiteDependencyInventoryTests(unittest.TestCase):
                                            "    pass\n", encoding="utf-8")
         found = third_party_imports([scripts / "entry.py"], scripts)
         self.assertEqual(sorted(found), ["from_init", "guarded_seed", "seeded_pkg"])
+
+    def test_repository_helpers_are_followed_without_hiding_their_dependencies(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            scripts = Path(tmp) / "scripts"
+            helpers = Path(tmp) / "tools" / "tests"
+            scripts.mkdir()
+            helpers.mkdir(parents=True)
+            entry = scripts / "entry.py"
+            entry.write_text("import repository_helper\nimport absent_dependency\n")
+            (helpers / "repository_helper.py").write_text("import helper_dependency\n")
+            found = third_party_imports([entry], scripts, local_dirs=(helpers,))
+            self.assertEqual(sorted(found), ["absent_dependency", "helper_dependency"])
 
     def test_a_guarded_module_level_import_is_not_a_hard_import(self):
         """An import the module guards with `try`/`except ImportError`, or places under a

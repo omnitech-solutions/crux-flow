@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "crux reviewer report (format_version 2)",
+  "description": "One independent review, the only evidence an independent-review gate accepts. It is bound to the book, run and prompt and names the reviewer role. Every path it reviews must be clean at advance, under either subject form: a commit range, or paths with their content hashes. A council record never satisfies this gate. The vendored writer write-review-report.py binds, secret-scans and writes the report. The gate cannot tell whether the review was real.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_type",
+    "format_version",
+    "written_at",
+    "book",
+    "run_id",
+    "prompt",
+    "reviewer_role",
+    "subject",
+    "verdict"
+  ],
+  "properties": {
+    "record_type": { "const": "reviewer-report" },
+    "format_version": { "const": "2" },
+    "written_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z(?![\\s\\S])"
+    },
+    "book": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "content_hash"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^(?:(?!(?:PB|ADR|RUN|BRIEF)-)[A-Z][A-Z0-9]{1,9}-)?PB-\\d{4}(?![\\s\\S])" },
+        "content_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])" }
+      }
+    },
+    "run_id": { "type": "string", "pattern": "^RUN-\\d{3}(?![\\s\\S])" },
+    "prompt": { "type": "integer", "minimum": 1 },
+    "reviewer_role": { "const": "reviewer" },
+    "reviewer": { "type": "string", "$comment": "Free text naming the reviewer instance. Informative only." },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["form"],
+      "properties": {
+        "form": { "type": "string", "enum": ["commit-range", "paths"] },
+        "range": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{7,64}\\.\\.[0-9a-f]{7,64}(?![\\s\\S])",
+          "$comment": "<base>..<end>. It must resolve, end at HEAD or an ancestor of HEAD, and no later commit may change a path it changed; every path it changed must be clean."
+        },
+        "paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}(?![\\s\\S])", "$comment": "sha256 of the reviewed bytes; HEAD, the index entry and the file must all equal it." }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["form"], "properties": { "form": { "const": "commit-range" } } },
+          "then": { "required": ["range"] }
+        },
+        {
+          "if": { "required": ["form"], "properties": { "form": { "const": "paths" } } },
+          "then": { "required": ["paths"] }
+        }
+      ]
+    },
+    "verdict": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "The reviewer's own verdict. The gate requires a report, not a particular verdict."
+    },
+    "findings": { "type": "array", "items": { "type": "string" } }
+  }
+}

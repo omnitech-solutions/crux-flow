@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.11"
-# dependencies = []
+# dependencies = ["pyyaml>=6.0,<7", "httpx>=0.27,<1"]
 # ///
 """generate-reviews-index.py — the vendored regenerator for
 <docs_dir>/adrs/reviews/index.md.
@@ -520,17 +520,50 @@ def _resolver_slugs(resolver: Path) -> dict | None:
             f"{type(data).__name__} at its top level; the rule resolver is an "
             "object carrying `slugs` and `retired_slugs`")
     maps: dict = {}
-    for key in ("slugs", "retired_slugs"):
+    for key in ("slugs", "retired_slugs", "historical_slugs"):
         value = data.get(key, {})
         if not isinstance(value, dict):
             raise OSError(
                 f"refusing to read {resolver}: resolver.json's `{key}` is a "
                 f"{type(value).__name__}; it is a map keyed by rule slug")
         maps[key] = value
+    for slug, row in maps["historical_slugs"].items():
+        valid = isinstance(slug, str) and isinstance(row, dict) and set(row) == {
+            "source_handle", "source_identity", "destination", "replacements"}
+        if valid:
+            destination = row["destination"]
+            valid = isinstance(row["source_handle"], str) and row["source_handle"].endswith("/" + slug) \
+                and isinstance(row["source_identity"], str) and re.fullmatch(r"[0-9a-f]{64}", row["source_identity"]) \
+                and isinstance(destination, dict) and set(destination) == {"source_adr", "clause_sha256"} \
+                and destination["source_adr"] == row["source_handle"].split("/", 1)[0] \
+                and isinstance(destination["clause_sha256"], str) and re.fullmatch(r"[0-9a-f]{64}", destination["clause_sha256"]) \
+                and isinstance(row["replacements"], list) and all(isinstance(h, str) for h in row["replacements"])
+        if not valid:
+            raise OSError("resolver.json historical_slugs rows must contain only source identities, destinations and replacement references")
     return maps
 
 
-def _handle_exists(locator: str, tree: Path, resolver_maps=None) -> bool:
+def _review_history(root: Path) -> dict:
+    """Resolve historical destinations only through fresh shared publication proof."""
+    import implementation_migration as migration
+    view = migration.authority_view(root)
+    return {handle.split("/", 1)[1]: dict(source_handle=handle, **fact)
+            for handle, fact in view["historical_handles"].items()}
+
+
+def _rule_exists(slug: str, maps: dict | None, historical: dict) -> bool:
+    if maps is None:
+        if historical:
+            raise OSError("historical review evidence requires the summaries resolver")
+        return True
+    if maps["historical_slugs"] != historical:
+        raise OSError("historical review resolver differs from validated source destinations")
+    # Shared proof already located the exact unique source clause. Replacements
+    # establish current eligibility; they are not the historical destination.
+    return slug in historical or slug in maps["slugs"] or slug in maps["retired_slugs"]
+
+
+def _handle_exists(locator: str, tree: Path, resolver_maps=None, *, repo_root: Path | None = None) -> bool:
     """Whether a HANDLE locator (already matched by `LOCATOR_HANDLE`) names a
     real surface under `tree`.
 
@@ -579,9 +612,7 @@ def _handle_exists(locator: str, tree: Path, resolver_maps=None) -> bool:
                                         "rule resolver resolver.json"))
     else:
         maps = resolver_maps()
-    if maps is None:
-        return True
-    return slug in maps["slugs"] or slug in maps["retired_slugs"]
+    return _rule_exists(slug, maps, _review_history(repo_root if repo_root is not None else tree.parent))
 
 
 def _locator_probe(root: Path, subject: str, tree: Path):
@@ -633,9 +664,17 @@ def _locator_probe(root: Path, subject: str, tree: Path):
                 "rule resolver resolver.json")))
         return cache[0]
 
+    # Preserve the resolver's bounded shape/containment diagnostics before the
+    # shared authority reader inspects declared projection inputs.
+    resolver_maps()
+    historical = _review_history(root)
+
     def probe(locator: str) -> bool:
         if LOCATOR_HANDLE.match(locator):
-            return _handle_exists(locator, tree, resolver_maps)
+            rule = _HANDLE_RULE_SLUG.match(locator)
+            if rule:
+                return _rule_exists(rule.group(1), resolver_maps(), historical)
+            return _handle_exists(locator, tree, resolver_maps, repo_root=root)
         if locator.startswith("~") or Path(locator).is_absolute():
             raise review_findings.ReviewFindingsError(
                 f"the locator {redact(locator)} is an absolute or "
@@ -951,8 +990,12 @@ def build(root: Path, today: datetime.date | None = None) -> tuple[Path | None, 
                 "link is refused on the same terms rather than read as an "
                 "absent surface")
     if not reviews.is_dir():
+        _review_history(root)
         return None, "", [], tree
     _contained(reviews, tree, "reviews directory")
+    # Obtain proof before parsing or rendering, including corpora with no rule
+    # locators. Invalid activation must never look like an absent history map.
+    probe = _locator_probe(root, str(tree_rel), tree)
     reports = collect(reviews, tree_rel, today)
     # Standing is a CORPUS property: every report is parsed before any row is
     # built, because a resolution written on one date moves the standing of a
@@ -966,7 +1009,7 @@ def build(root: Path, today: datetime.date | None = None) -> tuple[Path | None, 
         # cannot run until every report is parsed.
         review_findings.check_part_carryover(parsed)
         standing = review_findings.standing_by_finding(
-            parsed, locator_exists=_locator_probe(root, str(tree_rel), tree))
+            parsed, locator_exists=probe)
         for row in reports:
             counts = review_findings.report_standing(row["parsed"], standing)
             row["raised"] = raised_cell(row["parsed"])
@@ -983,6 +1026,7 @@ def build(root: Path, today: datetime.date | None = None) -> tuple[Path | None, 
     index = reviews / "index.md"
     have = _read_untranslated(index) if index.is_file() else ""
     orphans = orphan_rows(have, {r["name"] for r in reports})
+    _review_history(root)
     return index, render(reports), orphans, tree
 
 

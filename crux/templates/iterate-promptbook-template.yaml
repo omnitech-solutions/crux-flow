@@ -21,7 +21,7 @@
 #      verify-/dev-/review- module tags (no adr- tags — adr/verify XOR)
 # total_prompts == 4*verify + 4*dev_loops + 3*review_cycles + 2.
 
-format_version: "1"
+format_version: "2"
 id: PB-NNNN
 title: "Iterate: <bug, drift, or refinement to existing behavior>"
 status: active
@@ -33,9 +33,14 @@ forked_from: null
 tags: [cycle, workflow, iterate]
 cycle_kind: verify
 modules:
+  adrs: 0
+  implementations: 0
   verify: 1
   dev_loops: 1
   review_cycles: 1
+
+# Declare a slot before start for each formal Implementation Decision. Empty means incidental choices only.
+implementation_slots: []
 
 goal: |
   <One paragraph: the bug / drift / refinement being fixed through this iterate
@@ -54,21 +59,39 @@ strategy: |
   docs + journal + PR notes), summarize. Each phase has an internal loop with
   explicit exit criteria; 3-round non-convergence escalates.
 
-  Skills exercised: `query-docs`, `council`, `srde`, `log-work`, `code-review`,
+  Skills exercised: `query-docs`, `council`, `log-work`, `code-review`,
   `verify-code-docs`, `audit-docs`, plus the `Agent` tool for parallel dispatch.
+  The council runs through the council runner (`run-council.py`). `srde` is
+  evidence only and never settles the council gate.
   Out of scope: net-new/architectural features (use `dev-cycle`); cutting a
   release tag; merging the PR.
 
 run_autonomy: |
+  Both book formats execute with the current attempt-aware gate. New councils use
+  council-record format two and attempt format one. New formal closes retain gate
+  context three/profile four; historical context two/profile three and context one/profile two remain replay-only.
+  Finish any open Git merge or other sequence before council. The runner or
+  recovery alone commits attempt/result evidence; the historian commits run closes.
+  After each initial or revised formal revision or migration-batch subject write,
+  immediately record its bytes before committing it:
+
+    uv run "${CRUX_PLUGIN_ROOT}/scripts/run-work-witness.py" record <run-RUN-NNN.yaml> --prompt <n> --path <subject-path>
+
+  Never create a witness after a refusal. Repair only authorized preflight causes.
+  A persistence failure permits request-free recovery, never repeat deliberation.
   Once this cycle's run is started, it runs to completion without human review.
-  Questions and decisions are resolved by the `council` skill and dispatched
-  `Agent`s. The only stops are (a) a module escalation loop firing (3-round
-  non-convergence on council, quality gates, or review fix-loop), (b) the verify
-  council's "this is actually architectural -> use dev-cycle" escape verdict, and
-  (c) a genuinely irreversible/outward-facing action the plan did not authorize
-  (push/merge, deploy, external send, data deletion, spend). In-repo edits —
-  including `docs/AGENTS.md`, skill files, and code — are never stop points. See
-  `docs/AGENTS.md` §11 "Run execution autonomy" for the full contract.
+  Questions and decisions are resolved by the council runner for a council
+  gate, and by dispatched `Agent`s otherwise. The only stops are (a) a module escalation loop firing (3-round
+  non-convergence on council, quality gates, or review fix-loop; or the
+  preflight retry sequence, a third preflight refusal at one convening
+  prompt), (b) the verify
+  council's "this is actually architectural -> use dev-cycle" escape verdict,
+  (c) a council that cannot run through the council runner yields
+  DEFER_TO_HUMAN, and (d) a genuinely irreversible/outward-facing action the
+  plan did not authorize (push/merge, deploy, external send, data deletion, spend). In-repo
+  edits — including `docs/AGENTS.md`, skill files, and code — are never stop
+  points. See `docs/AGENTS.md` §11 "Run execution autonomy" for the full
+  contract.
 
 prompts:
   # --- Verify module #1 (4 prompts) — from cycle-module-verify.yaml, module_tag verify-1 ---
@@ -84,47 +107,303 @@ prompts:
       journal. Dispatch 2–3 research agents in parallel: each returns a
       reproduction (steps / failing test / concretely-cited drift, not a vague
       description), the root cause (cause vs. symptom), the scope, and a proposed
-      MINIMAL remediation approach. Synthesize into a `Diagnosis` block in this
+      MINIMAL remediation approach.
+
+      Reproduce at the run's `base_commit`, and record that commit in the
+      Diagnosis. Name each reproduction's kind. A textual reproduction quotes
+      text and reads it at the base with `git show <base_commit>:<path>`. An
+      executed reproduction runs code, a test or a command, and runs against the
+      base tree. The working tree stands in for the base tree only when
+      `git diff --quiet <base_commit> -- <paths>` exits 0 and
+      `git ls-files --others --exclude-standard -- <paths>` prints nothing,
+      where `<paths>` covers every input the reproduction reads: the code under
+      test, what it imports, its fixtures and configuration, and the test
+      itself. Equal files prove nothing about inputs the list leaves out. When
+      the check fails, run the reproduction in a private worktree,
+      `git worktree add --detach <private scratch path> <base_commit>`, never
+      under a shared `/tmp` path, and remove it afterwards. When a reproduction
+      cannot run at the base, record that as a stated limit of the evidence,
+      never as a reproduction. When `base_commit` is null, say so and record the
+      commit you used.
+
+      Synthesize into a `Diagnosis` block in this
       run snapshot's `notes`. Do NOT write an ADR; if the work turns out to be
       architectural, the council's escape verdict (next) routes it to `dev-cycle`.
+      The snapshot is a later council subject. Immediately after each diagnosis
+      write, record its bytes before committing it:
+
+        uv run "${CRUX_PLUGIN_ROOT}/scripts/run-work-witness.py" record <run-RUN-NNN.yaml> --prompt <n> --path <run-RUN-NNN.yaml>
+
+      A later advance changes snapshot bytes; it does not renew this witness.
     expected_output: |
       A `Diagnosis` block in the run `notes`: reproduction/evidence, root cause,
-      scope, proposed minimal approach.
+      scope, proposed minimal approach, the `base_commit` the reproduction ran at,
+      each reproduction's kind (textual or executed), and any stated limit.
     side_effects: [query-docs]
 
   - n: 2
     title: "Verify: convene LLM council to review the diagnosis"
     module_tag: verify-1
     purpose: |
-      Gate the diagnosis + approach with multi-perspective review before code.
+      Gate the diagnosis + approach with multi-perspective review before any code
+      lands — the same rigor `dev-cycle` applies to an ADR, applied to a fix.
     prompt: |
-      Invoke the `council` skill (Claude + Gemini + GPT, async) — or 5 parallel
-      review agents — each owning one dimension over the `Diagnosis`: (1)
-      Evidence/Reproduction, (2) Root-cause correctness, (3) Approach soundness +
-      **minimality** (no scope creep), (4) Consistency, (5) Security. **Escape
-      verdict:** if the work is actually ARCHITECTURAL, treat it as a
-      `docs/AGENTS.md` §11 premise-contradiction stop — mark this prompt
-      `blocked` (paused), escalate to the user, recommend a `dev-cycle` (the
-      diagnosis persists as a citable `learning`). Otherwise route: all APPROVE →
-      Prompt 4; minor non-safety nits → Prompt 3; split verdict → deeper review
-      autonomously (`srde`, then a read-only deep-review `Agent`) → Prompt 3.
+      For a formal Implementation Decision, declare this verify module's slot before
+      start and select the approach before council. Author the exact decision
+      revision alongside the diagnosis. After each initial or revised write, record:
+
+        uv run "${CRUX_PLUGIN_ROOT}/scripts/run-work-witness.py" record <run-RUN-NNN.yaml> --prompt <n> --path <decision-path>
+
+      Then commit that revision. Never create a witness after a preflight refusal.
+      Add --implementation-revision
+      <decision-path> --subject <decision-path> --retain-subjects to each council.
+      The question names its exact path and digest, retains all five diagnosis
+      dimensions, and explicitly assesses architectural conflict for that approach.
+      Diagnosis-only approval cannot approve a formal Implementation Decision.
+      Use the exact question names Evidence/Reproduction, Root-cause correctness,
+      Approach soundness and minimality, Consistency and Security.
+
+      Council deliberation runs only through the council runner,
+      `run-council.py`, and its council record is the only evidence this gate
+      accepts (rule:council-gate-needs-a-runner-record). A reviewer report never
+      satisfies this gate, and no reviewer subagent casts a seat's vote
+      (rule:council-is-never-harness-native).
+
+      Convene a round over the `Diagnosis` block:
+        (a) Run the gate-information query and follow any correction notice
+            it prints: `uv run "${CRUX_PLUGIN_ROOT}/scripts/advance-run.py"
+            <run-RUN-NNN.yaml> --book <book.yaml> --gate-info --prompt <n>`.
+        (b) Commit the run snapshot that carries `Diagnosis`. The council
+            runner reads only a subject that is tracked and unchanged.
+        (c) Write the question to
+            `<run_dir>/council/<RUN>-p<n>-r<round>-question.md`. It states the
+            five dimensions below with their sub-questions, says that every seat
+            assesses every dimension (rule:every-seat-assesses-five-dimensions),
+            and states the escape verdict: a seat that finds the work needs a new
+            decision votes `ARCHITECTURAL`. The council runner appends the vote
+            instruction. From round 2 on, the question also carries the open
+            blocking findings of the round before.
+        (d) Run, as a background command, `uv run
+            "${CRUX_PLUGIN_ROOT}/scripts/run-council.py" <run-RUN-NNN.yaml>`
+            with `--prompt <n>` (the number of this council prompt),
+            `--round <round>`, `--question <question-file>` and
+            `--subject <run-RUN-NNN.yaml>`. `<round>` is the number of council
+            records with outcome `ran` already in this module, plus one. A
+            could-not-run record takes no place, so after you fix its cause you
+            reconvene with the same number. Exit 0: the council ran, and the
+            council runner committed its record. Exit 1 with a record: the
+            council runner committed it, and the gate will stop on it. Exit 1
+            with `"refused": "round"` and `"record": null`: `run-council.py`
+            refused a `--round` that differs from that number, before any call,
+            and wrote nothing; correct it and run again. Exit 1 with `"refused": "prompt"` and `"record": null`: `--prompt` was not the run's current prompt; run again with the current prompt or omit `--prompt`. Exit 1 with `"refused": "preflight"`: follow the preflight paragraph below. Exit 1 with `"refused": "attempt-open"`, exit 2, or a council runner that ended without an exit code or with a code other than 0, 1 and 2: follow the recovery paragraph below.
+
+      **The council runner commits.** The council runner commits the attempt
+      record and the council record itself. It commits the attempt record before
+      any council request (rule:an-open-council-attempt-stops-the-gate). It
+      verifies that each commit holds the bytes it computed
+      (rule:council-evidence-matches-its-attempt). You commit no council record.
+
+      **Preflight refusal.** Exit 1 with `"refused": "preflight"` and
+      `"record": null` is a preflight refusal, raised before any council
+      request. No council record was written, and nothing was committed. Each
+      cause names its repair.
+      For `retype`, correct the `--question` or `--subject` path. For
+      `commit-run-work`, the subject is a file this run wrote and recorded with
+      the witness writer; commit exactly that path:
+
+        uv run "${CRUX_PLUGIN_ROOT}/scripts/run-work-witness.py" commit <run-RUN-NNN.yaml> --path <subject path>
+
+      Then run the council runner again. If the witness writer refuses the
+      commit with `"refused": "commit"`, git refused, and its `code`
+      decides. For `index-locked`, the commit checked the lock before it
+      staged anything: wait for any git command this run started to finish,
+      then run the witness commit once more, which spends no council retry.
+      When the lock persists, it is stale: report a contradicted-premise
+      stop for the owner. For every other code (`sequence-in-progress`,
+      `hook-or-commit-failed`, `timeout`, `mismatch`), report a
+      contradicted-premise stop for the owner, and do not run the council
+      runner again, which would spend a retry. When the refusal's `code` is
+      `timeout`, or it carries `moved`, the owner restores the set-aside
+      work first (`git stash list`, or a pre-commit framework's backup
+      patch), then removes a stale `index.lock` in the git directory. A
+      `mismatch` may follow a landed commit: the owner checks `git log` for
+      the path. A refusal of `invalid` is the owner's too: report the same
+      stop. For `missing` or a path refusal, correct the path and commit
+      again. The refusals `unattributed`, `unwitnessed`, `witness-mismatch`,
+      `mixed`, `council-path`, `witness-invalid` and `witness-binding` have
+      no repair: run the council runner again, and it records
+      `preflight-needs-owner`. The bound is three refusals at this prompt:
+      the third commits a could-not-run record with the code
+      `preflight-retries-spent`, and the run takes stop 1
+      (rule:only-a-preflight-refusal-is-retried).
+
+      **Recovery.** Start recovery when exit 2 means no committed council
+      record exists and stderr names a claimed attempt, when the council runner
+      refused with `"refused": "attempt-open"`, or when the council runner
+      ended without an exit code or with a code other than 0, 1 and 2. When the
+      exit-2 stderr names `timeout`, or names outside work the commit moved,
+      the owner's remedy comes before recovery: report a contradicted-premise
+      stop for the owner. The owner first restores the set-aside
+      work (`git stash list`, or a pre-commit framework's backup patch) and
+      then removes a stale `index.lock` in the git directory. Start recovery
+      only after the owner reports both steps done. Run the process check:
+      confirm that no council runner you started for this module is still
+      running. Then probe the attempt's lock. While a council runner is live,
+      wait. Pass `--prompt <n>` to the probe and to recovery. Without it,
+      recovery cannot recognise a record whose pending copy is already removed,
+      and it reports `nothing-open`:
+
+        uv run "${CRUX_PLUGIN_ROOT}/scripts/run-council.py" --recover <run-RUN-NNN.yaml> --prompt <n> --probe
+
+      When the probe reports `"lock": "unknown"`, treat it as a live council
+      runner: wait and probe again. When it persists although no council runner
+      runs, report an environment fault as a contradicted-premise stop for the
+      owner. When the lock is free, run recovery: the same command without
+      `--probe`. Recovery makes no council request and reads no key
+      (rule:recovery-never-deliberates-again). On `recognised` or `committed`,
+      read the record it names as its exit code says. On `released`, the claim
+      made no request. When the council runner's exit 2 named `index-locked`,
+      or it was killed before it reported, run the council runner again at the
+      same round now: that is no reconvening. When `index-locked` persists
+      across that one rerun, the lock is stale: report a contradicted-premise
+      stop for the owner. When its exit 2 named another code
+      (`hook-or-commit-failed`, `sequence-in-progress`, `timeout` or
+      `mismatch`), the cause is the owner's: report a contradicted-premise
+      stop, and run the council runner again at the same round once the owner
+      fixes it. When that exit 2 named `timeout` or moved work, the owner's
+      remedy order above came first. On `live-runner`, wait and probe again. On
+      `nothing-open`, no attempt is open: report the exit 2 cause. After a
+      council runner that ended without an exit code or with a code other than
+      0, 1 and 2, nothing was claimed and no round was spent: run it again at
+      the same round. On `index-locked`, wait for any git command this run
+      started to finish, then run recovery again; never delete
+      `.git/index.lock`. After `commit-refused` with `"commit_landed": true`,
+      follow that branch before any open-attempt step. For code `timeout`, or a
+      report that carries `outside_moved`, report a contradicted-premise stop
+      for the owner. Once the owner has restored the set-aside work
+      (`git stash list`, or a pre-commit framework's backup patch) and then
+      removed a stale `index.lock` in the git directory, run recovery once
+      more. For `mismatch`, a hook altered the record: the owner fixes it, and
+      you run recovery with `--owner-commit-pending` at the owner's
+      instruction. For any other code, run recovery once more at once. A
+      `commit-refused` report names the outside paths the commit found changed
+      as `outside_moved` and the owned paths it left staged as `owned_staged`.
+      The marker `<outside state not compared>` in `outside_moved` means the
+      commit could not compare the outside state: check `git status` and
+      `git stash list`. On `mismatch`, `unproven`, a `commit-refused` that did
+      not land, a persisting `index-locked` or a landed branch that recovery
+      leaves open, the attempt stays open: advance `--outcome blocked` with the
+      attempt record attached (stop 4). When HEAD does not hold the attempt
+      record, the gate refuses that advance: this prompt cannot advance, so
+      report why, a stop 4 for the owner. When recovery exits 2, it names an
+      environment fault: report a contradicted-premise stop for the owner, who
+      fixes the environment. Never convene a replacement round over an open
+      attempt, and never before recovery reports; a persistence failure is
+      never a reason to convene another round. When exit 2 names no attempt,
+      nothing was claimed: this prompt cannot advance; report why.
+
+      When the book was authored with `--deep-review`, round 1 also passes
+      `docs/adrs/index.md`, every ADR the diagnosis cites and `docs/AGENTS.md` as
+      a `--subject`, each tracked and clean; that round counts like any other.
+
+      The five dimensions, over the diagnosis, each assessed by every seat:
+        (1) Evidence/Reproduction — is the issue actually demonstrated (repro
+            steps / failing test / concretely-cited drift), not asserted?
+        (2) Root-cause correctness — is the diagnosed cause the real cause, or a
+            symptom? Would the proposed fix actually resolve it?
+        (3) Approach soundness + **minimality** — is it the smallest correct
+            change? Any scope creep (refactors, features) that doesn't belong in
+            a fix? Regression risk?
+        (4) Consistency — does the approach fit existing behavior, ADRs, and the
+            conventions in `docs/AGENTS.md`?
+        (5) **Security** — does the fix introduce a security risk (new attack
+            surface, secret/credential handling incl. `~/.crux/`, injection/
+            authz, supply-chain/external-fetch)? `REQUEST_CHANGES` if unmitigated.
+
+      **Escape verdict (the iterate-specific stop).** A seat that concludes the
+      work is ACTUALLY ARCHITECTURAL — it requires a new decision, not a fix —
+      votes the token `ARCHITECTURAL`. The gate check reads that vote as stop 4,
+      a `docs/AGENTS.md` §11 run-autonomy **premise-contradiction stop**. Mark
+      this prompt `blocked` (`--outcome blocked` with the record in
+      `--artifacts`) and **escalate to the user**, recommending they abandon
+      this `iterate` run (`run-promptbook abandon PB-NNNN --reason "<why>"`) and
+      start a `dev-cycle` whose book cites this one in prose. The verify journal
+      entry + the diagnosis persist as a `learning` the new `dev-cycle`'s ADR
+      can cite. Do NOT silently convert or proceed.
+
+      A council that cannot run through the council runner (no key, a refused
+      seat assignment, fewer than three providers, no quorum) yields
+      DEFER_TO_HUMAN (rule:only-a-preflight-refusal-is-retried). So does a
+      subject outside your authority to repair, code `preflight-needs-owner`.
+      The council runner has committed the record it wrote. Attach it with
+      `--outcome blocked`; the run stops at the same stop 4. The code
+      `preflight-retries-spent` stops it at stop 1 instead. No reviewer subagent
+      takes a seat.
+
+      The council runner's exit code and the record's `outcome` decide the
+      contradicted-premise stop: exit 1 with `outcome: could-not-run` and any code but
+      `preflight-retries-spent`, or a record that ran whose `refusal_reason` names the
+      secret scan. The aggregate action
+      DEFER_TO_HUMAN does not decide it, because a council that ran carries that
+      action on a SPLIT or on low confidence, for example.
+
+      `srde` is evidence and never settles this gate. A dissent it resolves
+      enters the next round's question, and that dissent keeps blocking until a
+      council round converges without it.
+
+      Attach the committed council record with `--artifacts`: the gate reads
+      only a committed record and refuses the advance, writing nothing, when it
+      is not. The gate check reads each
+      seat's decision, never the aggregate label
+      (rule:convergence-is-derived-per-seat). A `pass` verdict allows
+      `--outcome done` and refuses `--outcome blocked`. A record that did not
+      converge advances with `--outcome blocked` and `--artifacts`; `--outcome
+      done` is refused on any verdict other than `pass`. A `route` verdict
+      returns the run to this module's address-findings prompt for the next
+      round, and a `stop` verdict keeps the run here for the user. The bound is
+      three council rounds, with no adjudicator. This prompt closes only on convergence
+      (rule:council-gate-advances-on-convergence-or-refutation).
     expected_output: |
-      Aggregated 5-dimension verdict on the diagnosis; escape stop if it fired;
-      srde/deep-review resolution if split; findings.
-    side_effects: [council, srde]
+      The council record's path attached; per-seat decisions and blocking
+      findings listed from it; the architectural-escape stop if it fired.
+    side_effects: [council]
 
   - n: 3
-    title: "Verify: address council findings, return to Prompt 2"
+    title: "Verify: address council findings, re-convene the council"
     module_tag: verify-1
     purpose: |
-      Close the diagnosis loop until the council approves.
+      Close the diagnosis loop until the council converges on the fix approach.
     prompt: |
-      Revise the `Diagnosis` block in the run `notes` for each council finding
-      (sharpen root cause, tighten the minimal approach, add evidence). Resolve
-      autonomously. When every finding is resolved, return to Prompt 2 to
-      re-convene. After 3 full loops without convergence, STOP and escalate.
+      If a formal revision's reasoning changes, retain the earlier revision and
+      author a new revision. Immediately record its write before committing it:
+
+        uv run "${CRUX_PLUGIN_ROOT}/scripts/run-work-witness.py" record <run-RUN-NNN.yaml> --prompt <n> --path <decision-path>
+
+      Commit the revision before reconvening. Resolve any open attempt first.
+      The latest deciding receipt must itself retain the selected revision;
+      earlier-round inclusion is insufficient.
+
+      For each blocking finding in the latest council record (Prompt 2), revise
+      the `Diagnosis` block in the run `notes` — sharpen the root cause, tighten
+      the minimal approach, add evidence — and fold each nit in as an edit.
+      Resolve findings autonomously. The run snapshot is a council subject.
+      After each revision, record the write with the witness writer:
+
+        uv run "${CRUX_PLUGIN_ROOT}/scripts/run-work-witness.py" record <run-RUN-NNN.yaml> --prompt <n> --path <run-RUN-NNN.yaml>
+
+      When every finding is resolved, commit the
+      run snapshot and re-convene the council: run steps (a) to (d) of Prompt 2
+      with the round number that step (d) defines, and attach the new council
+      record to this prompt with `--artifacts`. The council runner commits the
+      attempt record and the council record itself; handle its exit as Prompt 2
+      directs. Its preflight refusals count at this prompt, toward the same bound
+      of three. The module close reads every recorded round. A finding
+      an edit answers stays blocking until a later round converges without it.
+      When Prompt 2's gate passed, no blocking finding is left: record that and
+      advance. After a third round that did not converge, advance to module close with the record
+      attached; the gate check stops the run there at stop 1.
     expected_output: |
-      Updated `Diagnosis`; control returns to Prompt 2.
+      Updated `Diagnosis`; a new council record attached when a round ran.
     side_effects: []
 
   - n: 4
@@ -133,13 +412,25 @@ prompts:
     purpose: |
       Record the verified root cause + chosen approach (the no-ADR durable why).
     prompt: |
+      For a formal ID, pass --implementation-revision <decision-path> on this
+      ordinal-four successful advance. The latest deciding council must itself
+      retain that exact revision. Only advance appends binding with DONE; commit
+      it before consumers. Approval establishes intent, never delivery or current state.
+      Before logging, advance this prompt with the latest council record of this
+      module in `--artifacts`. A `pass` verdict allows `--outcome done`. Otherwise
+      advance with `--outcome blocked`: a `route` verdict returns the run to the
+      address-findings prompt, and a `stop` verdict keeps the run here for the
+      user. Convene a round here only when this module has no council record,
+      because its council ran before council records existed.
+
       Invoke `log-work` with a reflective `decision`/`learning` journal entry:
       the root cause, the chosen minimal approach, why it's right, and any
       council debate. Reference this run. Name at least one non-obvious thing the
       reproduction/council surfaced. This commits the cycle to the approach; the
       dev module implements it next, reading the `Diagnosis` + this entry.
     expected_output: |
-      A new `decision`/`learning` entry in `docs/journal/YYYY-MM.md`.
+      A new `decision`/`learning` entry in `docs/journal/YYYY-MM.md`; the
+      deciding council record attached.
     side_effects: [log-work]
 
   # --- Dev module #1 (4 prompts) — from cycle-module-dev.yaml, module_tag dev-1 ---
@@ -151,6 +442,13 @@ prompts:
     purpose: |
       Convert the verified diagnosis + approach into ordered work units.
     prompt: |
+      Read governing architectural constraints and any selected formal implementation reasoning
+      separately. An Implementation Decision supplies no rule or current-state authority.
+      For a selected formal decision, compare delivery to the approved original and include annotations in
+      independent review scope. Report approval, delivery and queried source state separately.
+      Validate the committed approval binding and its retained context before
+      treating reasoning as reviewed intent. Use the context's supported profile;
+      book format supplies none. Preserve historical context bytes.
       Read the verified approach: the `Diagnosis` block in this run's `notes` +
       the verify module's commit-approach journal entry (an iterate cycle has no
       ADR — this is the `{RULE_REFS}` substitute). Produce an implementation plan:
@@ -169,6 +467,13 @@ prompts:
     purpose: |
       Implement the plan with parallel agents where independent.
     prompt: |
+      Read governing architectural constraints and any selected formal implementation reasoning
+      separately. An Implementation Decision supplies no rule or current-state authority.
+      For a selected formal decision, compare delivery to the approved original and include annotations in
+      independent review scope. Report approval, delivery and queried source state separately.
+      Validate the committed approval binding and its retained context before
+      treating reasoning as reviewed intent. Use the context's supported profile;
+      book format supplies none. Preserve historical context bytes.
       Group the Prompt 5 work units by independence. Dispatch one `Agent` per
       independent group; each receives the diagnosis, the plan, its work units,
       and `docs/AGENTS.md` conventions.
@@ -185,6 +490,13 @@ prompts:
       Each agent makes actual edits, adds/updates tests, and reports files
       changed + test results + any unilateral decisions. Integrate; reconcile
       overlaps. Stay within the approved minimal scope.
+
+      Integrate commits only outside the tester's window. The tester's window runs
+      from the tester's dispatch until the tester returns. The agent that dispatched
+      the tester holds the window. While it is open, that agent commits nothing to the main checkout, convenes no council, runs no live-tree tool, and dispatches no agent that does. Every dispatch you make while the window is open says so. The run has one commit
+      lane: no commit and no council while the tester's full suite or a live-tree
+      tool (compile-doctrine.py, summarize-adrs.py, derive-arch.py,
+      run-drift-gates.py, the council runner) runs.
     expected_output: |
       All work units implemented; per-agent reports collected.
     side_effects: []
@@ -195,9 +507,16 @@ prompts:
     purpose: |
       Verify the fix passes every gate before review.
     prompt: |
+      Read governing architectural constraints and any selected formal implementation reasoning
+      separately. An Implementation Decision supplies no rule or current-state authority.
+      For a selected formal decision, compare delivery to the approved original and include annotations in
+      independent review scope. Report approval, delivery and queried source state separately.
+      Validate the committed approval binding and its retained context before
+      treating reasoning as reviewed intent. Use the context's supported profile;
+      book format supplies none. Preserve historical context bytes.
       Run, in order, and RECORD each in the run `notes` with its exact command +
-      a concrete result token (e.g. `unittest → 149 OK`, `validate-catalog
-      --dry-run → exit 0`), NOT a bare "all green": the test suite; the linter/
+      a concrete result token (e.g. `unittest → 149 OK`, `validate-catalog --dry-run
+      → exit 0`), NOT a bare "all green": the test suite; the linter/
       formatter; static analysis; security analysis; `verify-code-docs`; and — if
       the diff touches any distributed surface (`crux/skills/`, `crux/agents/`,
       `crux/templates/`) — the **release-content scan** `check-public-release-content.py`
@@ -209,6 +528,25 @@ prompts:
       (surface stderr; a distinct lane). Fix any
       failure (re-edit), then re-run the failed gate AND every subsequent gate.
       After 3 full loops without convergence, STOP and escalate.
+
+      The run's designated tester runs the full suite. No agent other than the
+      tester or the dev-lead starts a full suite, and one full suite runs at a time.
+      The historian records the Tester record in the run notes under `Tester
+      record`: gate label, command, HEAD, clean-tree status at start and end, result
+      tokens and wall time. The quality-gate run carries the gate label `--gate
+      <book-id>/<run-id>/p<N>/quality-gate`. Gate labels come from the closed set
+      `integration`, `quality-gate`, `exit`. `<book-id>` is the book's `id` field
+      (for example `PB-0144`), and `<run-id>` is the run's `run_id` (for example
+      `RUN-001`). A cycle run labels its integration run `quality-gate`. `exit` labels the full suite at the
+      exit gate before merge is offered. `integration` labels an integration full
+      suite in a book that has no quality-gate prompt. Per-unit runs pass no
+      `--gate` and are never reusable. Before re-running a gate's full suite, the
+      tester may pass `--reuse` with that gate's label: the full-suite runner
+      reports the matching record and starts no second run, and otherwise runs the
+      suites. A record for another gate never matches `--reuse` for this one. A project whose full-suite runner takes no `--gate` or
+      `--reuse` option still names the gate label in the Tester record and runs the
+      suite each time. While the tester's full suite or a live-tree tool runs, no
+      agent commits and no council convenes.
     expected_output: |
       All gates green; each gate's command + result token captured in `notes`.
     side_effects: [verify-code-docs]
@@ -219,10 +557,36 @@ prompts:
     purpose: |
       First-pass self-review before external eyes.
     prompt: |
+      Read governing architectural constraints and any selected formal implementation reasoning
+      separately. An Implementation Decision supplies no rule or current-state authority.
+      For a selected formal decision, compare delivery to the approved original and include annotations in
+      independent review scope. Report approval, delivery and queried source state separately.
+      Validate the committed approval binding and its retained context before
+      treating reasoning as reviewed intent. Use the context's supported profile;
+      book format supplies none. Preserve historical context bytes.
+      Precondition: This review requires the Tester record from this module's
+      quality-gate prompt. It holds when
+      `git merge-base --is-ancestor <recorded HEAD> HEAD` exits 0, every path printed
+      by `git diff --name-only <recorded HEAD> HEAD` lies under a bookkeeping path,
+      and `git status --porcelain --untracked-files=all` is empty. The bookkeeping
+      paths are the run directory, the run's own book file, `<docs_dir>/log.md` and
+      `<docs_dir>/journal/`. The book file counts only while its frozen-plan hash
+      equals the run's `book_content_hash`; compare them with audit-docs CHK-PB-BIND,
+      or compute_book_hash from `${CRUX_PLUGIN_ROOT}/scripts/validate-promptbook.py`.
+      The frozen-plan subset excludes the run-state fields `current_run`,
+      `current_prompt`, `status` and every key outside the plan subset. Name the
+      result in the run notes. This is citation, never a substitute for the
+      integration run, the exit gate or a release gate. When any precondition check
+      fails, the run stays at this prompt: no advance-run route returns it to the
+      quality-gate prompt. When `git status --porcelain --untracked-files=all` is not empty, the conductor first commits the run's own changes. It names every other path to the owner and stops; it deletes nothing. Then the conductor has the tester re-run the full suite of this module's quality-gate prompt, the historian records the new Tester
+      record, and the checks run again.
       Invoke the `code-review` skill (default effort, no `--comment` — a private
       dry-run) scoped to this loop's diff. Fix every `CONFIRMED` finding; evaluate
       `PLAUSIBLE`. Do NOT advance until every `CONFIRMED` is resolved or deferred
-      with rationale in the run `notes`.
+      with rationale in the run `notes`. When the fixes in this prompt touch any
+      path outside the bookkeeping paths, the tester runs a new full suite under
+      this module's quality-gate label at the post-fix HEAD, and the historian
+      records it as a new Tester record, before the review module cites one.
     expected_output: |
       Internal-review findings list and resolutions.
     side_effects: []
@@ -234,11 +598,19 @@ prompts:
     purpose: |
       Independent verification of correctness, consistency, clarity, and security.
     prompt: |
+      Read governing architectural constraints and any selected formal implementation reasoning
+      separately. An Implementation Decision supplies no rule or current-state authority.
+      For a selected formal decision, compare delivery to the approved original and include annotations in
+      independent review scope. Report approval, delivery and queried source state separately.
+      Validate the committed approval binding and its retained context before
+      treating reasoning as reviewed intent. Use the context's supported profile;
+      book format supplies none. Preserve historical context bytes.
       Dispatch parallel `Agent` reviewers, each blind to the others, scoped to the
       full cycle diff. **Three quality dimensions:** (a) Correctness — re-run the
-      Prompt 7 gates, then read the diff for behavior bugs + confirm the fix
+      Prompt 7 gates except the full test suite, for which check the Tester
+      record, then read the diff for behavior bugs + confirm the fix
       actually resolves the diagnosed root cause; (b) Consistency — vs ADRs,
-      `docs/AGENTS.md`, adjacent patterns; (c) Clarity. **PLUS a dedicated
+      `docs/AGENTS.md`, adjacent patterns; (c) Clarity. No reviewer starts a full suite; reviewers cite the Tester record. **PLUS a dedicated
       multi-subagent security review** — one `Agent` per threat class (S1
       injection, S2 secrets incl. `~/.crux/`, S3 authz, S4 supply-chain, S5
       unsafe file/shell/resource), scope-adaptive with MANDATORY N/A reports. A
@@ -265,6 +637,26 @@ prompts:
       an item stands verified only where this reviewer ran the command and
       read the result token, or re-read the observation where it is
       recorded; anything it cannot re-derive is unobserved in its own report.
+
+      **The independent-review gate.** This prompt advances only with reviewer
+      reports attached (rule:review-gate-needs-a-reviewer-report). Commit the
+      work, then fix the reviewed range as
+      `<the run's base_commit>..<HEAD at dispatch>`. The gate check does not
+      compare the base, so hold it. Each reviewer writes its own
+      report: `uv run "${CRUX_PLUGIN_ROOT}/scripts/write-review-report.py"
+      <run-RUN-NNN.yaml> --prompt <n> --range <base>..<end> --verdict
+      '<verdict>'`, adding one `--finding '<finding>'` per finding. Single-quote
+      each value and write an embedded `'` as `'\''`; never put model-written
+      text inside double quotes. Text with quotes or several lines goes in a
+      file passed with `--verdict-file` or `--finding-file`. A reviewer whose
+      harness grants no shell returns those fields, and the agent that
+      commissioned the review runs the writer with them. From the range end to
+      the advance, write nothing to the run snapshot or the book: the range
+      covers both, so a later write to either refuses every report. Commit only
+      the reports before the advance: a commit after the range end that changes
+      a reviewed path refuses every report. Record notes, deferrals and gate
+      tokens after the advance. Attach every report with `--artifacts`. A
+      council record never satisfies this gate.
     expected_output: |
       Aggregated external-review + security findings, plus a disposition
       per Evidence item.
@@ -276,6 +668,13 @@ prompts:
     purpose: |
       Ensure the fix is tested, documented, and that proper practices were followed.
     prompt: |
+      Read governing architectural constraints and any selected formal implementation reasoning
+      separately. An Implementation Decision supplies no rule or current-state authority.
+      For a selected formal decision, compare delivery to the approved original and include annotations in
+      independent review scope. Report approval, delivery and queried source state separately.
+      Validate the committed approval binding and its retained context before
+      treating reasoning as reviewed intent. Use the context's supported profile;
+      book format supplies none. Preserve historical context bytes.
       Dispatch 3 parallel `Agent` reviewers: (a) Test coverage — every changed
       path tested? the root-cause regression now covered by a test? edge cases?
       no false-greens? (b) Comments/docs — non-obvious WHY explained;
@@ -313,6 +712,13 @@ prompts:
     purpose: |
       Address all review findings before PR.
     prompt: |
+      Read governing architectural constraints and any selected formal implementation reasoning
+      separately. An Implementation Decision supplies no rule or current-state authority.
+      For a selected formal decision, compare delivery to the approved original and include annotations in
+      independent review scope. Report approval, delivery and queried source state separately.
+      Validate the committed approval binding and its retained context before
+      treating reasoning as reviewed intent. Use the context's supported profile;
+      book format supplies none. Preserve historical context bytes.
       Combine the Prompt 9 + 10 findings (quality, security, conformance). Fix
       every MUST-FIX (dispatch fix `Agent`s or fix directly); document
       SHOULD-CONSIDER deferrals in `notes`. A fix dispatch is an assignment: it
@@ -373,8 +779,25 @@ prompts:
       5. **PR notes**: draft a PR body (do NOT open the PR) — Summary, the verified
          root cause, Test plan (incl. the regression test), Risk notes. Store it
          in the run snapshot's `pr_draft` field.
+      6. **Result record**: skip this item when the run's
+         `implementation_bindings` is empty. Otherwise, wait until the review
+         reports are committed. Then write one evidence file per
+         `implementation_bindings` entry in this run's directory. The shape is
+         defined by `${CRUX_PLUGIN_ROOT}/schemas/implementation-result.schema.json`;
+         `${CRUX_PLUGIN_ROOT}/templates/implementation-result-template.yaml` is an example.
+         Mark `delivery_state: complete` only when every decision scope entry is
+         covered and every file changed under the scope between
+         `preimage_revision` and `source_revision` is listed; otherwise mark it
+         `partial` when part of the scope was delivered, or `unimplemented` with empty
+         `scope` and `sources` when none was. Then run `uv run "${CRUX_PLUGIN_ROOT}/scripts/implementation-decisions.py"
+         result --decision <the entry's revision.path> --evidence <evidence file>`.
+         Commit the evidence file and the result record at the `written` path the
+         command prints, each by explicit path.
+         Record any `refused` code the result command prints in the run notes.
     expected_output: |
-      CHANGELOG updated; docs clean per audit-docs; journal entry; PR draft stored.
+      CHANGELOG updated; docs clean per audit-docs; journal entry; PR draft stored;
+      a result record per implementation binding, or none when
+      implementation_bindings is empty.
     side_effects: [audit-docs, log-work]
 
   - n: 13
@@ -403,9 +826,9 @@ prompts:
       one-paragraph outcome; links (the verify journal entry, CHANGELOG entry,
       this run); stats (prompts, council rounds, dev gate loops, review-fix loops,
       files changed, tests added); outstanding deferred work; and the `pr_draft`
-      text. THEN run `uv run "${CRUX_PLUGIN_ROOT}/scripts/advance-run.py" <run-RUN-NNN.yaml>
-      --outcome done --result "summary written; archiving next"
-      --book <active-book.yaml>`. This prompt's `result` records
+      text. THEN run `uv run "${CRUX_PLUGIN_ROOT}/scripts/advance-run.py"
+      <run-RUN-NNN.yaml> --outcome done --result "summary written; archiving
+      next" --book <book.yaml>`. This prompt's `result` records
       the hand-off, NOT "book archived" — the archive has not happened yet at
       the instant that string is written. The run reaches `status: completed`,
       `current_prompt` is nulled on both book and run, and the book's

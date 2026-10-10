@@ -233,6 +233,10 @@ def _post_gate(root: Path) -> tuple[int | None, list[str]]:
 
 
 def main(argv=None) -> int:
+    supplied = list(sys.argv[1:] if argv is None else argv)
+    if any(arg == "--migration-disposition" or arg.startswith("--migration-disposition=") for arg in supplied):
+        from migration_disposition import main as disposition_main
+        return disposition_main("doctrine-pairing", supplied)
     ap = argparse.ArgumentParser(
         description="Human sign-off for one doctrine reconciliation pairing: "
         "render the (invariant, rule) texts, validate fail-closed, upsert the "
@@ -253,21 +257,12 @@ def main(argv=None) -> int:
 
     try:
         manifest = sp.read_manifest(root)
-        adrs = sp.adrs_dir(root)
         tree_dir = sp.resolve_tree(root)
-        governs_from = sp.governs_from(manifest)
-        # ADR-0095 requirement 5: the same observation gate compile-doctrine.py
-        # applies — read the corpus iff the concern is enabled; refuse (exit 2)
-        # an enabled concern this run cannot read. Call the ONE shared
-        # predicate rather than re-deriving it here: `observations_source`
-        # exists because this test was briefly copied per-lane, and the copy
-        # that drifted made a gate report clean on a tree the regenerator
-        # marked BROKEN.
-        observations = sp.observations_source(root, manifest)
-        records = sp.collect_records(adrs, governs_from=governs_from,
-                                     observations=observations)
-        invariants = dp.read_invariants(root)
-        existing = dp.read_reconciliations(root)
+        loaded, view, pending, actual = dp._load_doctrine_inputs(root, manifest)
+        dp._plan_doctrine_outputs(loaded, view, pending)
+        records = sp._summary_authority_records(loaded["records"], view, loaded["removed"], loaded["aliases"])["records"]
+        invariants = loaded["invariants"]
+        existing = loaded["reconciliations"]
     except (sp.GovernsValidationError, dp.DoctrineValidationError) as exc:
         print(json.dumps({"validation_errors": exc.problems}, sort_keys=True))
         return 1
@@ -393,6 +388,18 @@ def main(argv=None) -> int:
     path = dp.reconciliations_path(root)
     current_bytes = path.read_text(encoding="utf-8") if path.is_file() else None
     noop = current_bytes == wanted_bytes
+
+    try:
+        refusal = dp._bound_reconciliation_write_refusal(root, wanted_bytes)
+    except (sp.GovernsValidationError, dp.DoctrineValidationError) as exc:
+        print(json.dumps({"validation_errors": exc.problems}, sort_keys=True))
+        return 1
+    except Exception as exc:
+        sys.stderr.write(f"signoff-reconciliation: {type(exc).__name__}: {exc}\n")
+        return 2
+    if refusal is not None:
+        print(json.dumps({"findings": [_finding(refusal)]}, sort_keys=True))
+        return 1
 
     if args.dry_run:
         print(rendering)

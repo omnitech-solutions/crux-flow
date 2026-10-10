@@ -1,6 +1,6 @@
 ---
 name: run-adr-council
-description: "Run a structured multi-model council review of a specified ADR and return its verdict for the ADR approval gate."
+description: "Run a multi-model council review of a specified ADR; inside a cycle run, its council record is the ADR approval gate's evidence."
 arguments: [adr]
 metadata:
   tags: "council, adr, verification, multi-model"
@@ -8,7 +8,7 @@ metadata:
   risk_level: "medium"
   triggers: "run the council on ADR-NNNN | council review ADR-NNNN | run-adr-council ADR-NNNN | council-check this ADR"
   requires_env: "OPENROUTER_API_KEY"
-  routing_note: "Reads the ADR, fences its body as data, invokes the async council, returns a structured verdict; no per-ADR driver."
+  routing_note: "Inside a run it passes the ADR to run-council.py as a --subject, which run-council.py fences as data. Its council record is the gate evidence. Outside a run the async driver fences the ADR body itself and is informational. There is no per-ADR driver."
 ---
 
 # run-adr-council
@@ -28,7 +28,9 @@ This skill is portable across Claude Code, Codex, and OpenCode. This section ove
 <!-- END GENERATED: runtime-compat -->
 
 
-Parameterized ADR council runner. Eliminates copy-paste-adapted council driver scripts: rather than writing a per-ADR driver, this skill assembles the structured council prompt and invokes `async_council.py` for any ADR.
+Parameterized ADR council skill. Eliminates copy-paste-adapted council driver scripts: rather than writing a per-ADR driver, this skill assembles the structured council question and runs the council for any ADR.
+
+Council deliberation runs only through the council runner, and its council record is the only evidence a council gate accepts.[^council] Independent review is a reviewer's examination, and its reviewer report is the only evidence an independent-review gate accepts.[^review] Neither satisfies the other's gate.
 
 ## Invocation
 
@@ -40,6 +42,23 @@ run-adr-council docs/adrs/ADR-<NNNN>-<slug>.md
 
 If `--question` is omitted, the default council question is:
 > "Does this ADR meet the acceptance bar? Is the decision sound, the consequences complete, the scope appropriate, and the acceptance criteria clear?"
+
+## Gate path: inside a cycle run
+
+Inside a promptbook run, the ADR approval gate is a council gate. Follow this path; the pipeline below serves an informational council outside a run.
+
+Finish any open Git merge or other sequence before council. Live execution of
+both book formats uses the current attempt-aware gate. This skill reviews an
+architectural module; a combined book still dispatches its structural module kind.
+Use the implementation council path for a replaceable choice, preserving ADR
+refutation and adjudicator procedures for architectural modules alone.
+
+1. **Commit the ADR.** The council runner accepts only a subject that is tracked and clean. After each write of the ADR, record a run-work witness: `uv run "${CRUX_PLUGIN_ROOT}/scripts/run-work-witness.py" record <run> --prompt N --path <ADR file>`. The witness lets the conductor repair an ADR left uncommitted instead of stopping for the owner. Never record a witness to repair a preflight refusal: a subject with no witness taken at its write goes to the owner.
+2. **Assemble the question file** at `<run_dir>/council/<RUN>-p<N>-r<R>-question.md`. Do not fence the ADR inside it: the council runner sends every subject fenced as data with its sha256. State the council question. List the five dimensions with their questions: Completeness, Correctness, Consistency, Clarity and Security. Take the questions from the council-approval prompt of the `adr` module (`cycle-module-adr.yaml`, ordinal 2). Add the line "every seat assesses every dimension".[^seats] Each seat assesses all five; five dimensions do not make five seats.
+3. **Run the council runner** as a background command. A seat sees only the question and the subjects, so pass the committed ADR, `docs/adrs/index.md` and every ADR or code path the ADR cites, each as its own `--subject`, all tracked and clean: `uv run "${CRUX_PLUGIN_ROOT}/scripts/run-council.py" <run> --prompt N --round R --question <question file> --subject <ADR file> --subject docs/adrs/index.md [--subject <cited path> ...]`. The `council` skill lists the other flags and the exit codes. The council runner appends the four-token vote instruction and the finding tags, so this skill does not. `--round R` is the number of council records with outcome `ran` already in this module, plus one. A valid adjudicator refutation record fills place 3, and a could-not-run record takes no place, so after you fix its cause you reconvene with the same number. `run-council.py` refuses a mismatch before any call (exit 1, `"record": null`, no record written).
+4. **Return the council record's path.** The council runner commits the attempt record and the council record itself. It commits the attempt record before any council request. The claim begins a council attempt, one execution of the round, which is distinct from a seat's calls. The council runner then commits the council record and verifies its bytes.[^attempt][^match] The gate reads only a committed record. The conductor attaches the record to the prompt with `--artifacts`, and the gate check reads each seat's decision from it. On exit 0 the conductor advances `--outcome done` when the gate passes, and `--outcome blocked` when the record has not converged; the gate check then routes the run to the address-findings prompt or stops it. On exit 1 with `"refused": "round"` the round number was wrong: correct it and run again. On exit 1 with `"refused": "prompt"` `--prompt` was not the run's current prompt: run again with the current prompt or omit `--prompt`. On exit 1 with `"refused": "preflight"` an input failed the checks before any request, and no council record was written: apply each cause's `repair` and run again at the same round. `retype` means correct the path; `commit-run-work` means commit the witnessed subject with `run-work-witness.py commit <run> --path <path>`. The third preflight refusal at this prompt commits a `preflight-retries-spent` record instead, an escalation-loop stop. On exit 1 with `"refused": "attempt-open"` an open attempt holds the module: recover it as below, never claim past it. On exit 1 with a record the conductor reads the record's `outcome`: `could-not-run` means the council could not run and defers to a human (`preflight-needs-owner` included), and `ran` means the secret scan refused the record's full write. Either way the conductor attaches it with `--outcome blocked`, and the run stops.[^defer] Exit 2 means no council record was committed, never that nothing was written. When stderr names `timeout`, or names outside work the commit moved, the owner's remedy comes before recovery: the conductor reports a contradicted-premise stop for the owner. The owner first restores the set-aside work (`git stash list`, or a pre-commit framework's backup patch) and then removes a stale `index.lock` in the git directory. Start recovery only after the owner reports both steps done. A council runner that ended without an exit code, with a signal or with any other code stopped before it reported: treat it as an exit 2 that names a claimed attempt. Run the process check, probe the lock with `run-council.py --recover <run> --prompt N --probe`, and once no live council runner holds it, run `run-council.py --recover <run> --prompt N`. Pass `--prompt`: without it recovery cannot recognise a record whose pending copy is already removed, and it reports `nothing-open`. Recovery makes no council request and commits or recognises only the original council record; never convene another round over a claimed attempt, and not until recovery reports.[^recover] Route each recovery result by the recovery table in `run-promptbook`'s `references/gates.md`. When stderr names no attempt, the prompt cannot advance, and the conductor reports why, as a contradicted-premise stop for the owner.
+
+The async driver under Step 4 satisfies no gate. No native agent and no reviewer casts a seat's vote.[^council]
 
 ## Pipeline
 
@@ -145,7 +164,7 @@ d=$(mktemp -d)
 uv run "$d/driver.py"
 ```
 
-Each attempt at a seat has its own deadline, 600 s by default. A seat that fails with a
+Each call to a seat has its own deadline, 600 s by default (`--timeout`). A seat that fails with a
 `timeout`, `provider`, `malformed-response` or `truncated` fault is called once more, so the
 worst case per seat is two deadlines, about 20 minutes. A Claude Code foreground shell call
 stops at 10 minutes, so **run the driver as a background command** and read its output when it
@@ -167,7 +186,7 @@ Print the structured result:
 - `dissent_count` (required — never skip; counts dissents from responding seats only)
 - Key agreements and disagreements
 
-The verdict is recorded in the calling context (run-snapshot Result line or conversation). This skill writes no log op of its own.
+Inside a run, the council record is the verdict, and the conductor attaches its path. Outside a run, the printed result is informational and gates nothing; record it in the conversation. This skill writes no log op of its own.
 
 ## Failure behavior
 
@@ -179,20 +198,20 @@ The verdict is recorded in the calling context (run-snapshot Result line or conv
 | **A seat errors after its retry** (`retried` is true on an errored vote) | The seat is called once more after a `timeout`, `provider`, `malformed-response` or `truncated` fault, and it is one errored vote, not two. Name its `fault_label` (the last attempt's) and `first_fault_label`, with both finish reasons. `truncated` with finish `length` means the seat ran out of output budget. `malformed-response` with finish `stop` means the reply held no usable JSON object. Read the verdict over the responding seats as in the row above. A seat with `recovered` true answered on its retry and is a normal responding seat. |
 | **Conditioned approval** — `final_recommendation["conditioned"]` is true (a responding seat returned `APPROVE_WITH_CONDITIONS`) | The label can read `UNANIMOUS_APPROVE` or `MAJORITY_APPROVE`, but the routed action is `EXECUTE_WITH_MONITORING` at most and never `AUTO_EXECUTE`. Surface each seat's conditions from `final_recommendation["conditions"]`. A conditioned approval is not convergence: hand the conditions back to the caller's address-findings step, as for a mixed verdict. |
 | **Nit approval** — `final_recommendation["nits"]` is true (a responding seat returned `APPROVE_WITH_NITS`) | Report each seat's `nit_items`. Nits never change the route and never block: report them, and the caller decides whether to fix them. |
-| **Mixed verdict** — some APPROVE, some REJECT / substantive dissents (`consensus: SPLIT` or a majority label, not a `UNANIMOUS_` label) | This is the **fix-loop signal, not inconclusive.** Surface the aggregated findings (the union of `dissenting_points` over responding seats) and hand control back to the caller's address-findings step. This skill does not edit the ADR or re-convene itself — see "Multi-round composition" below. |
-| All **responding** seats return `REJECT` (`consensus: UNANIMOUS_REJECT`) | A verdict, and not convergence. Surface the aggregated findings (the union of `dissenting_points` over responding seats) and hand control back to the caller's address-findings step, as for a mixed verdict. The routed action is `ABORT`. This skill does not edit the ADR or re-convene itself. |
+| **Mixed verdict** — some APPROVE, some REJECT / substantive dissents (`consensus: SPLIT` or a majority label, not a `UNANIMOUS_` label) | This is the **fix-loop signal, not inconclusive.** Surface the aggregated findings (the union of `dissenting_points` over responding seats) and hand control back to the caller's address-findings step. This skill does not edit the ADR or reconvene itself — see "Multi-round composition" below. |
+| All **responding** seats return `REJECT` (`consensus: UNANIMOUS_REJECT`) | A verdict, and not convergence. Surface the aggregated findings (the union of `dissenting_points` over responding seats) and hand control back to the caller's address-findings step, as for a mixed verdict. The routed action is `ABORT`. This skill does not edit the ADR or reconvene itself. |
 | All **responding** seats return `DEFER_TO_HUMAN` (`consensus: UNANIMOUS_DEFER_TO_HUMAN`) | Surface as inconclusive — do not declare a verdict. Caller must decide whether to retry with a narrower question. |
 | All **responding** seats return the same token outside `APPROVE` / `REJECT` / `DEFER_TO_HUMAN` (for example `REVISE`), or free text (`consensus: UNANIMOUS_REVISE` or `UNANIMOUS_OFF_SCALE`) | The seats agree with each other, not with an approval. Surface as inconclusive, name the tokens from `final_recommendation["off_scale"]`, and never treat it as approval or convergence. The routed action is `DEFER_TO_HUMAN`. The caller decides whether to retry with a prompt that states the decision scale. |
 | API failure (all providers, or responding seats below quorum → `NO_QUORUM`) | Surface the error clearly; do not write a partial verdict. Retry guidance: check `crux-env list --project <project>` to confirm keys are present. |
 
 ## Multi-round composition
 
-This skill is a **single-convene primitive**: one invocation runs exactly one `deliberate_sync` against the ADR **as it exists on disk right now**, and returns one verdict. It does **not** loop internally, edit the ADR, or count rounds. A multi-round convergence loop composes across repeated invocations, with **loop ownership held by the caller** (typically the `dev-cycle` ADR module, which bounds the loop to 3 rounds and escalates on non-convergence):
+This section describes the informational driver outside a cycle run. Inside a run, the gate path above applies and the gate check derives convergence per seat. This skill is a **single-convene primitive**: one invocation runs exactly one `deliberate_sync` against the ADR **as it exists on disk right now**, and returns one verdict. It does **not** loop internally, edit the ADR, or count rounds. A multi-round convergence loop composes across repeated invocations, with **loop ownership held by the caller**:
 
 - **One invocation = one round.** Re-invoke `run-adr-council <ADR-id>` for each new round.
 - **Findings carry over via the ADR body + `--question`.** Between rounds the caller edits the ADR in place to address findings (the body is the carrier; `status` stays `Proposed`), then re-invokes. Append the prior round's **still-unresolved** findings to `--question` as a fenced "prior-round findings addressed:" block so the council can confirm closure — cap it to the unresolved set so the prompt doesn't grow unbounded.
 - **Convergence** = `UNANIMOUS_APPROVE` over responding seats, `conditioned` false, and no dissenting point from a responding seat whose decision is not `APPROVE_WITH_NITS` → the caller advances to accept. The dissenting points of an `APPROVE_WITH_NITS` seat are its `nit_items`; they do not block convergence, so report them. A `UNANIMOUS_` label other than `UNANIMOUS_APPROVE` (such as `UNANIMOUS_DEFER_TO_HUMAN`, `UNANIMOUS_REVISE` or `UNANIMOUS_OFF_SCALE`) is not convergence.
-- **Split / mixed** → the caller runs its address-findings step (which may include deeper review), then re-invokes for the next round.
+- **Split / mixed** → the caller runs its address-findings step (a fix in the ADR, or a named check that refutes the finding), then re-invokes for the next round.
 - **Stop criterion and round counting belong to the caller, NOT this skill.** This skill counts nothing and never escalates; the bound (≤ 3 rounds → stop + escalate) lives in the caller's ADR module. This division keeps the driver generic, constant, and stateless (its load-bearing invariant) and avoids two competing escalation authorities.
 
 ## Self-test
@@ -232,4 +251,12 @@ Closure criterion: the skill ran end-to-end against a real ADR without any sed-a
 - [ ] `dissent_count` was surfaced in the output (never silently omitted).
 - [ ] `conditioned` and `nits` were read from `final_recommendation`, with each seat's `conditions` and `nit_items`.
 - [ ] The driver ran as a background command.
-- [ ] The council output is advisory — the verdict never auto-executes a `transition-adr` accept or any other downstream action. The caller decides what to do with the result.
+- [ ] The council output is evidence for the gate, not an action — the verdict never auto-executes a `transition-adr` accept or any other downstream action. The caller decides what to do with the result.
+
+[^council]: rule:council-is-never-harness-native, rule:council-gate-needs-a-runner-record
+[^review]: rule:review-gate-needs-a-reviewer-report
+[^seats]: rule:every-seat-assesses-five-dimensions, rule:council-assignment-is-validated-before-spend
+[^defer]: rule:only-a-preflight-refusal-is-retried
+[^attempt]: rule:an-open-council-attempt-stops-the-gate
+[^match]: rule:council-evidence-matches-its-attempt
+[^recover]: rule:recovery-never-deliberates-again

@@ -134,6 +134,13 @@ def eligibility(record: dict | None) -> tuple[bool, str]:
     """
     if record is None:
         return False, REASON_UNKNOWN
+    if record.get("historical"):
+        return False, "the source rule is historical implementation reasoning"
+    if record.get("retired_by") or record.get("review_state") == "removed":
+        return False, "the source rule is retired or removed from live authority"
+    if record.get("alias_handles") or record.get("authority", "prescriptive") != "prescriptive" \
+            or record.get("disposition", "decided") != "decided":
+        return False, "the source is not an architectural rule"
     # NO DEFAULT KIND. `record.get("source_kind") or "adr"` would resolve a missing,
     # empty or null kind to the ONE kind that can be eligible — a fail-open default in
     # the module whose whole contract is that nothing is admitted by default. Not

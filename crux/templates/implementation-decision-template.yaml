@@ -1,0 +1,33 @@
+# Parameterized example. Replace identities, constraints and prose before review.
+# ADR-NNNN must resolve to an Accepted architectural host in the target tree.
+# Review binds the exact revision; this record grants no governing authority.
+record_type: implementation-decision
+format_version: "1"
+book_id: DEMO-PB-0001
+run_id: RUN-001
+slug: strategy
+revision: 1
+slot: implementation-1
+display_title: "Choose a lookup strategy"
+scope:
+  - src/lookup.py
+constraint_refs:
+  - ADR-NNNN/example-constraint
+# Optional. When no architectural rule governs the scope, declare that instead of citing an
+# irrelevant rule. Replace the list above with "constraint_refs: []" and add the marker below.
+# The frozen book slot must carry the identical marker, reason included. The reason is one line
+# of 1 to 500 characters. A slot that names a migration batch never carries the marker.
+# no_governing_constraint:
+#   reason: "A one-off data-repair script outside every module the architecture describes."
+reasoning: "Explain the problem and why the evidence supports this choice."
+alternatives:
+  - "Describe another approach and its tradeoffs."
+approach: "Describe the selected implementation."
+assumptions:
+  - "Name an assumption that the evidence will test."
+intended_evidence:
+  - "Name the observation that would establish the outcome."
+source_labels:
+  - label: "Lookup implementation"
+    path: src/lookup.py
+related_choices: []

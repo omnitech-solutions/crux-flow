@@ -74,6 +74,8 @@ uv run "${CRUX_PLUGIN_ROOT}/scripts/signoff-survey.py" --repo-root <repo-root> [
 
 Exit 0 · 1 findings (JSON on stdout) · 2 environment (stderr). On findings, print them and STOP — a refused batch is not signable as it stands, and the remedy is on the sheet or in the tree, never in a flag.
 
+Sign-off reads the corpus through guarded admission. When it refuses on a proof or source (for example, a declared migration source that is unavailable or invalid), stop and report the refusal. Do not bypass it by editing a surface, a receipt or the sheet by hand. Preserve the human cells and the user's explicit confirmation in step 2: no refusal remedy fills a verdict, domain or rationale, and none signs without that confirmation.
+
 ### 2. THE USER READS THE RENDERING AND CONFIRMS
 
 Present the rendering to the user: each claim, the verdict the sheet carries for it, and the domain the record will take. Ask for explicit confirmation to publish this one batch.

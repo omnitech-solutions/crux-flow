@@ -19,6 +19,8 @@ related_adrs: []             # ADR ids that reference this brief (back-populated
 > `rule:<slug>`. A rule this brief proposes and that does not exist yet is written in
 > the placeholder form `rule:<new-thing>` — the angle brackets make it a non-token
 > under the citation grammar, so the brief passes the citation lint while the rule is
-> still a proposal. Delete this stub once you start writing.
+> still a proposal. Do not cite a rule that has been demoted to history: the citation
+> lint flags it in a brief. Describe the former rule in prose without a citation token,
+> or cite its replacement as `rule:<slug>`. Delete this stub once you start writing.
 
 <body>

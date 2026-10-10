@@ -101,10 +101,8 @@ INTERPRETER_DELTAS: dict[tuple[int, int], dict[str, dict]] = {
 }
 SCRATCH_DOCS = ".crux-arch-scratch"
 
-# A `source: self` entry derives THIS repository in place, at its own root —
-# not a cached clone. `.crux-arch-scratch/` then lands here rather than under
-# `.cache/<name>/`; it is gitignored, and `derive_one`'s existing `finally`
-# removes it exactly as it does for a cloned repo's scratch directory.
+# A `source: self` entry derives a copy of THIS repository, not a cached clone;
+# `_self_hosted_copy` below says what the copy leaves out and why.
 REPO_ROOT = HERE.parents[3]
 
 # The five files a golden captures. `overview.md`, `index.md` and
@@ -188,7 +186,62 @@ def count_entities(text: str) -> dict:
     return {"table_rows": rows, "graph_edges": edges, "headings": headings}
 
 
+# The `source: self` derive reads a COPY of this checkout, never the checkout.
+# Its expectation record states that the derive reads a scratch `docs_dir` and
+# never this repository's configured documentation tree. Once that tree has
+# published an implementation migration, the in-place derive cannot keep that
+# promise: the decision index refuses to read architectural history for a
+# `docs_dir` other than the configured one ("architectural history belongs to a
+# different configured tree"), and the refusal is correct. The copy leaves out
+# the configured tree and `.git`, so the derive reads exactly the sources the
+# record describes. The other names are regenerable caches and isolation state;
+# `.cache` holds the corpus's own third-party clones.
+_SELF_COPY_IGNORE = shutil.ignore_patterns(
+    ".git", "__pycache__", "*.pyc", "node_modules", ".venv", ".cache", "logs",
+    ".pytest_cache", ".ruff_cache", SCRATCH_DOCS, ".crux-selftest-scratch",
+)
+
+
+@contextlib.contextmanager
+def _self_hosted_copy(root: Path):
+    """Yield a copy of *root* without `.git` and without its configured docs tree."""
+    import tempfile                                # noqa: PLC0415
+
+    from bionic_config import load_config          # noqa: PLC0415
+
+    root = root.resolve()
+    try:
+        docs_tree = (root / load_config(root).docs_dir).resolve()
+    except Exception:                              # noqa: BLE001 — no config, no docs tree
+        docs_tree = None
+    harness = (root / ".claude").resolve()
+
+    def ignore(directory: str, names: list[str]) -> set[str]:
+        ignored = set(_SELF_COPY_IGNORE(directory, names))
+        here = Path(directory).resolve()
+        if docs_tree is not None and here == docs_tree.parent:
+            ignored.update({docs_tree.name}.intersection(names))
+        if here == harness:
+            ignored.update({"worktrees"}.intersection(names))
+        return ignored
+
+    with tempfile.TemporaryDirectory(prefix="crux-arch-self-") as tmp:
+        copy = Path(tmp) / root.name
+        shutil.copytree(root, copy, ignore=ignore, symlinks=True)
+        if docs_tree is not None and (copy / docs_tree.relative_to(root)).exists():
+            raise RuntimeError("the self-hosted copy still holds the configured docs tree")
+        yield copy
+
+
 def derive_one(name: str, root: Path, *, arch_stack: str | None = None) -> dict:
+    """Derive one corpus entry; a `source: self` entry derives a copy of this checkout."""
+    if Path(root).resolve() == REPO_ROOT.resolve():
+        with _self_hosted_copy(Path(root)) as copy:
+            return _derive_one(name, copy, arch_stack=arch_stack)
+    return _derive_one(name, root, arch_stack=arch_stack)
+
+
+def _derive_one(name: str, root: Path, *, arch_stack: str | None = None) -> dict:
     """Derive one cached repo. Returns {"tree": {rel: text}, "report": {...}}.
 
     `arch_stack`, given only for a `source: self` entry, forces

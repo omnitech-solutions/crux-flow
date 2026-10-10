@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "crux implementation annotation (format_version 1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_type",
+    "format_version",
+    "decision",
+    "operation",
+    "target",
+    "original_sha256",
+    "correction"
+  ],
+  "properties": {
+    "record_type": {
+      "const": "implementation-annotation"
+    },
+    "format_version": {
+      "const": "1"
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        }
+      }
+    },
+    "operation": {
+      "type": "string",
+      "enum": [
+        "correct-spelling",
+        "correct-punctuation",
+        "correct-display-label"
+      ]
+    },
+    "target": {
+      "type": "string",
+      "pattern": "^(?:display_title|source_labels\\.(?:0|[1-9]\\d*)\\.label)(?![\\s\\S])"
+    },
+    "original_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+    },
+    "correction": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

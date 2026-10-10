@@ -55,7 +55,7 @@ def parse_evidence(entry) -> tuple[str, int, int] | None:
     return path, int(m.group("start")), int(m.group("end"))
 
 
-def resolve_contained(root: Path, path: str) -> Path | None:
+def resolve_contained(root: Path, path: str, *, _source_io=None) -> Path | None:
     """The RESOLVED path of `path` under `root`, or None when it escapes.
 
     Containment is asserted after `resolve()`, which follows every symlink in
@@ -69,25 +69,31 @@ def resolve_contained(root: Path, path: str) -> Path | None:
     """
     if not valid_evidence_path(path):
         return None
-    try:
-        root_r = Path(root).resolve()
-        resolved = (root_r / path).resolve()
-    except (OSError, RuntimeError):      # unreadable, or a symlink loop
-        return None
+    if _source_io is not None:
+        root_r = _source_io.resolve(Path(root))
+        resolved = _source_io.resolve(root_r / path)
+    else:
+        try:
+            root_r = Path(root).resolve()
+            resolved = (root_r / path).resolve()
+        except (OSError, RuntimeError):      # unreadable, or a symlink loop
+            return None
     if resolved == root_r or root_r not in resolved.parents:
         return None
     return resolved
 
 
-def evidence_path_resolves(root: Path, path: str) -> bool:
+def evidence_path_resolves(root: Path, path: str, *, _source_io=None) -> bool:
     """Whether `path` names a real file INSIDE `root`. A path that reaches out
     of the repository through a symlink is not contained, however ordinary its
     spelling, and is refused here."""
-    resolved = resolve_contained(root, path)
-    return resolved is not None and resolved.is_file()
+    resolved = (resolve_contained(root, path) if _source_io is None
+                else resolve_contained(root, path, _source_io=_source_io))
+    return resolved is not None and (resolved.is_file() if _source_io is None
+                                    else _source_io.kind(resolved) == "file")
 
 
-def evidence_entry_resolves(root: Path | None, entry: str) -> bool:
+def evidence_entry_resolves(root: Path | None, entry: str, *, _source_io=None) -> bool:
     """Whole-entry convenience: grammar, then containment, then existence.
     No root, no resolution."""
     if root is None:
@@ -95,4 +101,5 @@ def evidence_entry_resolves(root: Path | None, entry: str) -> bool:
     parsed = parse_evidence(entry)
     if parsed is None:
         return False
-    return evidence_path_resolves(root, parsed[0])
+    return (evidence_path_resolves(root, parsed[0]) if _source_io is None
+            else evidence_path_resolves(root, parsed[0], _source_io=_source_io))

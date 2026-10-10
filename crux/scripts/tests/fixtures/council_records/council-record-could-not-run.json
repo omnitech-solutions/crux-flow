@@ -1,0 +1,50 @@
+{
+  "record_type": "council-record",
+  "format_version": "1",
+  "writer": "run-council",
+  "written_at": "2026-10-01T12:05:00.000001Z",
+  "book": {
+    "id": "PB-0999",
+    "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "run_id": "RUN-001",
+  "binding": {
+    "prompt": 2,
+    "module_tag": "adr-1"
+  },
+  "council_kind": "adr",
+  "round": 1,
+  "question": {
+    "path": "docs/promptbooks/runs/PB-0999-fixture/council/question.md",
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "system_prompt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "vote_instruction_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "subjects": [
+    {
+      "path": "docs/adrs/ADR-0001-fixture.md",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "retained_copy": null
+    }
+  ],
+  "registry": {
+    "path": "crux/scripts/crux/_config/llm_router_config.json",
+    "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "version": "4.1.0"
+  },
+  "outcome": "could-not-run",
+  "refusal_reason": {
+    "code": "no-key",
+    "names": [
+      "OPENROUTER_API_KEY"
+    ]
+  },
+  "quorum_met": false,
+  "degraded": false,
+  "errored_seats": [],
+  "seats": [],
+  "aggregate": {
+    "consensus": "NO_QUORUM",
+    "action": "DEFER_TO_HUMAN"
+  }
+}

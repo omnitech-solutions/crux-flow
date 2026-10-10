@@ -124,7 +124,7 @@ class IngestLabelVocabularyTests(unittest.TestCase):
     LABELS = {
         "refused", "insufficient-credit", "timeout", "auth", "rate-limit",
         "unreachable", "provider", "client-config", "malformed-response",
-        "unexpected-status", "truncated",
+        "unexpected-status", "truncated", "served-model", "served-provider-mismatch",
     }
 
     def test_the_label_table_holds_exactly_the_pinned_set(self):

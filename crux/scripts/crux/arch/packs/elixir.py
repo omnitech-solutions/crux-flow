@@ -57,6 +57,8 @@ from ..core import (
     _canon,
     _cell,
     _contained,
+    _retained_source_walk,
+    _retained_source_resolver,
     _mermaid,
     _node_ids,
     _norm_path,
@@ -288,7 +290,7 @@ def _walk_ex_files(root: Path):
     + dot dirs. `os.walk(followlinks=False)` never descends a symlinked dir; dir
     and file names are codepoint-sorted so an aggregate-cap truncation selects a
     stable, locale-independent prefix (ADR-0069 point 6)."""
-    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+    for dirpath, dirnames, filenames in _retained_source_walk(root, root):
         dirnames[:] = sorted(
             d for d in dirnames if d not in _SKIP_DIRS and not d.startswith(".")
         )
@@ -633,7 +635,9 @@ def _elixir_router_files(root: Path) -> list:
     root = Path(root)
     found: list = []
     seen: set = set()
-    for p in sorted(root.rglob("router.ex")):
+    for p in sorted(Path(directory) / name
+                    for directory, _children, files in _retained_source_walk(root, root)
+                    for name in files if name == "router.ex"):
         rel = p.relative_to(root).parts
         if any(part in _SKIP_DIRS or part.startswith(".") for part in rel):
             continue
@@ -1246,7 +1250,7 @@ def extract_elixir_data_model(root: Path, docs_dir: str) -> tuple[str, dict]:
 
 def _elixir_migrations_dir(root: Path):
     d = Path(root) / "priv" / "repo" / "migrations"
-    return d if d.is_dir() else None
+    return d if _retained_source_resolver(root)(d) is not None and d.is_dir() else None
 
 
 def _detect_elixir_migrations(root: Path) -> bool:

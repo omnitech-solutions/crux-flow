@@ -31,6 +31,11 @@ tokens are neither evidence nor rejections, `resolver_available` is false,
 and the caller can tell "no reflection" from "could not check". The wiki-link
 lane still decides on its own.
 
+Historical implementation citations reflect their original source with
+`authority: none`. The owning reader supplies freshly proved canonical history;
+projected historical maps alone supply no proof. A reserved retired slug with
+no live successor reflects its validated historical displacer, never a replacement.
+
 Fence-aware, using the shared subset in `crux/scripts/md_fences.py`: a
 citation quoted inside a fenced block is content, not a citation.
 
@@ -94,7 +99,8 @@ def citation_lines(text: str) -> list[tuple[int, str]]:
     return out
 
 
-def artifact_references(text: str, artifact: str, resolver: dict | None) -> dict:
+def artifact_references(text: str, artifact: str, resolver: dict | None, *,
+                        _history: dict | None = None) -> dict:
     """Whether `text` carries a citation of `artifact`, and on what evidence.
 
     `resolver` is the parsed `<docs_dir>/adrs/summaries/resolver.json`, or
@@ -104,16 +110,24 @@ def artifact_references(text: str, artifact: str, resolver: dict | None) -> dict
     and three lists that never overlap:
 
       `evidence`     — what makes `referenced` true: a `wikilink`, a
-                       `resolved-slug`, or a `retired-slug`.
+                       `resolved-slug`, `retired-slug`, `historical-slug`, or
+                       `historical-retired-slug`.
       `rejected`     — a citation checked and found to be about something
                        else: a `foreign-slug` (with `resolves_to`) or an
                        `unresolved-slug`.
       `unverifiable` — a slug token seen while no resolver was available.
                        Neither evidence nor a rejection, because nothing
                        checked it.
+
+    `_history` is private loaded data supplied by the owning proof boundary,
+    not a registry, context or approval override. Historical rows carry no rule.
     """
     slugs = (resolver or {}).get("slugs", {}) if isinstance(resolver, dict) else {}
     retired = (resolver or {}).get("retired_slugs", {}) if isinstance(resolver, dict) else {}
+    # Only the owning reader supplies canonical, freshly proved history. A raw
+    # resolver's historical maps alone never establish historical evidence.
+    historical = (_history or {}).get("historical_slugs", {})
+    displacements = (_history or {}).get("historical_displacements", {})
     evidence: list[dict] = []
     rejected: list[dict] = []
     unverifiable: list[dict] = []
@@ -125,6 +139,16 @@ def artifact_references(text: str, artifact: str, resolver: dict | None) -> dict
         for slug in RULE_TOKEN_RE.findall(line):
             if resolver is None:
                 unverifiable.append({"kind": "unverifiable-slug", "token": slug, "line": lineno})
+                continue
+            if slug in historical:
+                row = historical[slug]
+                owner = _handle_owner(row["source_handle"])
+                if owner == artifact:
+                    evidence.append(dict(kind="historical-slug", token=slug, line=lineno,
+                        authority="none", **row))
+                else:
+                    rejected.append(dict(kind="foreign-slug", token=slug, line=lineno,
+                        authority="none", resolves_to=owner))
                 continue
             handle = slugs.get(slug)
             if handle is not None:
@@ -142,6 +166,17 @@ def artifact_references(text: str, artifact: str, resolver: dict | None) -> dict
                 else:
                     rejected.append({"kind": "foreign-slug", "token": slug, "line": lineno,
                                      "resolves_to": ", ".join(sorted(set(owners)))})
+                continue
+            if slug in retired and slug in displacements:
+                edges = displacements[slug]
+                matching = [edge for edge in edges if _handle_owner(edge["source_displacer"]) == artifact]
+                if matching:
+                    evidence.extend(dict(kind="historical-retired-slug", token=slug,
+                        line=lineno, authority="none", **edge) for edge in matching)
+                else:
+                    rejected.append(dict(kind="foreign-slug", token=slug, line=lineno,
+                        authority="none", resolves_to=", ".join(sorted({
+                            _handle_owner(edge["source_displacer"]) for edge in edges}))))
                 continue
             rejected.append({"kind": "unresolved-slug", "token": slug, "line": lineno})
 

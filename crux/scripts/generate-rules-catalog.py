@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["pyyaml>=6.0"]
+# dependencies = ["pyyaml>=6.0,<7", "httpx>=0.27,<1"]
 # ///
 """generate-rules-catalog.py — project this project's own rules into a catalog the plugin ships.
 
@@ -54,6 +54,7 @@ import argparse
 import bisect
 import json
 import re
+import stat
 import sys
 from pathlib import Path
 
@@ -62,6 +63,7 @@ import authoring_scope as _scope  # noqa: E402
 
 import publication_eligibility as pe  # noqa: E402
 import summaries_projection as sp  # noqa: E402
+import implementation_migration as migration  # noqa: E402
 
 # The repository's one bound-and-redact helper, reached through the projection
 # exactly as the sibling citation lint reaches it. Every untrusted value this
@@ -92,8 +94,28 @@ MAX_SCANNED_FILES = 5000
 TEXT_SUFFIXES = {".md", ".tmpl", ".py", ".yaml", ".yml", ".json", ".toml", ".sh", ".txt"}
 
 
+def _guarded_citing_paths(directory: Path, plugin_root: Path, source_io):
+    """Enumerate each directory through the operation transport before descent."""
+    pending = [directory]
+    while pending:
+        directory = pending.pop()
+        if source_io.kind(directory) != "directory":
+            continue
+        for path in source_io.glob(directory, "*"):
+            if any(part in EXCLUDED_PARTS for part in path.relative_to(plugin_root).parts):
+                continue
+            entry = source_io.metadata(path)
+            if entry is None:
+                continue
+            if stat.S_ISDIR(entry["st_mode"]):
+                pending.append(path)
+            else:
+                # Like Path.rglob, do not recurse through directory symlinks.
+                yield path
+
+
 def cited_slug_paths(
-        plugin_root: Path) -> tuple[dict[str, list[str]], list[dict]]:
+        plugin_root: Path, *, _source_io=None) -> tuple[dict[str, list[str]], list[dict]]:
     """`(slug -> sorted `path:line` locations, refusals)` over the shipped surfaces.
 
     The CITING PATH is what makes a refusal actionable: a finding naming only the slug
@@ -120,10 +142,12 @@ def cited_slug_paths(
     scanned = 0
     for root in SCAN_ROOTS:
         base = plugin_root / root
-        if not base.is_dir():
+        if not sp._source_is_dir(base, _source_io):
             continue
-        for path in sorted(base.rglob("*")):
-            if not path.is_file():
+        paths = (base.rglob("*") if _source_io is None else
+                 _guarded_citing_paths(base, plugin_root, _source_io))
+        for path in sorted(paths):
+            if not sp._source_is_file(path, _source_io):
                 continue
             rel = path.relative_to(plugin_root)
             if any(part in EXCLUDED_PARTS for part in rel.parts):
@@ -152,13 +176,15 @@ def cited_slug_paths(
             # surface, and an oversized file is refused rather than read whole. Each is
             # now RECORDED rather than skipped.
             try:
-                real = path.resolve(strict=True)
+                real = (path.resolve(strict=True) if _source_io is None else
+                        _source_io.resolve(path))
             except OSError as exc:
                 refusals.append({"path": label,
                                  "reason": f"cannot resolve: {redact(exc, quoted=False)}"})
                 continue
+            plugin_real = sp._source_resolve(plugin_root, _source_io)
             try:
-                real.relative_to(plugin_root.resolve())
+                real.relative_to(plugin_real)
             except ValueError:
                 # Deliberately NOT a refusal that reds the gate: a symlink leaving the
                 # plugin root does not ship, so it is not a shipped surface and has no
@@ -168,14 +194,17 @@ def cited_slug_paths(
                                  "advisory": True})
                 continue
             try:
-                if real.stat().st_size > MAX_FILE_BYTES:
+                size = (real.stat().st_size if _source_io is None else
+                        _source_io.metadata(real)["st_size"])
+                if size > MAX_FILE_BYTES:
                     refusals.append({
                         "path": label,
                         "reason": f"larger than MAX_FILE_BYTES ({MAX_FILE_BYTES}); "
                                   "refused rather than read whole",
                     })
                     continue
-                text = real.read_text(encoding="utf-8")
+                text = (real.read_text(encoding="utf-8") if _source_io is None else
+                        _source_io.read_text(real, max_bytes=MAX_FILE_BYTES))
             except (OSError, UnicodeDecodeError) as exc:
                 refusals.append({
                     "path": label,
@@ -202,6 +231,86 @@ def cited_slug_paths(
     return ({slug: sorted(set(locs)) for slug, locs in found.items()}, refusals)
 
 
+def _load_catalog_inputs(repo_root: Path, plugin_root: Path) -> tuple[dict, dict]:
+    import implementation_migration as migration
+    target = plugin_root / "catalog/rules.json"
+    if not target.parent.resolve().is_relative_to(repo_root.resolve()) or target.is_symlink():
+        raise OSError("catalog destination is not contained under the repository or is symlinked")
+    docs = sp.resolve_tree(repo_root)
+    view = migration.authority_view(repo_root)
+    declared = sp.declared_input_domain(docs / "adrs/summaries")
+    sp._projection_require(not isinstance(declared, list) or "implementation-migration" not in declared
+        or view["state"] == "published", "catalog declared migration input unavailable")
+    manifest = sp.read_manifest(repo_root)
+    observations = sp.observations_source(repo_root, manifest) or docs / "observations"
+    records = sp.collect_records(docs / "adrs", governs_from=None, observations=observations)
+    reviews = sp.read_reviews(docs / "adrs")
+    aliases = sp.collect_observation_alias_rows(observations, records)
+    cited, refusals = cited_slug_paths(plugin_root)
+    migration._unchanged_inputs(repo_root, view["dependency_fingerprints"])
+    return dict(root=repo_root, target=target, records=records,
+        reviews=reviews, aliases=aliases, cited=cited, refusals=refusals), view
+
+
+def _catalog_payload(loaded: dict, facts: dict) -> dict:
+    """Pure publication policy, shared by ordinary reads and private candidate plans."""
+    for value in (loaded["records"], loaded["reviews"], loaded["aliases"], loaded["cited"], loaded["refusals"], facts):
+        sp._plain_summary_value(value)
+    overlay = sp._summary_authority_records(loaded["records"], facts,
+        sp.removed_handles(loaded["reviews"]), loaded["aliases"])
+    records = sp.live_records(overlay["records"])
+    slugs = overlay["slugs"]
+    by_handle = {r["handle"]: r for r in records}
+    by_slug = {slug: by_handle[handle] for slug, handle in slugs.items()}
+    cited = loaded["cited"]
+    sp._projection_require(isinstance(cited, dict) and all(re.fullmatch(r"[a-z][a-z0-9-]*", slug)
+        and isinstance(paths, list) and all(isinstance(p, str) for p in paths)
+        for slug, paths in cited.items()), "catalog citing paths invalid")
+    wanted = set(cited)
+    historical = wanted.intersection(overlay["historical_slugs"])
+    ineligible = pe.findings({s: cited[s] for s in wanted.intersection(by_slug)}, by_slug)
+    for slug in sorted(historical):
+        row = overlay["historical_slugs"][slug]
+        for path in sorted(set(cited[slug]))[:pe.MAX_LOCATIONS_PER_FINDING]:
+            ineligible.append(dict(path=path, citation="rule:" + slug, slug=slug,
+                reason="historical implementation citation; replace with " + ", ".join(
+                    "rule:" + sp.slug_of(h) for h in row["replacements"])))
+    rules = {}
+    for slug in sorted(wanted.intersection(by_slug)):
+        row = by_slug[slug]
+        sp._projection_require(isinstance(row.get("rule"), str) and isinstance(row.get("domain"), str),
+                               "catalog rule or domain is not text")
+        rules[slug] = dict(rule=row["rule"], domain=row["domain"])
+    return dict(schema="1", rules=rules, unresolved=sorted(wanted - set(by_slug) - historical),
+                ineligible=ineligible, refusals=loaded["refusals"])
+
+
+class _CatalogOutputPlan(tuple):
+    """Immutable compiled bytes; schema one has no deferred provenance fields."""
+    __slots__ = ()
+
+
+def _plan_rules_catalog_outputs(loaded: dict, migration_facts: dict,
+                               pending_publication: dict | None) -> _CatalogOutputPlan:
+    sp._projection_require(set(loaded) == {"root", "target", "records", "reviews", "aliases", "cited", "refusals"},
+                           "catalog loaded input shape invalid")
+    root, target = loaded["root"], loaded["target"]
+    sp._projection_require(isinstance(root, Path) and root.is_absolute() and
+        isinstance(target, Path) and target == root / "crux/catalog/rules.json", "catalog destination invalid")
+    sp._plain_summary_value(str(target))
+    if pending_publication is not None:
+        sp._summary_pending_publication(pending_publication)
+    payload = _catalog_payload(loaded, migration_facts)
+    sp._projection_require(not payload["unresolved"] and not payload["ineligible"] and
+        not any(not row.get("advisory") for row in payload["refusals"]), "catalog publication refused")
+    return _CatalogOutputPlan(((target, render(payload).encode("utf-8")),))
+
+
+def _materialize_rules_catalog_outputs(plan: _CatalogOutputPlan, committed_publication_ref=None) -> dict[Path, bytes]:
+    """Return compiled bytes. Actual provenance belongs to the publication boundary."""
+    return dict(plan)
+
+
 def build_catalog(repo_root: Path, plugin_root: Path) -> dict:
     """The catalog payload, plus the two diagnostic lists `main` consumes and strips.
 
@@ -215,41 +324,12 @@ def build_catalog(repo_root: Path, plugin_root: Path) -> dict:
     two-field projection discarded. The two emitted fields are projected at the end
     instead, so the bytes are identical to before.
     """
-    # No `hasattr` guard with a hardcoded `bionic` fallback: the tree's name is
-    # configurable, so a helper rename would have silently projected the wrong tree
-    # instead of failing. An AttributeError here is the exit-2 lane, which is correct.
-    docs = sp.resolve_tree(repo_root)
-    records = sp.live_records(
-        sp.collect_records(docs / "adrs", governs_from=None, observations=docs / "observations")
-    )
-    # The slug -> handle map is the projection's OWN, not a second spelling of the
-    # split. It raises on a live-slug collision, where the previous inline loop resolved
-    # one last-write-wins -- which would have let this guard judge one record while the
-    # catalog published another's text. One map, one answer.
-    slugs, _retired = sp.live_and_retired_slugs(records)
-    # No `if handle in by_handle` guard: both sides derive from `records`, so every
-    # handle the slug map names is a key here. A guard over a condition that cannot
-    # fail reads as caution and is really a claim that the two maps might disagree.
-    by_handle = {r["handle"]: r for r in records}
-    by_slug: dict[str, dict] = {slug: by_handle[handle] for slug, handle in slugs.items()}
-
-    cited, refusals = cited_slug_paths(plugin_root)
-    wanted = set(cited)
-    missing = sorted(s for s in wanted if s not in by_slug)
-    publishable = sorted(wanted & set(by_slug))
-
-    # THE GUARD, over exactly the publishable set and nothing wider. An unresolvable
-    # slug is the `unresolved` list's business and is refused there first, so no input
-    # reaches two refusals; the predicate's own absent-record refusal stays a fail-closed
-    # default for any other caller.
-    ineligible = pe.findings({s: cited[s] for s in publishable}, by_slug)
-
-    rules = {
-        s: {"rule": by_slug[s].get("rule", ""), "domain": by_slug[s].get("domain", "")}
-        for s in publishable
-    }
-    return {"schema": "1", "rules": rules, "unresolved": missing,
-            "ineligible": ineligible, "refusals": refusals}
+    loaded, view = _load_catalog_inputs(repo_root, plugin_root)
+    payload = _catalog_payload(loaded, view)
+    if not payload["unresolved"] and not payload["ineligible"] and not any(
+            not row.get("advisory") for row in payload["refusals"]):
+        _plan_rules_catalog_outputs(loaded, view, None)
+    return payload
 
 
 def _require_surface_refusal(why: str) -> int:
@@ -363,6 +443,10 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         catalog = build_catalog(repo_root, plugin_root)
+    except (migration.Refused, sp.GovernsValidationError) as exc:
+        problems = exc.problems if isinstance(exc, sp.GovernsValidationError) else [{"problem": redact(exc, quoted=False)}]
+        print(json.dumps({"validation_errors": problems, "written": None}, sort_keys=True))
+        return 1
     except Exception as exc:  # noqa: BLE001 — environment/input failures are the exit-2 lane
         print(f"generate-rules-catalog: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2

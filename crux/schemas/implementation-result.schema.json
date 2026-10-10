@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "crux implementation result (format_version 1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_type",
+    "format_version",
+    "decision",
+    "delivery_state",
+    "source_revision",
+    "preimage_revision",
+    "scope",
+    "sources",
+    "reviews",
+    "annotations"
+  ],
+  "properties": {
+    "record_type": {
+      "const": "implementation-result"
+    },
+    "format_version": {
+      "const": "1"
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        }
+      }
+    },
+    "delivery_state": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partial",
+        "unimplemented"
+      ]
+    },
+    "source_revision": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})(?![\\s\\S])"
+    },
+    "preimage_revision": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})(?![\\s\\S])"
+    },
+    "scope": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "preimage",
+          "delivered"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "preimage": {
+            "type": "string",
+            "pattern": "^(?:[0-9a-f]{64}|absent)(?![\\s\\S])"
+          },
+          "delivered": {
+            "type": "string",
+            "pattern": "^(?:[0-9a-f]{64}|absent)(?![\\s\\S])"
+          }
+        }
+      }
+    },
+    "reviews": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+          }
+        }
+      }
+    },
+    "annotations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["delivery_state"],
+        "properties": {
+          "delivery_state": {"const": "unimplemented"}
+        }
+      },
+      "then": {
+        "properties": {
+          "scope": {"const": []},
+          "sources": {"const": []}
+        }
+      },
+      "else": {
+        "properties": {
+          "scope": {"minItems": 1},
+          "sources": {"minItems": 1}
+        }
+      }
+    }
+  ]
+}

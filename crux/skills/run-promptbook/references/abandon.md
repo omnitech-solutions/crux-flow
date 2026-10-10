@@ -15,6 +15,15 @@ Editing a YAML plan mid-run breaks the snapshot's reference to it — `book_cont
 The mid-run fork path is deleted. `forked_from` remains an accepted book field that is always `null`, and nothing writes it. State the consequence plainly when it comes up: the successor relation now lives in prose and no longer resolves mechanically.
 
 
+## Preserve formal implementation history
+
+For format two, abandon preserves every reviewed revision, approval binding and
+append-only result. A successor may replace the approach without revoking the earlier
+Implementation Decision. Changing frozen kind, slots, scope or constraints requires a
+successor plan. Changing reasoning requires fresh exact-revision approval at a lawful
+gate; absence of such a route requires escalation or a successor. Do not rewrite
+accepted architectural bodies or archived books/runs to make the new choice fit.
+
 ## The pipeline (mode: abandon)
 
 Abandoning is a **run-level** act. It is how a book that will not finish still closes cleanly, and it is the signal `archive-promptbook` reads.

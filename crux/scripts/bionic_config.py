@@ -367,7 +367,17 @@ def _read_and_validate_config(cfg_path: Path, source: str) -> tuple[str, str, st
     artifact_prefix, arch_stack, arch_extractors, arch_decision_index_mode).
     Raises BionicConfigError on any failure.
     """
-    text = cfg_path.read_text(encoding="utf-8")
+    return parse_config_text(cfg_path.read_text(encoding="utf-8"), source=source, path=cfg_path)
+
+
+def parse_config_text(text: str, *, source: str, path: str | Path | None = None
+                      ) -> tuple[str, str | None, str, str | None, dict, str]:
+    """Parse captured config text; preserve keyless docs_dir for discovery.
+
+    The path labels diagnostics only. Selected docs_dir text validation and
+    filesystem containment remain separate from this extraction contract.
+    """
+    cfg_path = Path(path if path is not None else source)
     if len(text) > 65536:
         raise BionicConfigError(f"{cfg_path} exceeds 64 KiB; not a plausible config file")
     for lineno, line in enumerate(text.splitlines(), 1):
@@ -429,7 +439,7 @@ def _read_and_validate_config(cfg_path: Path, source: str) -> tuple[str, str, st
 # ─────────────────── ADR-0059 bare-directory discovery ────────────────────
 
 
-def _is_crux_manifest(path: Path) -> bool:
+def _is_crux_manifest(path: Path, *, _source_io=None) -> bool:
     """True iff `path` is a manifest belonging to a crux tree.
 
     ADR-0059 precedence clause 4: a manifest counts only if it parses AND
@@ -442,10 +452,19 @@ def _is_crux_manifest(path: Path) -> bool:
     this module is stdlib-only and discovery must not acquire a PyYAML
     dependency. A malformed manifest simply does not count.
     """
+    if _source_io is not None:
+        if _source_io.kind(path) != "file":
+            return False
+        return is_crux_manifest_text(_source_io.read_text(path))
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return False
+    return is_crux_manifest_text(text)
+
+
+def is_crux_manifest_text(text: str) -> bool:
+    """Recognize the existing shallow two-key discriminator in captured text."""
     has_version = re.search(r"^schema_version\s*:", text, re.MULTILINE) is not None
     has_concerns = re.search(r"^concerns_enabled\s*:", text, re.MULTILINE) is not None
     return has_version and has_concerns
@@ -460,9 +479,15 @@ def _parse_migration_marker(marker: Path) -> str:
     if marker.is_symlink():
         raise BionicConfigError(f"invalid migration marker {marker}: symlink")
     try:
-        lines = marker.read_text(encoding="utf-8").splitlines()
+        text = marker.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         raise BionicConfigError(f"invalid migration marker {marker}: unreadable") from exc
+    return parse_migration_marker_text(text, marker=marker)
+
+
+def parse_migration_marker_text(text: str, *, marker: str | Path) -> str:
+    """Validate a captured tagged receipt; marker labels diagnostics only."""
+    lines = text.splitlines()
     if (len(lines) < 3
             or not re.fullmatch(r"source: [^\s]+", lines[0])
             or not re.fullmatch(r"step: [1-6]", lines[1])
@@ -489,7 +514,104 @@ def _read_migration_marker(root: Path) -> str | None:
     return found[0] if found else None
 
 
-def discover_docs_dir(root: Path) -> str:
+def _select_discovered_docs_dir(valid: list[str], marked: str | None) -> str:
+    """Choose from already qualified conventional inputs, without I/O."""
+    if len(valid) > 1:
+        if marked in valid:
+            return marked
+        raise BionicConfigError(
+            "two crux trees found: "
+            + " and ".join(f"{d}/manifest.yml" for d in valid)
+            + ". Refusing to guess which is authoritative. A valid partial "
+            "migration must be resumed or abandoned with crux v3.23.2; "
+            "otherwise reconcile the trees or name the tree explicitly in "
+            ".bionic.yml (docs_dir:)."
+        )
+    return valid[0] if valid else DEFAULT_DOCS_DIR
+
+
+def discover_docs_dir_from_inputs(inputs: dict[str, str]) -> str:
+    """Discover from captured conventional manifests and tagged receipts."""
+    valid = [name for name in (LEGACY_DOCS_DIR, DEFAULT_DOCS_DIR)
+             if name + "/manifest.yml" in inputs
+             and is_crux_manifest_text(inputs[name + "/manifest.yml"])]
+    found = [parse_migration_marker_text(inputs[name + "/.migrating"], marker=name + "/.migrating")
+             for name in (DEFAULT_DOCS_DIR, LEGACY_DOCS_DIR) if name + "/.migrating" in inputs]
+    if len(found) > 1:
+        raise BionicConfigError("multiple migration markers found; refusing to choose a source")
+    return _select_discovered_docs_dir(valid, found[0] if found else None)
+
+
+def _complete_layout_selection(values: tuple, source: str, discovered: str | None
+                               ) -> tuple[tuple, str]:
+    version, directory, prefix, stack, extractors, mode = values
+    if directory is None:
+        directory = discovered
+        source = ("" if source == "defaults" else source + "+") + f"discovery:{directory}"
+    _validate_docs_dir_text(directory)
+    return (version, directory, prefix, stack, extractors, mode), source
+
+
+def select_layout_inputs(inputs: dict[str, str]) -> tuple[tuple, str]:
+    """Select validated layout values from captured inputs, without paths or I/O.
+
+    Absence is an absent key. The caller owns capture, intended-file kind checks
+    and actual-repository containment; these values grant no authority.
+    """
+    source = next((name for name in (BIONIC_CONFIG_FILENAME, CONFIG_FILENAME) if name in inputs), "defaults")
+    values = ((SUPPORTED_CONFIG_VERSIONS[-1], None, "", None, {}, "complete") if source == "defaults"
+              else parse_config_text(inputs[source], source=source))
+    discovered = discover_docs_dir_from_inputs(inputs) if values[1] is None else None
+    return _complete_layout_selection(values, source, discovered)
+
+
+def _collect_discovery_inputs(root: Path, *, _source_io) -> dict[str, str]:
+    """Capture conventional inputs through the caller's guarded transport."""
+    import stat
+    inputs = {}
+    for directory in (LEGACY_DOCS_DIR, DEFAULT_DOCS_DIR):
+        path = root / directory / "manifest.yml"
+        if _source_io.kind(path) == "file":
+            inputs[directory + "/manifest.yml"] = _source_io.read_text(path)
+    for directory in (DEFAULT_DOCS_DIR, LEGACY_DOCS_DIR):
+        path = root / directory / ".migrating"
+        metadata = _source_io.metadata(path)
+        if metadata is None:
+            continue
+        if stat.S_ISLNK(metadata["st_mode"]):
+            raise BionicConfigError(f"invalid migration marker {path}: symlink")
+        text = _source_io.read_text(path)
+        parse_migration_marker_text(text, marker=path)
+        inputs[directory + "/.migrating"] = text
+    return inputs
+
+
+def _collect_layout_inputs(root: Path, *, _source_io) -> dict[str, str]:
+    """Capture only the canonical selected configuration and needed discovery."""
+    import stat
+    root = Path(root)
+    inputs, directory = {}, None
+    for name in (BIONIC_CONFIG_FILENAME, CONFIG_FILENAME):
+        path = root / name
+        metadata = _source_io.metadata(path)
+        if metadata is None:
+            continue
+        resolved = _source_io.resolve(path)
+        kind = _source_io.kind(resolved)
+        if kind == "directory":
+            raise BionicConfigError(f"{path} is a directory; expected a YAML file")
+        if stat.S_ISLNK(metadata["st_mode"]) and kind is None:
+            raise BionicConfigError(f"{path} is a dangling symlink; expected a YAML file")
+        text = _source_io.read_text(path)
+        inputs[name] = text
+        directory = parse_config_text(text, source=name, path=path)[1]
+        break
+    if directory is None:
+        inputs.update(_collect_discovery_inputs(root, _source_io=_source_io))
+    return inputs
+
+
+def discover_docs_dir(root: Path, *, _source_io=None) -> str:
     """Bare-directory discovery (ADR-0044 §3, specified there and implemented here).
 
     Evaluation order matters and is the one round-2 council review corrected:
@@ -501,31 +623,16 @@ def discover_docs_dir(root: Path) -> str:
       4b. exactly one -> that directory
       4c. none        -> DEFAULT_DOCS_DIR (bionic)
     """
+    if _source_io is not None:
+        return discover_docs_dir_from_inputs(_collect_discovery_inputs(Path(root), _source_io=_source_io))
     valid = [d for d in (LEGACY_DOCS_DIR, DEFAULT_DOCS_DIR)
              if _is_crux_manifest(root / d / "manifest.yml")]
     marked = _read_migration_marker(root)
 
-    if len(valid) > 1:
-        if marked in valid:
-            # An in-flight migration: resolution returns the recorded source —
-            # the tree the migration has not yet finished leaving, which is the
-            # same directory the manifest-last ordering keeps authoritative.
-            return marked
-        raise BionicConfigError(
-            "two crux trees found: "
-            + " and ".join(f"{d}/manifest.yml" for d in valid)
-            + ". Refusing to guess which is authoritative. A valid partial "
-            "migration must be resumed or abandoned with crux v3.23.2; "
-            "otherwise reconcile the trees or name the tree explicitly in "
-            ".bionic.yml (docs_dir:)."
-        )
-    if len(valid) == 1:
-        # The legacy tree wins when it is the only one — an established docs/
-        # tree keeps working with zero config and no migration.
-        return valid[0]
-    return DEFAULT_DOCS_DIR
+    return _select_discovered_docs_dir(valid, marked)
 
-def load_config(repo_root: str | Path | None = None, *, require_tree: bool = False) -> BionicConfig:
+def load_config(repo_root: str | Path | None = None, *, require_tree: bool = False,
+                _source_io=None) -> BionicConfig:
     """Load and validate the repo-root layout config.
 
     ADR-0044 §3 precedence as amended by ADR-0059: `.bionic.yml` carrying
@@ -544,42 +651,30 @@ def load_config(repo_root: str | Path | None = None, *, require_tree: bool = Fal
     tree passes True.
     """
     root_raw = Path(repo_root) if repo_root is not None else Path.cwd()
-    if not root_raw.is_dir():
+    is_directory = root_raw.is_dir() if _source_io is None else _source_io.kind(root_raw) == "directory"
+    if not is_directory:
         raise BionicConfigError(f"repo root is not a directory: {root_raw}")
-    root = root_raw.resolve()
+    root = root_raw.resolve() if _source_io is None else _source_io.resolve(root_raw)
 
-    cfg_path, source = _select_config_file(root_raw)
-    if cfg_path is None:
-        config_version = SUPPORTED_CONFIG_VERSIONS[-1]
-        docs_dir = discover_docs_dir(root_raw)
-        prefix = ""
-        arch_stack = None
-        arch_extractors: dict = {}
-        arch_decision_index_mode = "complete"
-        source = f"discovery:{docs_dir}"
+    if _source_io is not None:
+        values, source = select_layout_inputs(_collect_layout_inputs(root, _source_io=_source_io))
     else:
-        (
-            config_version,
-            docs_dir,
-            prefix,
-            arch_stack,
-            arch_extractors,
-            arch_decision_index_mode,
-        ) = _read_and_validate_config(cfg_path, source)
-        if docs_dir is None:
-            # Clause 3: config present, `docs_dir` absent -> discovery, never the
-            # new default. The config still supplies config_version and prefix.
-            docs_dir = discover_docs_dir(root_raw)
-            source = f"{source}+discovery:{docs_dir}"
-
-    _validate_docs_dir_text(docs_dir)
+        cfg_path, source = _select_config_file(root_raw)
+        if cfg_path is None:
+            values = (SUPPORTED_CONFIG_VERSIONS[-1], None, "", None, {}, "complete")
+        else:
+            values = _read_and_validate_config(cfg_path, source)
+        discovered = discover_docs_dir(root_raw) if values[1] is None else None
+        values, source = _complete_layout_selection(values, source, discovered)
+    (config_version, docs_dir, prefix, arch_stack, arch_extractors, arch_decision_index_mode) = values
 
     # Containment layer (ADR-0032 §1): resolve once, require a PROPER
     # subdirectory of the resolved repo root. A docs_dir that is or traverses
     # a symlink is permitted iff its resolved target stays under the root;
     # resolving to the root itself is rejected (scripts that prune under the
     # docs tree must never treat the whole repo as the tree).
-    target = (root_raw / docs_dir).resolve()
+    target = ((root_raw / docs_dir).resolve() if _source_io is None
+              else _source_io.resolve(root / docs_dir))
     if target == root or not target.is_relative_to(root):
         raise BionicConfigError(
             f"docs_dir {docs_dir!r} resolves to {target}, which is not a proper subdirectory of the repo root {root}"
@@ -596,13 +691,15 @@ def load_config(repo_root: str | Path | None = None, *, require_tree: bool = Fal
     if require_tree:
         # ADR-0059 clause 1: a config that points at nothing is a wrong layout,
         # and a wrong layout must be visible at the point of resolution.
-        if not target.is_dir():
+        if not (target.is_dir() if _source_io is None else _source_io.kind(target) == "directory"):
             raise BionicConfigError(
                 f"docs_dir {docs_dir!r} resolves to {target}, which does not exist. "
                 "The configured tree is missing; run init-docs, fix .bionic.yml, or "
                 "finish the migration that moved it."
             )
-        if not _is_crux_manifest(target / "manifest.yml"):
+        valid_manifest = (_is_crux_manifest(target / "manifest.yml") if _source_io is None
+                          else _is_crux_manifest(target / "manifest.yml", _source_io=_source_io))
+        if not valid_manifest:
             raise BionicConfigError(
                 f"docs_dir {docs_dir!r} resolves to {target}, which holds no valid crux "
                 "manifest (a manifest.yml carrying schema_version and concerns_enabled). "

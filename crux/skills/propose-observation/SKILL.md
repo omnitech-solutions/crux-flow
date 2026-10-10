@@ -112,6 +112,8 @@ Hold the printed value as `${ANCHOR_ID}`. **Duplicate check:** the uniqueness ru
 - Set `observation.next_number = ${N} + 1`.
 - Write `manifest.yml` back. Preserve all other keys and formatting.
 
+Step 10 commits the counter bump with the record file it allocated, and only then runs the regenerators.
+
 ### 7. Add the row to `docs/observations/index.md`
 
 - Insert the record's row at the top of the table body (newest first), in the column order the index header carries. The index **visibly marks** the status: an `observed` record is survey debt and must be legible as such, never hidden.
@@ -134,7 +136,22 @@ Prepended (newest first), using the `observation` op from the `docs/AGENTS.md` �
 
 Body, 1–2 lines: the title, the file path, `provenance: reconstructed`, the `anchor_id`. Note the body is human-authored next.
 
-### 10. Hand off to the user
+### 10. Commit, then regenerate the projections
+
+While a tester's window is open, commit nothing and run no regenerator. The window runs from the tester's dispatch until the tester returns; outside a run there is none.
+
+Commit this skill's own writes first: the record file, `manifest.yml`, `observations/index.md`, `docs/index.md` and `log.md`. Never commit the counter bump without the file it allocated. Stage only these paths (`git add -- <paths>`) and commit only them (`git commit -- <paths>`), so no change already staged is included. If a regenerator still exits 2 with `migration-input-not-committed`, another uncommitted input is in the tree: stop and name it; never commit a file this skill did not write.
+
+Then regenerate the summaries projection, then the doctrine projection, because the new record and the bump change their input hash. The commit comes first because, in a tree whose projections declare migration inputs, a regenerator refuses an uncommitted input with exit 2 (`migration-input-not-committed`).
+
+```
+uv run "${CRUX_PLUGIN_ROOT}/scripts/summarize-adrs.py" --repo-root <repo-root>
+uv run "${CRUX_PLUGIN_ROOT}/scripts/compile-doctrine.py" --repo-root <repo-root>
+```
+
+Confirm `--dry-run` of each exits 0, then commit the regenerated projections so none stays uncommitted.
+
+### 11. Hand off to the user
 
 - Tell the user: observation id assigned, file path, status `observed`, `anchor_id`.
 - Explicitly instruct: the body is yours to write — what the code does, where the evidence is, and why this is observed rather than decided. Do NOT change the frontmatter.
@@ -155,6 +172,7 @@ Body, 1–2 lines: the title, the file path, `provenance: reconstructed`, the `a
 - [ ] `docs/observations/index.md` has the row at the top, visibly marked `observed`.
 - [ ] `docs/index.md` `## Observations (N)` count matches the actual file count; `_Last updated:_` is `${TODAY}`.
 - [ ] `docs/log.md` has a new `## [${TODAY}] observation | ${ID}:` entry at the top.
+- [ ] The record, the counter bump and the index, docs-index and log writes are committed before any regenerator runs; `summarize-adrs.py --dry-run` and `compile-doctrine.py --dry-run` exit 0 afterwards, and the regenerated projections are committed.
 - [ ] No ADR was created or modified, and no existing observation was touched.
 
 ## Red flags — STOP and reconsider

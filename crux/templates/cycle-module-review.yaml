@@ -39,17 +39,27 @@
 # existing 3 prompts (no extra prompt; the `3K` count is unchanged). A review
 # module missing any of
 # these violates the cycle contract.
+#
+# A template change fixes no existing book; the gate check corrects a book that
+# already exists when it executes (rule:existing-books-are-corrected-at-execution).
 
 - title: "Review {M}: external team review (multi-dimension + dedicated security review) of {SCOPE}"
   module_tag: review-{M}
   purpose: |
     Independent verification of correctness, consistency, clarity, and security.
   prompt: |
+    Read governing architectural constraints and any selected formal implementation reasoning
+    separately. An Implementation Decision supplies no rule or current-state authority.
+    For a selected formal decision, compare delivery to the approved original and include annotations in
+    independent review scope. Report approval, delivery and queried source state separately.
+    Validate the committed approval binding and its retained context before
+    treating reasoning as reviewed intent. Use the context's supported profile;
+    book format supplies none. Preserve historical context bytes.
     Dispatch parallel `Agent` reviewers scoped to {SCOPE}, each blind to the
     others. **Three quality-dimension reviewers:**
-      (a) Correctness — re-runs the dev module's **full quality-gate suite**
-          (the COMPLETE test run, not a subset — same mandate as the dev gate),
-          then reads the diff for behavior bugs the gates can't catch.
+      (a) Correctness — checks the Tester record for the dev module's **full
+          quality-gate suite**, then reads the diff for behavior bugs the gates
+          can't catch. No reviewer starts a full suite; reviewers cite the Tester record.
       (b) Consistency — checks the change against the rules it cites: the
           `rule:<slug>` citations recorded in this run's Artifacts
           (INCLUDING every rule an ADR accepted earlier in this cycle
@@ -88,7 +98,8 @@
     severity (MUST-FIX / SHOULD-CONSIDER / NIT). A `[SECURITY:Sn]` finding
     exploitable on a reachable path is MUST-FIX and CANNOT be downgraded;
     deferred (SHOULD-CONSIDER) security items go in run-snapshot Notes under
-    `Review {M} security deferrals` with residual-risk rationale.
+    `Review {M} security deferrals` with residual-risk rationale, written
+    after this prompt's advance.
 
     Every reviewer receives the book's `goal` statements — the Outcome, the
     Evidence, and the Constraint. Each judges the change against the Outcome
@@ -106,6 +117,26 @@
     an item stands verified only where this reviewer ran the command and
     read the result token, or re-read the observation where it is
     recorded; anything it cannot re-derive is unobserved in its own report.
+
+    **The independent-review gate.** This prompt advances only with reviewer
+    reports attached (rule:review-gate-needs-a-reviewer-report). Commit the
+    work, then fix the reviewed range as
+    `<the run's base_commit>..<HEAD at dispatch>`. The gate check does not
+    compare the base, so hold it. Each reviewer writes its own
+    report: `uv run "${CRUX_PLUGIN_ROOT}/scripts/write-review-report.py"
+    <run-RUN-NNN.yaml> --prompt <n> --range <base>..<end> --verdict
+    '<verdict>'`, adding one `--finding '<finding>'` per finding. Single-quote
+    each value and write an embedded `'` as `'\''`; never put model-written
+    text inside double quotes. Text with quotes or several lines goes in a
+    file passed with `--verdict-file` or `--finding-file`. A reviewer whose
+    harness grants no shell returns those fields, and the agent that
+    commissioned the review runs the writer with them. From the range end to
+    the advance, write nothing to the run snapshot or the book: the range
+    covers both, so a later write to either refuses every report. Commit only
+    the reports before the advance: a commit after the range end that changes
+    a reviewed path refuses every report. Record notes, deferrals and gate
+    tokens after the advance. Attach every report with `--artifacts`. A
+    council record never satisfies this gate.
   expected_output: |
     Aggregated external-review + security findings for {SCOPE}, plus a
     disposition per Evidence item.
@@ -117,6 +148,13 @@
     Ensure the change is tested, documented, and that proper development
     practices were followed.
   prompt: |
+    Read governing architectural constraints and any selected formal implementation reasoning
+    separately. An Implementation Decision supplies no rule or current-state authority.
+    For a selected formal decision, compare delivery to the approved original and include annotations in
+    independent review scope. Report approval, delivery and queried source state separately.
+    Validate the committed approval binding and its retained context before
+    treating reasoning as reviewed intent. Use the context's supported profile;
+    book format supplies none. Preserve historical context bytes.
     Dispatch 3 parallel `Agent` reviewers scoped to {SCOPE}:
       (a) Test coverage — for every code path the diff introduced or
           changed within {SCOPE}, is there a test that exercises it? Are
@@ -182,6 +220,13 @@
   purpose: |
     Address all review findings before advancing.
   prompt: |
+    Read governing architectural constraints and any selected formal implementation reasoning
+    separately. An Implementation Decision supplies no rule or current-state authority.
+    For a selected formal decision, compare delivery to the approved original and include annotations in
+    independent review scope. Report approval, delivery and queried source state separately.
+    Validate the committed approval binding and its retained context before
+    treating reasoning as reviewed intent. Use the context's supported profile;
+    book format supplies none. Preserve historical context bytes.
     Combine the findings from this module's two review prompts — quality,
     **security (incl. any non-downgradable `[SECURITY:Sn]` MUST-FIX)**, and
     **dev-practice conformance (any Tier-1 NOT-ALLOWED hit / `CONFORMANCE:

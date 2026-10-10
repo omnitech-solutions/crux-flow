@@ -6,7 +6,7 @@
 # a standalone book — it has no top-level keys, only the prompt list.
 #
 # Reusable building block for a cycle's planning phase. One instance of this
-# module produces one Accepted ADR. A cycle MUST have at least one ADR module
+# module produces one Accepted ADR. An architectural cycle needs an ADR module
 # (the council-approved decision is the cycle's load-bearing artifact).
 #
 # Placeholder tokens (the cycle skill / human assembler substitutes these when
@@ -35,7 +35,12 @@
 #
 # Invariant enforced by this module: the council prompt is non-optional. A
 # cycle that contains an ADR-creation prompt without a paired council prompt
-# violates the cycle contract.
+# violates the cycle contract. The council prompt's evidence is a council record
+# written by the council runner (`run-council.py`); the gate check in
+# `advance-run.py` reads it. A reviewer report never satisfies that gate.
+#
+# A change to this file changes only books built from it afterwards. A book that
+# already exists is corrected at execution by the gate check, never by this file.
 
 - title: "Plan {M}: spawn planning team, propose ADR for {ADR_TOPIC}"
   module_tag: adr-{M}
@@ -54,6 +59,18 @@
     Context, Decision, Alternatives Considered (≥2), Consequences,
     References (linking to any related ADRs/briefs/research via wiki-links).
     Status starts at `Proposed`.
+
+    The ADR file and `docs/adrs/index.md` are council subjects. After
+    `propose-adr` writes them, and after every later edit to the ADR in this
+    prompt, record each write with the witness writer:
+
+      uv run "${CRUX_PLUGIN_ROOT}/scripts/run-work-witness.py" record <run-RUN-NNN.yaml> --prompt <n> --path <path>
+
+    A witness lets you repair, without the owner, a subject this run wrote
+    and left uncommitted when a council preflight refuses it. The witness
+    file is never council evidence. Never record a witness to repair a
+    preflight refusal: a subject with no witness taken at its write goes to
+    the owner.
 
     Record the ADR id (`ADR-NNNN`) in this run snapshot's Artifacts field
     under the label `ADR {M}`, and beside it the ADR's rule citations — one
@@ -88,113 +105,337 @@
   purpose: |
     Gate the ADR with multi-perspective review before acceptance.
   prompt: |
-    Invoke the `council` skill (multi-model: Claude + Gemini + GPT, async)
-    — or, equivalently, dispatch 5 parallel review agents via the `Agent`
-    tool — each owning one quality dimension:
-      (1) Completeness — are Context/Decision/Alternatives/Consequences
-          all fleshed out? Any missing references?
-      (2) Correctness — does the proposal actually solve the problem?
-          Are the assumptions verifiable?
-      (3) Consistency — does this conflict with any prior `Accepted` ADRs
-          (INCLUDING any ADRs accepted earlier in this cycle), briefs, or
-          invariants in `docs/AGENTS.md`?
-      (4) Clarity — would a new engineer (or future Claude) understand the
-          decision from this ADR alone?
-      (5) **Security** — does the decision introduce a security risk?
-          Evaluate: new attack surface or trust boundary; secret/credential
-          handling (does it touch `~/.crux/`, env vars, or log values?);
-          injection or authz implications; supply-chain exposure (new
-          dependency, external fetch, or unpinned source). Return
-          `REQUEST_CHANGES` if the ADR creates a security risk it does not
-          explicitly mitigate.
+    Council deliberation runs only through the council runner, and its council
+    record is the only evidence this gate accepts
+    (rule:council-gate-needs-a-runner-record). Independent review is a
+    reviewer's examination; neither satisfies the other's gate. Do these
+    steps in order.
 
-    Each agent must read: the proposed ADR, `docs/adrs/index.md`, and any
-    code paths or ADRs the proposal cites. Each returns a verdict
-    (`APPROVE` / `APPROVE_WITH_NITS` / `REQUEST_CHANGES`) plus a numbered
-    findings list.
+    1. Before anything else, run the read-only gate-information query and follow any
+       correction notice it prints:
 
-    Aggregate verdicts and route by exactly one of three cases:
-      - **Clean consensus** — ALL five `APPROVE`, zero findings → advance to
-        this module's accept prompt.
-      - **Minor nits only** — one or more `APPROVE_WITH_NITS` on
-        NON-safety-adjacent dimensions (Completeness, Clarity, or a
-        stylistic Consistency/Correctness nit), with NO `REQUEST_CHANGES`
-        and NO safety-adjacent dissent → advance directly to this module's
-        address-findings prompt (address the nits, re-convene). **No deeper
-        review** — a lone nit does not warrant the srde/deep-architecture pass.
-      - **Split verdict → deeper architectural review** (the case below).
+         uv run "${CRUX_PLUGIN_ROOT}/scripts/advance-run.py" <run-RUN-NNN.yaml> --book <book.yaml> --gate-info --prompt <n>
 
-    **Deeper architectural review (auto-trigger, autonomous — part of the
-    hardened cycle contract).** A **split verdict** is,
-    operationally, ANY of: (i) any dimension returns `REQUEST_CHANGES`;
-    (ii) any `APPROVE_WITH_NITS` or dissent on a *safety-adjacent* dimension
-    (Security, or a Correctness dissent alleging a real defect rather than a
-    stylistic gap); (iii) the dimensions return verdict tokens spanning more
-    than one level AND at least one is `REQUEST_CHANGES` (a pure
-    APPROVE/APPROVE_WITH_NITS mix is "minor nits only" above, NOT a split).
-    On a split, deepen the review before looping, WITHOUT involving a
-    human: (a) collect the per-dimension dissents; (b) run the `srde` skill
-    to resolve dissents answerable from existing in-repo docs/probes (resolved
-    → drop). **`srde` auto-drop is excluded for safety-adjacent dissents** —
-    Security, and Correctness dissents alleging a real defect, are NEVER
-    silently auto-resolved; they always route to (c) or the findings loop.
-    (c) For dissents `srde` cannot resolve, dispatch ONE dedicated
-    deep-architecture-review `Agent` that reads the full ADR graph
-    (`docs/adrs/index.md`, every cited ADR, `docs/AGENTS.md` invariants) and
-    renders a binding architectural verdict **using the same vocabulary as
-    the council** (`APPROVE` / `APPROVE_WITH_NITS` / `REQUEST_CHANGES` + a
-    findings list); its surviving findings → the address-findings prompt like
-    any other. The `srde`/deep-review probes are read-only over in-repo
-    content: they MUST NOT run untrusted code, fetch unpinned external
-    content, or read/expose secret values. The `--deep-review` flag (if the
-    book was authored with it) forces steps (a)–(c) on round 1 regardless of
-    verdict.
+    2. Commit the proposed ADR. The council runner accepts only a tracked
+       subject with no staged or unstaged change.
+
+    3. Invoke the `run-adr-council` skill to write the question file. Do not
+       fence the ADR in it: the council runner fences every `--subject` as data with
+       its sha256. The question lists these five dimensions, and
+       every seat assesses all five; five dimensions do not mean five seats
+       (rule:every-seat-assesses-five-dimensions):
+         (1) Completeness — are Context/Decision/Alternatives/Consequences
+             all fleshed out? Any missing references?
+         (2) Correctness — does the proposal actually solve the problem?
+             Are the assumptions verifiable?
+         (3) Consistency — does this conflict with any prior `Accepted` ADRs
+             (INCLUDING any ADRs accepted earlier in this cycle), briefs, or
+             invariants in `docs/AGENTS.md`?
+         (4) Clarity — would a new engineer (or future Claude) understand the
+             decision from this ADR alone?
+         (5) **Security** — does the decision introduce a security risk?
+             Evaluate: new attack surface or trust boundary; secret/credential
+             handling (does it touch `~/.crux/`, env vars, or log values?);
+             injection or authz implications; supply-chain exposure (new
+             dependency, external fetch, or unpinned source). A seat returns
+             `REQUEST_CHANGES` if the ADR creates a security risk it does not
+             explicitly mitigate.
+       A seat sees only the question and the subjects. Pass the proposed
+       ADR, `docs/adrs/index.md`, and every ADR or code path the proposal
+       cites, each as its own `--subject`. Every subject must be tracked and
+       clean. The council runner adds the vote instruction and the finding tags, so
+       the question does not. When the book was authored with
+       `--deep-review`, round 1 also passes `docs/AGENTS.md` as a subject,
+       for its invariants; that round counts like any other.
+
+    4. Run the council runner as a background command, because a council can
+       take about 20 minutes. `--round <r>` is the number of council records
+       with outcome `ran` already in this module, plus one. An admitted
+       adjudicator's refutation record fills place 3. A could-not-run record
+       takes no place, so after you fix its cause you reconvene with the same
+       number. `run-council.py` refuses a mismatch before any call (exit 1,
+       `"record": null`):
+
+         uv run "${CRUX_PLUGIN_ROOT}/scripts/run-council.py" <run-RUN-NNN.yaml> --prompt <n> --round <r> --question <question file> --subject <ADR file> --subject docs/adrs/index.md [--subject <cited path> ...]
+
+       Add `--book <book.yaml>` when the run layout does not locate the book.
+
+    5. Read the council runner's exit code, its stdout and the record's
+       `outcome`. Never decide whether the council ran from the aggregate
+       action: a council that ran also carries the action DEFER_TO_HUMAN, for
+       example when its seats split or confidence is low.
+       The council runner commits the attempt record and the council record
+       itself. It commits the attempt record before any council request
+       (rule:an-open-council-attempt-stops-the-gate). It verifies that each
+       commit holds the bytes it computed
+       (rule:council-evidence-matches-its-attempt). You commit no council
+       record.
+       - Exit 1 with `"refused": "preflight"` and `"record": null`: a
+         preflight refusal, raised before any council request. No council
+         record was written, and nothing was committed. Each cause names its
+         repair. For `retype`,
+         correct the `--question` or `--subject` path. For
+         `commit-run-work`, the subject is a file this run wrote and recorded
+         with the witness writer; commit exactly that path:
+
+           uv run "${CRUX_PLUGIN_ROOT}/scripts/run-work-witness.py" commit <run-RUN-NNN.yaml> --path <subject path>
+
+         Then run the council runner again. If the witness writer refuses the
+         commit with `"refused": "commit"`, git refused, and its `code`
+         decides. For `index-locked`, the commit checked the lock before it
+         staged anything: wait for any git command this run started to
+         finish, then run the witness commit once more, which spends no
+         council retry. When the lock persists, it is stale: report a
+         contradicted-premise stop for the owner. For every other code
+         (`sequence-in-progress`, `hook-or-commit-failed`, `timeout`,
+         `mismatch`), report a contradicted-premise stop for the owner, and
+         do not run the council runner again, which would spend a retry. When
+         the refusal's `code` is `timeout`, or it carries `moved`, the owner
+         restores the set-aside work first (`git stash list`, or a pre-commit
+         framework's backup patch), then removes a stale `index.lock` in the
+         git directory. A `mismatch` may follow a landed commit: the owner
+         checks `git log` for the path. A refusal of `invalid` is the owner's
+         too: report the same stop. For `missing` or a path refusal, correct
+         the path and commit again. The refusals `unattributed`,
+         `unwitnessed`, `witness-mismatch`, `mixed`, `council-path`,
+         `witness-invalid` and `witness-binding` have no repair: run the
+         council runner again, and it records `preflight-needs-owner`. The
+         bound is three refusals at this prompt: the third commits a
+         could-not-run record with the code `preflight-retries-spent`, and
+         the run takes stop 1 (rule:only-a-preflight-refusal-is-retried).
+       - Exit 1 with `"refused": "round"` and `"record": null`: the
+         `--round` number is wrong. Correct it and run again; nothing was
+         written.
+       - Exit 1 with `"refused": "prompt"` and `"record": null`: `--prompt` was
+         not the run's current prompt. Run again with the current prompt or
+         omit `--prompt`; nothing was written.
+       - Exit 1 with `"refused": "attempt-open"` and `"record": null`: an
+         open council attempt already holds this module, and nothing was
+         written. Run the process check: confirm that no council runner you
+         started for this module is still running. Then probe the attempt's
+         lock:
+
+           uv run "${CRUX_PLUGIN_ROOT}/scripts/run-council.py" --recover <run-RUN-NNN.yaml> --prompt <n> --probe
+
+         While a council runner is live, wait. When its lock is free, run
+         recovery as the exit 2 case directs. Never convene a replacement
+         round over an open attempt.
+       - Exit 1 with `outcome: could-not-run`: the council did not run, and
+         `refusal_reason.code` names why (`preflight-needs-owner` for a
+         subject outside your authority to repair, `preflight-retries-spent`,
+         a secret scan, no key, a refused seat assignment, fewer than three
+         providers, no quorum). The council runner has committed the record.
+         Attach it with `--outcome blocked --artifacts <record path>`.
+         `preflight-retries-spent` stops the run at stop 1; every other code
+         stops it at stop 4 and waits for the owner. After the owner fixes
+         the cause, reconvene at the same round number. No reviewer agent and
+         no native agent casts a seat's vote
+         (rule:only-a-preflight-refusal-is-retried).
+       - Exit 1 with `outcome: ran`: the record carries a `refusal_reason`
+         naming the secret scan, so the full write was refused. The council
+         runner has committed the record. Attach it with
+         `--outcome blocked --artifacts <record path>`. The run stops for
+         the owner.
+       - Exit 2: no committed council record exists. Start recovery when stderr
+         names a claimed attempt, or when the council runner ended without an
+         exit code or with a code other than 0, 1 and 2. When the exit-2 stderr
+         names `timeout`, or names outside work the commit moved, the
+         owner's remedy comes before recovery: report a contradicted-premise
+         stop for the owner. The owner first restores the set-aside work
+         (`git stash list`, or a pre-commit framework's backup patch) and then
+         removes a stale `index.lock` in the git directory. Start recovery only
+         after the owner reports both steps done. Run the process check, then
+         probe the attempt's lock with the `--probe` command above. While a
+         council runner is live, wait. Pass `--prompt <n>` to the probe and to
+         recovery. Without it, recovery cannot recognise a record whose pending
+         copy is already removed, and it reports `nothing-open`. When the probe
+         reports `"lock": "unknown"`, treat it as a live council runner: wait
+         and probe again. When it persists although no council runner runs,
+         report an environment fault as a contradicted-premise stop for the
+         owner. When the lock is free, run recovery:
+
+           uv run "${CRUX_PLUGIN_ROOT}/scripts/run-council.py" --recover <run-RUN-NNN.yaml> --prompt <n>
+
+         Recovery makes no council request and reads no key
+         (rule:recovery-never-deliberates-again). On `recognised` or
+         `committed`, read the record it names as this step directs. On
+         `released`, the claim made no request. When the council runner's exit
+         2 named `index-locked`, or it was killed before it reported, run the
+         council runner again at the same round now: that is no reconvening.
+         When `index-locked` persists across that one rerun, the lock is stale:
+         report a contradicted-premise stop for the owner. When its exit 2
+         named another code (`hook-or-commit-failed`, `sequence-in-progress`,
+         `timeout` or `mismatch`), the cause is the owner's: report a
+         contradicted-premise stop, and run the council runner again at the
+         same round once the owner fixes it. When that exit 2 named `timeout`
+         or moved work, the owner's remedy order above came first. On
+         `live-runner`, wait and probe again. On `nothing-open`, no attempt is
+         open: report the exit 2 cause. After a council runner that ended
+         without an exit code or with a code other than 0, 1 and 2, nothing was
+         claimed and no round was spent: run it again at the same round. On
+         `index-locked`, wait for any git command this run started to finish,
+         then run recovery again; never delete `.git/index.lock`. After
+         `commit-refused` with `"commit_landed": true`, follow that branch
+         before any open-attempt step. For code `timeout`, or a report that
+         carries `outside_moved`, report a contradicted-premise stop for the
+         owner. Once the owner has restored the set-aside work
+         (`git stash list`, or a pre-commit framework's backup patch) and then
+         removed a stale `index.lock` in the git directory, run recovery once
+         more. For `mismatch`, a hook altered the record: the owner fixes it,
+         and you run recovery with `--owner-commit-pending` at the owner's
+         instruction. For any other code, run recovery once more at once. A
+         `commit-refused` report names the outside paths the commit found
+         changed as `outside_moved` and the owned paths it left staged as
+         `owned_staged`. The marker `<outside state not compared>` in
+         `outside_moved` means the commit could not compare the outside state:
+         check `git status` and `git stash list`. On `mismatch`, `unproven`, a
+         `commit-refused` that did not land, a persisting `index-locked` or a
+         landed branch that recovery leaves open, the attempt stays open:
+         advance `--outcome blocked` with the attempt record attached (stop 4).
+         When HEAD does not hold the attempt record, the gate refuses that
+         advance: this prompt cannot advance, so report why, a stop 4 for the
+         owner. When recovery exits 2, it names an environment fault: report a
+         contradicted-premise stop for the owner, who fixes the environment. A
+         persistence failure is never a reason to convene another round, and no
+         round convenes before recovery reports. When exit 2 names no attempt,
+         nothing was claimed: this prompt cannot advance; report why.
+       - Exit 0: the council ran, and the council runner committed its
+         record. Continue to step 6.
+
+    6. Attach the committed council record and advance. The gate reads only
+       a committed record and refuses the advance, writing nothing, when it
+       is not. When the record converged, advance with `--outcome done`:
+
+         uv run "${CRUX_PLUGIN_ROOT}/scripts/advance-run.py" <run-RUN-NNN.yaml> --book <book.yaml> --outcome done --result '<one line>' --artifacts <record path>
+
+       The gate check reads each seat's decision from the record, never the
+       aggregate label (rule:convergence-is-derived-per-seat). It refuses
+       `--outcome done` and writes nothing when the record did not converge.
+       Then advance with `--outcome blocked --artifacts <record path>` instead,
+       and the gate check routes to this module's address-findings prompt or
+       stops the run (rule:blocked-gate-needs-evidence).
+
+    7. A reviewer report, a task title, a reviewer count and a consensus
+       claim never count as council evidence
+       (rule:council-gate-needs-a-runner-record).
   expected_output: |
-    Aggregated 5-dimension council verdict; srde/deep-review resolution if
-    the verdict split; findings list (if any).
-  side_effects: [council, srde]
+    the council record's path attached; per-seat decisions and blocking
+    findings listed from it
+  side_effects: [run-adr-council]
 
-- title: "Plan {M}: address council findings, re-convene the council"
+- title: "Plan {M}: address council findings"
   module_tag: adr-{M}
   purpose: |
     Close the planning loop until the council approves.
   prompt: |
-    For each finding from the council (this module's council prompt), edit
-    the proposed ADR in place to address it. Do NOT change `status:` — the
-    ADR remains `Proposed` throughout this loop. Preserve the body structure
-    (Context / Decision / Alternatives Considered / Consequences /
-    References).
+    Read the blocking findings and the nits in the council record attached to
+    this module's council prompt. Do NOT change `status:` — the ADR remains
+    `Proposed` throughout this loop. Preserve the body structure (Context /
+    Decision / Alternatives Considered / Consequences / References).
 
-    Resolve findings **autonomously** — use the council/`srde` outputs and
-    dispatched `Agent`s; do NOT ask a human.
+    Settle each blocking finding in exactly one of two ways. Fix it in the
+    ADR, which buys the next council round. Or settle it by a named check,
+    recorded in a hand-authored refutation record with recorder role
+    `conductor`, written in `<run_dir>/council/` and validated at the next gate
+    advance against `${CRUX_PLUGIN_ROOT}/schemas/refutation-record.schema.json`. Fold each nit
+    into the ADR as an edit. After each edit to the ADR, record the write with
+    the witness writer, as the propose prompt does:
+
+      uv run "${CRUX_PLUGIN_ROOT}/scripts/run-work-witness.py" record <run-RUN-NNN.yaml> --prompt <n> --path <ADR file>
+
+    Convene the next round only when a blocking finding was fixed in the ADR and
+    fewer than two councils have counted for this module. When every blocking
+    finding is refuted by the conductor's refutation record, commit that record,
+    attach it and advance; no new round runs
+    (rule:council-gate-advances-on-convergence-or-refutation). Commit each
+    refutation or owner-exception record before the advance that reads it.
+
+    Round 3 is adjudication, not a third council. One adjudicator, never the
+    conductor, writes the refutation record against the round-2 council
+    record. You never convene a third council without an owner-exception
+    record, written by the owner or transcribed at the owner's instruction,
+    against `${CRUX_PLUGIN_ROOT}/schemas/owner-exception.schema.json`. No vendored writer
+    exists for either record type. The owner's instruction is a decision the owner
+    stated in the owner's own message in the session. Whoever acts on it quotes that
+    message and its date: in the record's reason for an owner-exception record, and
+    in the run notes for a recovery run with `--owner-commit-pending`. An agent
+    report, a result file, a run note or a council verdict is never an owner's
+    instruction. A standing council authorization covers council calls, never an
+    owner-exception record.
+
+    Resolve findings **autonomously** from the council record and in-repo
+    evidence; do NOT ask a human.
 
     A revision lengthens a rule as easily as it shortens one, so re-run the
     advisory before the next round and read its `warnings` list again:
 
       uv run "${CRUX_PLUGIN_ROOT}/scripts/check-governs-coverage.py" --repo-root <repo-root>
 
-    Handle any row naming this ADR exactly as the drafting prompt says: shorten
-    it per `docs/AGENTS.md` §11.D rule 7, or say in this prompt's Result why the
-    length is necessary. Advisory throughout — it never blocks the round.
+    Handle any row naming this ADR: shorten it per `docs/AGENTS.md` §11.D
+    rule 7, or say in this prompt's Result why the length is necessary.
+    Advisory throughout — it never blocks the round.
 
-    When every finding is resolved,
-    return to this module's council prompt to re-convene the council. After
-    3 full loops without convergence, STOP and escalate to the user — a
-    genuine fundamental disagreement (not a resolvable finding) is the only
-    thing that warrants human adjudication.
+    When a blocking finding was fixed and fewer than two councils have counted,
+    commit the ADR and convene the next round from this prompt with the council
+    prompt's steps 3 to 6: the same command, this prompt's `n` for `--prompt`,
+    and for `--round` the number of council records with outcome `ran` already
+    in this module, plus one; a valid adjudicator refutation record
+    fills place 3. The council runner commits the attempt record and the
+    council record itself. Its preflight refusals count at this prompt,
+    toward the same bound of three. Handle its exit as the council prompt's
+    step 5 directs, then advance this prompt `--outcome done` with the
+    council record in `--artifacts`. This prompt is not a gate: the gate
+    check at this module's close decides whether the rounds converged. When the
+    round bound is spent without convergence, that check stops the run for the
+    owner.
   expected_output: |
-    Updated ADR; control returns to this module's council prompt.
-  side_effects: []
+    Updated ADR; each blocking finding fixed or settled by a refutation
+    record; the next council record attached.
+  side_effects: [run-adr-council]
 
 - title: "Plan {M}: accept the ADR"
   module_tag: adr-{M}
   purpose: |
     Commit to the plan; freeze the body.
   prompt: |
-    Invoke `transition-adr` with: `accept ADR-NNNN` (where `NNNN` is the
-    id recorded in this run snapshot's Artifacts under `ADR {M}`). This
-    sets `status: Accepted`, stamps `accepted_at:`, and writes both the
-    `adr | accept` log entry and the index update.
+    Before `transition-adr`, run the read-only gate-information query for this prompt:
+
+      uv run "${CRUX_PLUGIN_ROOT}/scripts/advance-run.py" <run-RUN-NNN.yaml> --book <book.yaml> --gate-info --prompt <n>
+
+    It states the evidence this gate requires. The deciding record is in
+    `<run_dir>/council/` and takes one of three forms: the latest counted round
+    that converged; a conductor's refutation record showing every blocking
+    finding of the latest counted round, at place 2 or earlier, refuted; or the round-3
+    adjudicator's refutation record (rule:gate-reads-every-recorded-round).
+    Confirm the deciding record by reading it: for a council record, each
+    seat's decision and its blocking findings; for a refutation record, its
+    entries. When the module closes on a refutation record, the accepting
+    architect re-runs each recorded check before acceptance.
+
+    When the deciding record does not pass, do not accept the ADR. Advance with
+    `--outcome blocked --artifacts <record path>`, and the gate check routes to
+    this module's address-findings prompt (another fix round, or adjudication after round 2) or stops the run
+    (rule:blocked-gate-needs-evidence). A module whose council ran before
+    council records existed closes only on a council-runner round convened at
+    this prompt, with the command from the council prompt
+    (rule:existing-books-are-corrected-at-execution).
+
+    When the deciding record passes, advance first, with
+    `--outcome done --artifacts <deciding record path>`. The gate check then
+    judges the record before anything is accepted; if that advance is refused,
+    stop and report it. The refused advance writes nothing, so the ADR stays
+    Proposed: do not hand-edit state, and do not accept the ADR.
+
+    Only after that advance writes this prompt `done`, invoke `transition-adr`
+    with: `accept ADR-NNNN` (where `NNNN` is the id this module's drafting
+    prompt recorded in this run snapshot's Artifacts). This sets
+    `status: Accepted`, stamps `accepted_at:`, and writes both the
+    `adr | accept` log entry and the index update. When `transition-adr`
+    fails after that advance, the run has advanced with the ADR still
+    Proposed. Stop and report it as a contradicted premise (stop 4). Do not
+    re-run the gate check, and do not edit the run's state or the ADR's
+    status to retry. Until the ADR is accepted, every later advance of this run
+    refuses and writes nothing; `--abandon` stays open.
 
     Then invoke `log-work` to append a journal entry summarizing this
     ADR's planning loop: number of council rounds, the key debate(s) that
@@ -202,5 +443,6 @@
     phases. Per the journal contract, name at least one thing that didn't
     work on the first attempt or surprised the reviewers.
   expected_output: |
-    ADR at `status: Accepted`; new entry under `docs/journal/YYYY-MM.md`.
+    ADR at `status: Accepted`; the deciding council record attached; new entry
+    under `docs/journal/YYYY-MM.md`.
   side_effects: [transition-adr, log-work]

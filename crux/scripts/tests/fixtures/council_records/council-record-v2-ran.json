@@ -1,0 +1,159 @@
+{
+  "aggregate": {
+    "action": "AUTO_EXECUTE",
+    "consensus": "UNANIMOUS_APPROVE"
+  },
+  "attempt": {
+    "attempt_id": "0123456789abcdef0123456789abcdef",
+    "path": "docs/promptbooks/runs/PB-0999-fixture/council/RUN-001-adr-1-r1-a1.attempt.json",
+    "sha256": "c7e0a816d430aa50316e838429b850361094f57d4f78ae88a81402c7289ca15e"
+  },
+  "binding": {
+    "module_tag": "adr-1",
+    "prompt": 2
+  },
+  "book": {
+    "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "PB-0999"
+  },
+  "council_kind": "adr",
+  "degraded": false,
+  "errored_seats": [],
+  "format_version": "2",
+  "outcome": "ran",
+  "question": {
+    "path": "docs/promptbooks/runs/PB-0999-fixture/council/question.md",
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "quorum_met": true,
+  "record_type": "council-record",
+  "refusal_reason": null,
+  "registry": {
+    "path": "crux/scripts/crux/_config/llm_router_config.json",
+    "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "version": "4.1.0"
+  },
+  "round": 1,
+  "run_id": "RUN-001",
+  "seal": "sha256:55ac5eea09e08c2e1b4e834a87cd01bbf60d6bb4f5c40050d0b885f91cdbe006",
+  "seats": [
+    {
+      "attempts": [
+        {
+          "attempt": 1,
+          "fault_label": null,
+          "finish_reason": "stop",
+          "generation_id": "gen-0000000000-fixtureopenai_top",
+          "replied": true,
+          "served_model": "openai/gpt-6-astra",
+          "served_model_match": true,
+          "served_provider": "OpenAI",
+          "served_provider_match": true
+        }
+      ],
+      "confidence": 0.9,
+      "decision": "APPROVE",
+      "errored": false,
+      "fault_label": null,
+      "findings": [],
+      "finish_reason": "stop",
+      "generation_id": "gen-0000000000-fixtureopenai_top",
+      "provider_namespace": "openai",
+      "reasoning": "Completeness: fine. Correctness: fine. Consistency: fine. Clarity: fine. Security: fine.",
+      "registry_key": "gpt-6-astra",
+      "requested_model": "openai/gpt-6-astra",
+      "retried": false,
+      "role": "openai_top",
+      "served_model": "openai/gpt-6-astra",
+      "served_provider": "OpenAI",
+      "serving_providers": [
+        "openai"
+      ]
+    },
+    {
+      "attempts": [
+        {
+          "attempt": 1,
+          "fault_label": null,
+          "finish_reason": "stop",
+          "generation_id": "gen-0000000000-fixtureanthropic_top",
+          "replied": true,
+          "served_model": "anthropic/claude-opus-5.5",
+          "served_model_match": true,
+          "served_provider": "Anthropic",
+          "served_provider_match": true
+        }
+      ],
+      "confidence": 0.9,
+      "decision": "APPROVE_WITH_NITS",
+      "errored": false,
+      "fault_label": null,
+      "findings": [
+        {
+          "dimension": "Clarity",
+          "id": "anthropic_top:F1",
+          "kind": "nit",
+          "safety_adjacent": false,
+          "text": "A sentence could be shorter."
+        }
+      ],
+      "finish_reason": "stop",
+      "generation_id": "gen-0000000000-fixtureanthropic_top",
+      "provider_namespace": "anthropic",
+      "reasoning": "Completeness: fine. Correctness: fine. Consistency: fine. Clarity: fine. Security: fine.",
+      "registry_key": "claude-opus-5.5-xhigh",
+      "requested_model": "anthropic/claude-opus-5.5",
+      "retried": false,
+      "role": "anthropic_top",
+      "served_model": "anthropic/claude-opus-5.5",
+      "served_provider": "Anthropic",
+      "serving_providers": [
+        "anthropic"
+      ]
+    },
+    {
+      "attempts": [
+        {
+          "attempt": 1,
+          "fault_label": null,
+          "finish_reason": "stop",
+          "generation_id": "gen-0000000000-fixturegoogle_top",
+          "replied": true,
+          "served_model": "google/gemini-3.1-pro-preview",
+          "served_model_match": true,
+          "served_provider": "Google AI Studio",
+          "served_provider_match": true
+        }
+      ],
+      "confidence": 0.9,
+      "decision": "APPROVE",
+      "errored": false,
+      "fault_label": null,
+      "findings": [],
+      "finish_reason": "stop",
+      "generation_id": "gen-0000000000-fixturegoogle_top",
+      "provider_namespace": "google",
+      "reasoning": "Completeness: fine. Correctness: fine. Consistency: fine. Clarity: fine. Security: fine.",
+      "registry_key": "gemini-3.1-pro-preview",
+      "requested_model": "google/gemini-3.1-pro-preview",
+      "retried": false,
+      "role": "google_top",
+      "served_model": "google/gemini-3.1-pro-preview",
+      "served_provider": "Google AI Studio",
+      "serving_providers": [
+        "google-ai-studio"
+      ]
+    }
+  ],
+  "subjects": [
+    {
+      "path": "docs/adrs/ADR-0001-fixture.md",
+      "retained_copy": null,
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  ],
+  "system_prompt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "vote_instruction_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "writer": "run-council",
+  "written_at": "2026-10-01T12:00:00.000001Z"
+}

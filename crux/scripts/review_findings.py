@@ -1413,7 +1413,7 @@ def _read_block_sequence(text: str) -> list[list[str]]:
 def _counted_thing_key(objective: str, part: str | None) -> str:
     """The COUNTED-THING key for one `measured_objectives` entry.
 
-    rule:rotation-discharges-on-attempt-or-measurement: an entry carries one
+    rule:rotation-preserves-assessment-outcomes: an entry carries one
     counted thing per objective-and-part pair where it names a part, and one
     per objective where it does not. The part id already carries the goal
     number (`OBJ-N.k`), so it alone is a unique key; a part-less entry keys
@@ -1447,7 +1447,7 @@ def measured_objectives(frontmatter: str) -> tuple[dict[str, dict[str, str]], st
         it is. An entry MAY carry an optional `part` field (`OBJ-N.k`), and
         EVERY entry — whether or not it names a part — MUST carry a
         `measure_digest` field: an identifier of the measure text version
-        the entry concerns (rule:rotation-discharges-on-attempt-or-measurement:
+        the entry concerns (rule:rotation-preserves-assessment-outcomes:
         "on EVERY entry whether or not it names a part", a correctness
         requirement rather than a convenience). An entry missing it is
         REFUSED, on the same footing as a missing `outcome`. An entry MAY
@@ -1551,7 +1551,7 @@ def measured_objectives(frontmatter: str) -> tuple[dict[str, dict[str, str]], st
                     "dropped, because a dropped entry reads as an "
                     "undischarged rotation nobody can see")
             thing = _counted_thing_key(objective, part)
-            # rule:rotation-discharges-on-attempt-or-measurement: EVERY entry —
+            # rule:rotation-preserves-assessment-outcomes: EVERY entry —
             # goal-level or part-level alike — carries an identifier of the
             # measure text version it concerns, as a CORRECTNESS requirement:
             # the rewrite-reset and the carried-escalation verification below

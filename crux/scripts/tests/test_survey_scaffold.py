@@ -282,7 +282,9 @@ class ScaffoldTestCase(unittest.TestCase):
         (self.obs / "OBS-0001-httpx.md").write_text(
             "---\nid: OBS-0001\nstatus: ratified\n"
             f'anchor_id: "{self.a1}"\nevidence: ["src/a.py:1-1"]\n'
+            "provenance: recovered\n"
             "governs:\n  - domain: runtime\n    rule: The gateway depends on httpx\n"
+            "    handle: OBS-0001/httpx\n    provenance: recovered\n"
             "---\n\nbody\n", encoding="utf-8")
         proc = self._scaffold()
         self.assertEqual(proc.returncode, 0, proc.stderr)

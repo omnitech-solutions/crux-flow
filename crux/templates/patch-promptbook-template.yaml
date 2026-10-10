@@ -27,7 +27,12 @@
 # THE TWO GATES A PATCH STILL PAYS. The council gate is a postcondition of the
 # verify phase; the review gate is a postcondition of the review phase. Both are
 # positional, guaranteed by the fixed phase sequence, so a patch book that
-# archives a completed run has passed both.
+# archives a completed run has passed both. Each gate admits one kind of
+# evidence: the council gate a council record written by the council runner
+# (`run-council.py`), the review gate reviewer reports. Neither satisfies the
+# other's gate. This text reaches a book only when the book is built from it;
+# a book that already exists is corrected at execution by the gate check,
+# never by this file.
 #
 # THE BLAST RADIUS is declared BELOW, before the run starts, and is held by two
 # guards — only the second is mechanical:
@@ -47,7 +52,7 @@
 # `whats_next.md`). An ADR path is deliberately NOT excluded — work that needs an
 # ADR is not a patch, and the check enforces that from the other end.
 
-format_version: "1"
+format_version: "2"
 id: PB-NNNN
 title: "Patch: <small reversible non-architectural change>"
 status: active
@@ -66,6 +71,9 @@ cycle_kind: patch
 # proves nothing, and the verify council exists to catch exactly that.
 blast_radius:
   - <repo/relative/path>
+
+# Declare a slot before start for each formal Implementation Decision. Empty means incidental choices only.
+implementation_slots: []
 
 goal: |
   <One paragraph: the small reversible non-architectural change this patch makes.
@@ -89,14 +97,30 @@ strategy: |
   outside the declared blast radius, cutting a release tag, merging the PR.
 
 run_autonomy: |
+  Both book formats execute with the current attempt-aware gate. New councils use
+  council-record format two and attempt format one. New formal closes retain gate
+  context three/profile four; historical context two/profile three and context one/profile two remain replay-only.
+  Finish any open Git merge or other sequence before council. The runner or
+  recovery alone commits attempt/result evidence; the historian commits run closes.
+  After each initial or revised formal revision or migration-batch subject write,
+  immediately record its bytes before committing it:
+
+    uv run "${CRUX_PLUGIN_ROOT}/scripts/run-work-witness.py" record <run-RUN-NNN.yaml> --prompt <n> --path <subject-path>
+
+  Never create a witness after a refusal. Repair only authorized preflight causes.
+  A persistence failure permits request-free recovery, never repeat deliberation.
   Once this cycle's run is started, it runs to completion without human review.
-  Questions and decisions are resolved by the `council` skill and dispatched
-  `Agent`s. The only stops are (a) an escalation loop firing (3-round
-  non-convergence on the council or the review fix-loop), (b) the verify
+  Questions and decisions are resolved by the council runner for a council
+  gate, and by dispatched `Agent`s otherwise. The only stops are (a) an escalation loop firing (3-round
+  non-convergence on the council or the review fix-loop; or the preflight
+  retry sequence, a third preflight refusal at one convening prompt), (b)
+  the verify
   council's escape verdict — "this needs an ADR, use `dev-cycle`" or "this is too
-  large to bound, use `iterate`" — and (c) a genuinely irreversible/outward-facing
-  action the plan did not authorize (push/merge, deploy, external send, data
-  deletion, spend). In-repo edits — including `docs/AGENTS.md`, skill files, and
+  large to bound, use `iterate`" — (c) a council that cannot run through the
+  council runner yields DEFER_TO_HUMAN, and (d) a genuinely
+  irreversible/outward-facing action the plan did not authorize (push/merge,
+  deploy, external send, data deletion, spend). In-repo edits — including
+  `docs/AGENTS.md`, skill files, and
   code — are never stop points. See `docs/AGENTS.md` §11 "Run execution autonomy"
   for the full contract.
 
@@ -119,28 +143,236 @@ prompts:
       reproduction; do not build a corpus of inputs to demonstrate a class, and
       do not let a security label on the finding widen the fix.
 
-      Then invoke the `council` skill (Claude + Gemini + GPT, async) over the
-      diagnosis. Each seat owns one dimension: (1) Evidence/reproduction; (2)
-      Root-cause correctness; (3) Approach soundness and minimality; (4)
-      **Blast-radius proportion** — is the declaration drawn no wider than the
-      work needs? A radius wider than the change is the tier's main failure mode,
-      because containment then passes for free; (5) Security.
+      Reproduce at the run's `base_commit`, and record that commit in the
+      Diagnosis. Name each reproduction's kind. A textual reproduction quotes
+      text and reads it at the base with `git show <base_commit>:<path>`. An
+      executed reproduction runs code, a test or a command, and runs against the
+      base tree. The working tree stands in for the base tree only when
+      `git diff --quiet <base_commit> -- <paths>` exits 0 and
+      `git ls-files --others --exclude-standard -- <paths>` prints nothing,
+      where `<paths>` covers every input the reproduction reads: the code under
+      test, what it imports, its fixtures and configuration, and the test
+      itself. Equal files prove nothing about inputs the list leaves out. When
+      the check fails, run the reproduction in a private worktree,
+      `git worktree add --detach <private scratch path> <base_commit>`, never
+      under a shared `/tmp` path, and remove it afterwards. When a reproduction
+      cannot run at the base, record that as a stated limit of the evidence,
+      never as a reproduction. When `base_commit` is null, say so and record the
+      commit you used.
+
+      The run snapshot is a council subject. After each write of the `Diagnosis` block, record
+      the write with the witness writer:
+
+        uv run "${CRUX_PLUGIN_ROOT}/scripts/run-work-witness.py" record <run-RUN-NNN.yaml> --prompt <n> --path <run-RUN-NNN.yaml>
+
+      Select a formal Implementation Decision before this verify phase's council
+      for a replaceable approach or material alternative whose reasoning must survive retrieval.
+      Declare slot 'patch' before start. Author the exact decision revision.
+      After each initial or revised write, immediately record its bytes:
+
+        uv run "${CRUX_PLUGIN_ROOT}/scripts/run-work-witness.py" record <run-RUN-NNN.yaml> --prompt <n> --path <decision-path>
+
+      Then commit the revision. Never create a witness after a preflight refusal.
+      Resolve any open attempt before reconvening. Add
+      these runner flags: --implementation-revision <decision-path>,
+      followed by --subject <decision-path> and --retain-subjects. The question names path and digest,
+      preserves every dimension below, and explicitly assesses architectural conflict.
+      Diagnosis-only approval is insufficient. Use exact question names
+      Evidence/Reproduction, Root-cause correctness, Approach soundness and minimality,
+      Blast-radius proportion and Security. Pass --implementation-revision on
+      the successful verify advance to bind approval with DONE; commit the close.
+      If selected after this phase completes, escalate or abandon for a successor.
+      Never add another council phase or reopen a completed prompt.
+
+      Council deliberation runs only through the council runner,
+      `run-council.py`, and its council record is the only evidence this gate
+      accepts (rule:council-gate-needs-a-runner-record). A reviewer report never
+      satisfies this gate, and no reviewer subagent casts a seat's vote
+      (rule:council-is-never-harness-native).
+
+      Convene the council over the diagnosis, council kind `patch`:
+        (a) Run the gate-information query and follow any correction notice
+            it prints: `uv run "${CRUX_PLUGIN_ROOT}/scripts/advance-run.py"
+            <run-RUN-NNN.yaml> --book <book.yaml> --gate-info --prompt <n>`.
+        (b) Commit the run snapshot that carries the `Diagnosis` block. The
+            council runner reads only a subject that is tracked and unchanged.
+        (c) Write the question to
+            `<run_dir>/council/<RUN>-p<n>-r<round>-question.md`. It states the
+            five dimensions below with their sub-questions, says that every seat
+            assesses every dimension (rule:every-seat-assesses-five-dimensions),
+            and states the three escape verdicts, each raised as a blocking
+            finding. The council runner appends the vote instruction. From round 2 on, the
+            question also carries the open blocking findings of the round before.
+        (d) Run, as a background command, `uv run
+            "${CRUX_PLUGIN_ROOT}/scripts/run-council.py" <run-RUN-NNN.yaml>`
+            with `--prompt <n>` (the number of this prompt), `--round <round>`,
+            `--question <question-file>` and `--subject <run-RUN-NNN.yaml>`.
+            `<round>` is the number of council records with outcome `ran`
+            already for this prompt, plus one. A could-not-run record takes no
+            place, so after you fix its cause you reconvene with the same
+            number. Exit 0: the council ran, and the council runner committed
+            its record. Exit 1 with a record: the council runner committed it,
+            and the gate will stop on it. Exit 1 with `"refused": "round"` and
+            `"record": null`: `run-council.py` refused a `--round` that
+            differs from that number, before any call, and wrote nothing;
+            correct it and run again. Exit 1 with `"refused": "prompt"` and `"record": null`: `--prompt` was not the run's current prompt; run again with the current prompt or omit `--prompt`. Exit 1 with `"refused": "preflight"`: follow the preflight paragraph below. Exit 1 with `"refused": "attempt-open"`, exit 2, or a council runner that ended without an exit code or with a code other than 0, 1 and 2: follow the recovery paragraph below.
+
+      **The council runner commits.** The council runner commits the attempt
+      record and the council record itself. It commits the attempt record before
+      any council request (rule:an-open-council-attempt-stops-the-gate). It
+      verifies that each commit holds the bytes it computed
+      (rule:council-evidence-matches-its-attempt). You commit no council record.
+
+      **Preflight refusal.** Exit 1 with `"refused": "preflight"` and
+      `"record": null` is a preflight refusal, raised before any council
+      request. No council record was written, and nothing was committed. Each
+      cause names its repair.
+      For `retype`, correct the `--question` or `--subject` path. For
+      `commit-run-work`, the subject is a file this run wrote and recorded with
+      the witness writer; commit exactly that path:
+
+        uv run "${CRUX_PLUGIN_ROOT}/scripts/run-work-witness.py" commit <run-RUN-NNN.yaml> --path <subject path>
+
+      Then run the council runner again. If the witness writer refuses the
+      commit with `"refused": "commit"`, git refused, and its `code`
+      decides. For `index-locked`, the commit checked the lock before it
+      staged anything: wait for any git command this run started to finish,
+      then run the witness commit once more, which spends no council retry.
+      When the lock persists, it is stale: report a contradicted-premise
+      stop for the owner. For every other code (`sequence-in-progress`,
+      `hook-or-commit-failed`, `timeout`, `mismatch`), report a
+      contradicted-premise stop for the owner, and do not run the council
+      runner again, which would spend a retry. When the refusal's `code` is
+      `timeout`, or it carries `moved`, the owner restores the set-aside
+      work first (`git stash list`, or a pre-commit framework's backup
+      patch), then removes a stale `index.lock` in the git directory. A
+      `mismatch` may follow a landed commit: the owner checks `git log` for
+      the path. A refusal of `invalid` is the owner's too: report the same
+      stop. For `missing` or a path refusal, correct the path and commit
+      again. The refusals `unattributed`, `unwitnessed`, `witness-mismatch`,
+      `mixed`, `council-path`, `witness-invalid` and `witness-binding` have
+      no repair: run the council runner again, and it records
+      `preflight-needs-owner`. The bound is three refusals at this prompt:
+      the third commits a could-not-run record with the code
+      `preflight-retries-spent`, and the run takes stop 1
+      (rule:only-a-preflight-refusal-is-retried).
+
+      **Recovery.** Start recovery when exit 2 means no committed council
+      record exists and stderr names a claimed attempt, when the council runner
+      refused with `"refused": "attempt-open"`, or when the council runner
+      ended without an exit code or with a code other than 0, 1 and 2. When the
+      exit-2 stderr names `timeout`, or names outside work the commit moved,
+      the owner's remedy comes before recovery: report a contradicted-premise
+      stop for the owner. The owner first restores the set-aside
+      work (`git stash list`, or a pre-commit framework's backup patch) and
+      then removes a stale `index.lock` in the git directory. Start recovery
+      only after the owner reports both steps done. Run the process check:
+      confirm that no council runner you started for this module is still
+      running. Then probe the attempt's lock. While a council runner is live,
+      wait. Pass `--prompt <n>` to the probe and to recovery. Without it,
+      recovery cannot recognise a record whose pending copy is already removed,
+      and it reports `nothing-open`:
+
+        uv run "${CRUX_PLUGIN_ROOT}/scripts/run-council.py" --recover <run-RUN-NNN.yaml> --prompt <n> --probe
+
+      When the probe reports `"lock": "unknown"`, treat it as a live council
+      runner: wait and probe again. When it persists although no council runner
+      runs, report an environment fault as a contradicted-premise stop for the
+      owner. When the lock is free, run recovery: the same command without
+      `--probe`. Recovery makes no council request and reads no key
+      (rule:recovery-never-deliberates-again). On `recognised` or `committed`,
+      read the record it names as its exit code says. On `released`, the claim
+      made no request. When the council runner's exit 2 named `index-locked`,
+      or it was killed before it reported, run the council runner again at the
+      same round now: that is no reconvening. When `index-locked` persists
+      across that one rerun, the lock is stale: report a contradicted-premise
+      stop for the owner. When its exit 2 named another code
+      (`hook-or-commit-failed`, `sequence-in-progress`, `timeout` or
+      `mismatch`), the cause is the owner's: report a contradicted-premise
+      stop, and run the council runner again at the same round once the owner
+      fixes it. When that exit 2 named `timeout` or moved work, the owner's
+      remedy order above came first. On `live-runner`, wait and probe again. On
+      `nothing-open`, no attempt is open: report the exit 2 cause. After a
+      council runner that ended without an exit code or with a code other than
+      0, 1 and 2, nothing was claimed and no round was spent: run it again at
+      the same round. On `index-locked`, wait for any git command this run
+      started to finish, then run recovery again; never delete
+      `.git/index.lock`. After `commit-refused` with `"commit_landed": true`,
+      follow that branch before any open-attempt step. For code `timeout`, or a
+      report that carries `outside_moved`, report a contradicted-premise stop
+      for the owner. Once the owner has restored the set-aside work
+      (`git stash list`, or a pre-commit framework's backup patch) and then
+      removed a stale `index.lock` in the git directory, run recovery once
+      more. For `mismatch`, a hook altered the record: the owner fixes it, and
+      you run recovery with `--owner-commit-pending` at the owner's
+      instruction. For any other code, run recovery once more at once. A
+      `commit-refused` report names the outside paths the commit found changed
+      as `outside_moved` and the owned paths it left staged as `owned_staged`.
+      The marker `<outside state not compared>` in `outside_moved` means the
+      commit could not compare the outside state: check `git status` and
+      `git stash list`. On `mismatch`, `unproven`, a `commit-refused` that did
+      not land, a persisting `index-locked` or a landed branch that recovery
+      leaves open, the attempt stays open: advance `--outcome blocked` with the
+      attempt record attached (stop 4). When HEAD does not hold the attempt
+      record, the gate refuses that advance: this prompt cannot advance, so
+      report why, a stop 4 for the owner. When recovery exits 2, it names an
+      environment fault: report a contradicted-premise stop for the owner, who
+      fixes the environment. Never convene a replacement round over an open
+      attempt, and never before recovery reports; a persistence failure is
+      never a reason to convene another round. When exit 2 names no attempt,
+      nothing was claimed: this prompt cannot advance; report why.
+
+      The five dimensions, each assessed by every seat: (1)
+      Evidence/reproduction; (2) Root-cause correctness; (3) Approach
+      soundness and minimality; (4) **Blast-radius proportion** — is the
+      declaration drawn no wider than the work needs? A radius wider than the
+      change is the tier's main failure mode, because containment then passes
+      for free; (5) Security.
 
       **Three escape verdicts, each a `docs/AGENTS.md` §11 premise-contradiction
       stop:** if the work needs an architectural decision recorded, STOP and
       recommend `dev-cycle`. If it cannot be bounded by the declaration or
       finished in one implement prompt, STOP and recommend `iterate`. If the
       radius is disproportionate, STOP — it cannot be widened now (the
-      declaration is frozen by `book_content_hash`), so re-author the book.
+      declaration is frozen by `book_content_hash`), so re-author the book. A
+      patch book has no escape token: a seat carries an escape verdict as a
+      blocking finding, and you take the stop by prose.
 
-      Otherwise resolve findings autonomously (`srde`, then a read-only
-      deep-review `Agent` for what srde cannot settle) and continue. After 3
-      rounds without convergence, STOP and escalate.
+      A council that cannot run through the council runner (no key, a refused
+      seat assignment, fewer than three providers, no quorum) yields
+      DEFER_TO_HUMAN (rule:only-a-preflight-refusal-is-retried). So does a
+      subject outside your authority to repair, code `preflight-needs-owner`.
+      The council runner has committed the record it wrote. Attach it with
+      `--outcome blocked`, and STOP. The code `preflight-retries-spent` is stop
+      1; every other could-not-run code is stop 4. No reviewer subagent takes a
+      seat.
+
+      The council runner's exit code and the record's `outcome` decide the
+      contradicted-premise stop: exit 1 with `outcome: could-not-run` and any code but
+      `preflight-retries-spent`, or a record that ran whose `refusal_reason` names the
+      secret scan. The aggregate action
+      DEFER_TO_HUMAN does not decide it, because a council that ran carries that
+      action on a SPLIT or on low confidence, for example.
+
+      The rounds run inside this one prompt. A record that did not converge
+      goes to the gate check with `--outcome blocked` and `--artifacts`;
+      `--outcome done` is refused on any verdict other than `pass`. A `pass` verdict refuses `--outcome blocked`; advance `done`. A `route`
+      verdict writes nothing: revise the `Diagnosis`, record the write with the
+      witness writer, commit the run snapshot, and re-convene here at the round
+      number that step (d) defines. A `stop` verdict writes this prompt
+      `blocked`. The council runner commits each council record; attach the
+      committed record: the gate reads only a committed record and refuses the
+      advance, writing nothing, when it is not. Advance this phase `done` only on convergence
+      (rule:council-gate-advances-on-convergence-or-refutation), with the
+      deciding council record in `--artifacts`. After 3 rounds without
+      convergence, STOP and escalate.
     expected_output: |
-      A `Diagnosis` block in the run `notes`; an aggregated council verdict
-      covering the approach AND the blast-radius proportion; any escape verdict
-      recorded explicitly.
-    side_effects: [query-docs, council, srde]
+      A `Diagnosis` block in the run `notes`; the council record's path attached,
+      with per-seat decisions and blocking findings listed from it, covering the
+      approach AND the blast-radius proportion; any escape verdict recorded
+      explicitly; the `base_commit` the reproduction ran at, each reproduction's
+      kind (textual or executed), and any stated limit.
+    side_effects: [query-docs, council]
 
   - n: 2
     phase: plan
@@ -174,6 +406,12 @@ prompts:
     purpose: |
       Land the approved change.
     prompt: |
+      For a selected formal decision, validate the committed approval binding
+      and retained context before treating reasoning as reviewed intent.
+      Use the context's supported profile; book format supplies none.
+      Preserve historical context bytes. Compare delivery to the approved
+      original, including annotations in independent review scope.
+      Report approval, delivery and queried source state separately.
       Implement the work units from the plan. Write the failing test first, watch
       it fail, then make it pass. A test is evidence of a change only once it has
       been seen to fail, for the reason the change addresses, against the code
@@ -184,6 +422,13 @@ prompts:
       Stay inside the declared blast radius and inside the approved scope. Record
       files changed, tests added or updated, and any unilateral decision with its
       rationale in this run snapshot's `notes`.
+
+      Integrate commits only outside the tester's window. The tester's window runs
+      from the tester's dispatch until the tester returns. The agent that dispatched
+      the tester holds the window. While it is open, that agent commits nothing to the main checkout, convenes no council, runs no live-tree tool, and dispatches no agent that does. Every dispatch you make while the window is open says so. The run has one commit
+      lane: no commit and no council while the tester's full suite or a live-tree
+      tool (compile-doctrine.py, summarize-adrs.py, derive-arch.py,
+      run-drift-gates.py, the council runner) runs.
     expected_output: |
       The change implemented with tests; files changed and decisions recorded in
       the run `notes`.
@@ -196,10 +441,17 @@ prompts:
       Verify the change before it ships. This phase's postcondition is the review
       gate.
     prompt: |
-      Run, in order, and RECORD each in the run `notes` with its exact command AND
-      a concrete result token (e.g. `unittest → 149 OK`, `validate-catalog
-      --dry-run → exit 0`) — NOT a bare "all green", which an unrecorded gate
-      makes indistinguishable from a gate never run:
+      For a selected formal decision, validate the committed approval binding
+      and retained context before treating reasoning as reviewed intent.
+      Use the context's supported profile; book format supplies none.
+      Preserve historical context bytes. Compare delivery to the approved
+      original, including annotations in independent review scope.
+      Report approval, delivery and queried source state separately.
+      Run, in order, and keep each gate's exact command AND a concrete result
+      token (e.g. `unittest → 149 OK`, `validate-catalog --dry-run → exit 0`)
+      to RECORD in the run `notes` after this prompt's advance — NOT a bare
+      "all green", which an unrecorded gate makes indistinguishable from a
+      gate never run:
       the repo's FULL test suite (the complete run, not a hand-picked subset);
       the linter/formatter; static analysis; security analysis;
       `verify-code-docs`; and — if the diff touches any distributed surface
@@ -210,11 +462,30 @@ prompts:
       error); a crash / exit >= 2 / non-zero with empty or unparseable stdout = an
       environment-capability error (surface stderr; a distinct lane).
 
+      The run's designated tester runs the full suite. No agent other than the
+      tester or the dev-lead starts a full suite, and one full suite runs at a time.
+      The historian records the Tester record in the run notes under `Tester
+      record`: gate label, command, HEAD, clean-tree status at start and end, result
+      tokens and wall time. The quality-gate run carries the gate label `--gate
+      <book-id>/<run-id>/p<N>/quality-gate`. Gate labels come from the closed set
+      `integration`, `quality-gate`, `exit`. `<book-id>` is the book's `id` field
+      (for example `PB-0144`), and `<run-id>` is the run's `run_id` (for example
+      `RUN-001`). A cycle run labels its integration run `quality-gate`. `exit` labels the full suite at the
+      exit gate before merge is offered. `integration` labels an integration full
+      suite in a book that has no quality-gate prompt. Per-unit runs pass no
+      `--gate` and are never reusable. Before re-running a gate's full suite, the
+      tester may pass `--reuse` with that gate's label: the full-suite runner
+      reports the matching record and starts no second run, and otherwise runs the
+      suites. A record for another gate never matches `--reuse` for this one. A project whose full-suite runner takes no `--gate` or
+      `--reuse` option still names the gate label in the Tester record and runs the
+      suite each time. While the tester's full suite or a live-tree tool runs, no
+      agent commits and no council convenes.
+
       Then dispatch an independent reviewer over the diff — correctness against
       the diagnosed root cause, consistency with ADRs and `docs/AGENTS.md`,
       clarity, and security (injection, secrets incl. the `~/.crux/` contract,
       authz, supply-chain, unsafe file/shell/path ops). A `[SECURITY:Sn]` finding
-      on a reachable path is a non-downgradable MUST-FIX.
+      on a reachable path is a non-downgradable MUST-FIX. No reviewer starts a full suite; reviewers cite the Tester record.
 
       The reviewer receives the book's `goal` statements — the Outcome, the
       Evidence, and the Constraint. It judges the change against the Outcome,
@@ -238,6 +509,26 @@ prompts:
 
       Fix every MUST-FIX, then re-run the gates. After 3 loops without
       convergence, STOP and escalate.
+
+      **The independent-review gate.** This prompt advances only with reviewer
+      reports attached (rule:review-gate-needs-a-reviewer-report). Commit the
+      work, then fix the reviewed range as
+      `<the run's base_commit>..<HEAD at dispatch>`. The gate check does not
+      compare the base, so hold it. Each reviewer writes its own
+      report: `uv run "${CRUX_PLUGIN_ROOT}/scripts/write-review-report.py"
+      <run-RUN-NNN.yaml> --prompt <n> --range <base>..<end> --verdict
+      '<verdict>'`, adding one `--finding '<finding>'` per finding. Single-quote
+      each value and write an embedded `'` as `'\''`; never put model-written
+      text inside double quotes. Text with quotes or several lines goes in a
+      file passed with `--verdict-file` or `--finding-file`. A reviewer whose
+      harness grants no shell returns those fields, and the agent that
+      commissioned the review runs the writer with them. From the range end to
+      the advance, write nothing to the run snapshot or the book: the range
+      covers both, so a later write to either refuses every report. Commit only
+      the reports before the advance: a commit after the range end that changes
+      a reviewed path refuses every report. Record notes, deferrals and gate
+      tokens after the advance. Attach every report with `--artifacts`. A
+      council record never satisfies this gate.
     expected_output: |
       All gates green with a command + result token recorded per gate; review
       findings resolved; one disposition per Evidence item.
@@ -255,9 +546,25 @@ prompts:
       one was written, journal entry, this run); stats (council rounds, gate
       loops, files changed, tests added); and any deferred work.
 
-      THEN run `uv run "${CRUX_PLUGIN_ROOT}/scripts/advance-run.py" <run-RUN-NNN.yaml>
-      --outcome done --result "summary written; archiving next"
-      --book <active-book.yaml>`. This prompt's `result` records the
+      **Result record.** Skip this when the run's `implementation_bindings` is
+      empty. Otherwise, wait until the review reports are committed, and finish
+      before the advance below. Write one evidence file per
+      `implementation_bindings` entry in this run's directory. The shape is
+      defined by `${CRUX_PLUGIN_ROOT}/schemas/implementation-result.schema.json`;
+      `${CRUX_PLUGIN_ROOT}/templates/implementation-result-template.yaml` is an example.
+      Mark `delivery_state: complete` only when every decision scope entry is
+      covered and every file changed under the scope between
+      `preimage_revision` and `source_revision` is listed; otherwise mark it
+      `partial` when part of the scope was delivered, or `unimplemented` with empty
+      `scope` and `sources` when none was. Then run `uv run "${CRUX_PLUGIN_ROOT}/scripts/implementation-decisions.py"
+      result --decision <the entry's revision.path> --evidence <evidence file>`.
+      Commit the evidence file and the result record at the `written` path the
+      command prints, each by explicit path.
+      Record any `refused` code the result command prints in the run notes.
+
+      THEN run `uv run "${CRUX_PLUGIN_ROOT}/scripts/advance-run.py"
+      <run-RUN-NNN.yaml> --outcome done --result "summary written; archiving
+      next" --book <book.yaml>`. This prompt's `result` records the
       hand-off, NOT "book archived" — the archive has not happened yet at the
       instant that string is written. The run reaches `status: completed`,
       `current_prompt` is nulled on both book and run, and the book's
@@ -286,5 +593,6 @@ prompts:
     expected_output: |
       Completion summary written; the blast-radius check read as a three-lane
       gate; the book archived (or the run abandoned and re-authored in another
-      tier, with the reason recorded).
+      tier, with the reason recorded); a result record per implementation
+      binding, or none when implementation_bindings is empty.
     side_effects: [archive-promptbook]

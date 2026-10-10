@@ -69,6 +69,7 @@ from ..core import (
     _canon,
     _cell,
     _contained,
+    _retained_source_walk,
     _mermaid,
     _node_ids,
     _norm_path,
@@ -151,7 +152,7 @@ def _walk_js_files(root: Path):
     `os.walk(followlinks=False)` never descends a symlinked directory; dir and
     file names are codepoint-sorted so an aggregate-cap truncation selects a
     stable, locale-independent prefix (point 6)."""
-    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+    for dirpath, dirnames, filenames in _retained_source_walk(root, root):
         dirnames[:] = sorted(
             d for d in dirnames if d not in _SKIP_DIRS and not d.startswith(".")
         )
@@ -967,7 +968,7 @@ def _find_graphql_files(root: Path) -> list:
     codepoint-sorted for a byte-stable render.
     """
     out: list = []
-    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+    for dirpath, dirnames, filenames in _retained_source_walk(root, root):
         dirnames[:] = sorted(
             d for d in dirnames if d not in _SKIP_DIRS and not d.startswith(".")
         )
@@ -1143,7 +1144,7 @@ def _find_prisma_schemas(root: Path) -> list:
     """All contained `schema.prisma` files, sorted by repo-relative path (point 2
     monorepo rule: the sorted-first is rendered, the rest a residual)."""
     out: list = []
-    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+    for dirpath, dirnames, filenames in _retained_source_walk(root, root):
         dirnames[:] = sorted(
             d for d in dirnames if d not in _SKIP_DIRS and not d.startswith(".")
         )

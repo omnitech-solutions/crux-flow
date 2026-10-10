@@ -97,6 +97,8 @@ Run `python3 "${CRUX_PLUGIN_ROOT}/scripts/crux-config.py"` from the repo root (o
 - Set `adr.next_number = ${N} + 1`.
 - Write `manifest.yml` back. Preserve all other keys and formatting.
 
+Step 9 commits the counter bump with the ADR file it allocated, and only then runs the regenerators.
+
 ### 6. Append to `docs/adrs/index.md`
 
 The index is a markdown table. Columns, in order: `id | title | status | date | supersedes | superseded_by | tags`.
@@ -124,23 +126,34 @@ Proposed. File `docs/adrs/${ID}-${SLUG}.md`. Tags: ${tags_csv}.
 
 ### 8. Update `docs/index.md` ADR section
 
-- Bump the count: `## ADRs (M)` where `M` is the new total ADR count under `docs/adrs/` (count files matching `ADR-*.md`, not the index).
-- Optionally append a one-line bullet for the new ADR; the rollup contract is "one row per ADR" — see other implementers' `docs/index.md` format contract.
-- Update the `_Last updated:_` line.
+- Update the `_Last updated:_` line. Step 9 regenerates the ADR section.
 
-### 9. Regenerate the summaries projection (governs-bearing ADRs)
+### 9. Commit, then regenerate the derived outputs
 
-If the new ADR carries a `governs` block — or `adr.governs_from` is set and `${N}` is at or above it — its governs entries now belong to the active-ADR set the summaries projection reads (top-level `adrs/`, whether Proposed or Accepted). Regenerate it so the working tree stays fresh:
+While a tester's window is open, commit nothing and run no regenerator. The window runs from the tester's dispatch until the tester returns; outside a run there is none.
+
+Commit this skill's own writes first: the ADR file, `manifest.yml`, `adrs/index.md`, `log.md` and `docs/index.md`. Never commit the counter bump without the file it allocated. Stage only these paths (`git add -- <paths>`) and commit only them (`git commit -- <paths>`), so no change already staged is included. If a regenerator still exits 2 with `migration-input-not-committed`, another uncommitted input is in the tree: stop and name it; never commit a file this skill did not write.
+
+Then regenerate the derived outputs, on every ADR write, whether or not the ADR carries a `governs` block. The commit comes first because, in a tree whose projections declare migration inputs, a regenerator refuses an uncommitted ADR input with exit 2 (`migration-input-not-committed`). The summaries input hash covers every active ADR's frontmatter, so any new ADR drifts it. Run the regenerators in this order:
 
 ```
+uv run "${CRUX_PLUGIN_ROOT}/scripts/generate-lineage.py" --repo-root <repo-root>
+uv run "${CRUX_PLUGIN_ROOT}/scripts/generate-index-rollup.py" --repo-root <repo-root>
 uv run "${CRUX_PLUGIN_ROOT}/scripts/summarize-adrs.py" --repo-root <repo-root>
+uv run "${CRUX_PLUGIN_ROOT}/scripts/compile-doctrine.py" --repo-root <repo-root>
 ```
 
-This rewrites `<docs_dir>/adrs/summaries/` (rule table, resolver, implementation map, `_meta.json`) from every active ADR's governs blocks. The projection's input hash covers the full active-ADR frontmatter, so any ADR frontmatter mutation drifts it; regenerating here keeps the `summarize-adrs.py --dry-run` drift gate (and CI) green rather than leaving a drifted tree for the next PR to catch. Skip only when the ADR has no `governs` block and `adr.governs_from` is unset.
+Last, when `arch` is in `concerns_enabled`, regenerate the arch spine. It runs last because it reads `adrs/index.md` and the other outputs and refuses a stale input:
+
+```
+uv run "${CRUX_PLUGIN_ROOT}/scripts/derive-arch.py" --repo-root <repo-root>
+```
+
+Confirm `--dry-run` of each regenerator, and of `generate-adr-index.py`, exits 0, then commit the regenerated projections so none stays uncommitted.
 
 ### 9a. Read the rule-length advisory
 
-Same guard as step 9: skip only when the ADR has no `governs` block and `adr.governs_from` is unset.
+Skip only when the ADR has no `governs` block and `adr.governs_from` is unset.
 
 ```
 uv run "${CRUX_PLUGIN_ROOT}/scripts/check-governs-coverage.py" --repo-root <repo-root>
@@ -190,7 +203,8 @@ the advisory is inert; that is a tree-configuration matter, not a finding about 
 - [ ] `docs/adrs/index.md` has a new row at the top with this ADR's `${ID}`, status `Proposed`, date `${TODAY}`.
 - [ ] `docs/adrs/index.md` `_Last updated:_` is `${TODAY}`.
 - [ ] `docs/log.md` has a new `## [${TODAY}] adr | ${ID}:` entry at the top.
-- [ ] `docs/index.md` ADR section count matches the actual file count.
+- [ ] The ADR file, the counter bump and the index, log and docs-index writes are committed before any regenerator runs.
+- [ ] `generate-adr-index.py`, `generate-lineage.py`, `generate-index-rollup.py`, `summarize-adrs.py` and `compile-doctrine.py` `--dry-run` exit 0, and `derive-arch.py --dry-run` exits 0 when `arch` is enabled; the regenerated projections are committed.
 - [ ] If `--accept-immediately` was passed: `transition-adr accept ${ID}` ran successfully and the verification carries through.
 
 ## Red flags — STOP and reconsider

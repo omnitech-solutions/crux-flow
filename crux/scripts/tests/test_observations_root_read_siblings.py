@@ -59,6 +59,7 @@ if HAVE_YAML:
 # one level down use the same words, so this is the discriminator every
 # refusal case asserts on.
 REFUSAL = "does not resolve to a directory inside the tree"
+ADMISSION_REFUSAL = "admission-context-or-source-refused"
 
 MANIFEST = """schema_version: "5"
 concerns_enabled:
@@ -149,8 +150,8 @@ class _LinkedConcernCase(unittest.TestCase):
 
     # ── the refusal assertion, leak-naming on failure ─────────────────────
 
-    def expect_refusal(self, call, exc_type, describe_leak):
-        """`call()` must raise `exc_type()` carrying REFUSAL. When it returns
+    def expect_refusal(self, call, exc_type, describe_leak, *, refusal=REFUSAL):
+        """`call()` must raise `exc_type()` carrying the refusal. When it returns
         instead, fail with what the call read from the outside directory.
 
         `exc_type` is a zero-arg callable rather than the class itself so an
@@ -160,8 +161,12 @@ class _LinkedConcernCase(unittest.TestCase):
             result = call()
         except Exception as exc:  # noqa: BLE001 — classified just below
             self.assertIsInstance(exc, exc_type(), repr(exc))
-            self.assertIn(REFUSAL, str(exc))
-            self.assertIn("observations", str(exc))
+            self.assertIn(refusal, str(exc))
+            if refusal == REFUSAL:
+                self.assertIn("observations", str(exc))
+            else:
+                self.assertEqual(str(exc), refusal)
+                self.assertNotIn(RECORD_NAME, str(exc))
             return exc
         self.fail("read the outside directory instead of refusing: "
                   + describe_leak(result))
@@ -179,14 +184,16 @@ class CheckObservationsRootTests(_LinkedConcernCase):
     def test_a_concern_linked_out_of_the_repo_is_refused(self):
         self.link_out()
         self.expect_refusal(lambda: CO.check(self.root),
-                            lambda: CO.ObservationsRefusal, self._leak)
+                            lambda: CO.ObservationsRefusal, self._leak,
+                            refusal=ADMISSION_REFUSAL)
 
     def test_the_refusal_is_a_capability_error_not_a_finding(self):
         """The lane: `ObservationsRefusal` is a RuntimeError so `main()`'s
         exit-2 tuple admits it, and it is never a CHK-OBS-* finding string."""
         self.link_out()
         exc = self.expect_refusal(lambda: CO.check(self.root),
-                                  lambda: CO.ObservationsRefusal, self._leak)
+                                  lambda: CO.ObservationsRefusal, self._leak,
+                                  refusal=ADMISSION_REFUSAL)
         self.assertIsInstance(exc, RuntimeError)
         self.assertNotIn("CHK-OBS", str(exc))
 
@@ -230,7 +237,7 @@ class CheckObservationsRootTests(_LinkedConcernCase):
             proc.returncode, 2,
             f"the CLI reported on the outside record instead of refusing: "
             f"exit={proc.returncode} stdout={proc.stdout}")
-        self.assertIn(REFUSAL, proc.stderr)
+        self.assertIn(ADMISSION_REFUSAL, proc.stderr)
         self.assertIn("check_observations:", proc.stderr)
         self.assertEqual(proc.stdout, "", "a refusal emits no payload")
         self.assertNotIn(RECORD_NAME, proc.stdout + proc.stderr,

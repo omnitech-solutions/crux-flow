@@ -17,6 +17,9 @@ recurring-mistake catalog.
 | "I'll increment `manifest.yml` first, then write — feels cleaner." | A failed write would burn the number. Write-then-increment, same as every other allocator in the project. |
 | "I'll skip `docs/index.md`'s Promptbooks count — `audit-docs` will fix it." | Don't author drift on purpose. Update both files now. |
 | "Two review modules feels like overkill; let me collapse them into one." | If the user requested two, the reason is probably "I want to review after each dev loop, not just at the end." Honor the request; the cost is 3 prompts. |
+| "No key, so five reviewers will do." | No. When the council runner cannot run, it writes DEFER_TO_HUMAN and the run stops. |
+| "Reviewer consensus equals the council." | A reviewer report never satisfies a council gate. Only the council runner's council record does. |
+| "The template change fixed my running book." | No. A template change fixes no existing book. The gate check corrects the book at execution, and the book's bytes stay unchanged. |
 
 ## Common mistakes
 
@@ -33,8 +36,11 @@ recurring-mistake catalog.
 - **Forgetting to ask about module counts** when the user signals
   multi-step scope ("we'll need to migrate the schema AND update the UI").
   Always prompt for counts when scope sounds compound.
-- **Computing `total_prompts` wrong**: the formula is `4N + 4M + 3K + 2`.
-  Off-by-one in the +2 forgets the prep+summary pair.
+- **Computing `total_prompts` wrong**: the format-two formula is
+  `4(A+I) + 4D + 3R + 2`, with A ADR modules, I implementation modules, D dev
+  modules and R review modules (a verify-kind book counts V in place of A+I).
+  A format-one book uses `4N + 4M + 3K + 2`. Off-by-one in the +2 forgets the
+  prep+summary pair.
 - **Numbering prompts wrong after assembly**: `prompts[].n` is sequential
   starting at 1 across the fully concatenated list, regardless of which module
   produced each element. Assign `n:` AFTER concatenation and BEFORE writing the

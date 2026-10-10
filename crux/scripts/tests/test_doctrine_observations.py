@@ -736,7 +736,7 @@ class CompileDriverGateTests(unittest.TestCase):
         self.assertIsNone(meta["survey_receipts_sha256"])
         # Hard-coded literal, and the OLD value asserted absent, so a
         # regression to "3" fails rather than being tolerated.
-        self.assertEqual(meta["schema"], "4")
+        self.assertEqual(meta["schema"], "5")
         self.assertNotEqual(meta["schema"], "3")
 
 
@@ -814,7 +814,7 @@ class P1ZeroObservationIdentityTests(unittest.TestCase):
                          {"observations_sha256", "survey_receipts_sha256"})
         self.assertEqual(m_read["observations_sha256"], EMPTY_CORPUS_SHA256)
         self.assertIsNone(m_held["observations_sha256"])
-        self.assertEqual(m_read["schema"], "4")
+        self.assertEqual(m_read["schema"], "5")
         self.assertNotEqual(m_read["schema"], "3")
 
     def test_p1c_one_pairing_observation_changes_the_compile_and_its_removal_restores_it(self):
@@ -1028,12 +1028,14 @@ class CitationRenderingTests(_Base):
     def test_the_live_tree_renders_a_citation_on_every_rule_row(self):
         """Built in memory from the repository; nothing is written. The
         expected handle set is DERIVED from the live records on disk, never
-        frozen as a count."""
+        frozen as a count. The records pass through the same migration
+        authority overlay every production builder applies, so a handle the
+        migration demoted to historical-only is not expected as a rule row."""
         require_dev_surface(self, REPO_ROOT / "bionic" / "manifest.yml", "bionic/manifest.yml")
         manifest = sp.read_manifest(REPO_ROOT)
-        live = {r["handle"] for r in sp.live_records(sp.collect_records(
-            sp.adrs_dir(REPO_ROOT), governs_from=sp.governs_from(manifest),
-            observations=sp.observations_dir(REPO_ROOT)))}
+        loaded, view, _pending, _actual = dp._load_doctrine_inputs(REPO_ROOT, manifest)
+        live = {r["handle"] for r in sp.live_records(sp._summary_authority_records(
+            loaded["records"], view, loaded["removed"], loaded["aliases"])["records"])}
         built = {p.name: body for p, body in CD.build(REPO_ROOT, manifest=manifest).items()}
         rows = self._citation_rows(built["index.md"])
         self.assertTrue(live, "the live tree carries no governs rule; the test is vacuous")

@@ -20,9 +20,10 @@ snapshot's own committed version (see `base_commit_pin.py`, whose `divergence` t
 writer `advance-run.py` calls too). Both ends must enforce it. A run that overshoots
 can commit its work, hand-edit `base_commit` forward, and archive without ever calling
 the writer — and this gate then drew its diff from the new base and passed with an
-empty changed set. The pin binds from the snapshot's first commit onward; before that
-there is no committed record and the guard makes no claim, so a run in its first
-prompt is not refused for lack of a record. Given the value, this derives the changed
+empty changed set. The committed record is the snapshot's version at HEAD, so the pin
+refuses an uncommitted hand-edit only: a hand-edit committed to HEAD becomes the record
+and passes. Before the snapshot's first commit there is no committed record and the
+guard makes no claim, so a run in its first prompt is not refused for lack of a record. Given the value, this derives the changed
 set from the repository:
 
     git diff --name-only --no-renames <base_commit> --   (base -> working tree)
@@ -194,9 +195,12 @@ def _git(repo_root: Path, *args: str, nul: bool = False) -> list[str]:
     if shutil.which("git") is None:
         raise CapabilityError("git is not on PATH")
     try:
+        # The shared isolated environment: an ambient GIT_DIR or GIT_WORK_TREE would make git
+        # judge another repository's tree, and a replace ref would make it read another commit.
         proc = subprocess.run(
             ["git", "-C", str(repo_root), *args],
             capture_output=True, text=True, check=False,
+            env=_pin.git_isolated_env(),
         )
     except OSError as exc:  # pragma: no cover - defensive
         raise CapabilityError(f"could not run git: {exc}") from exc

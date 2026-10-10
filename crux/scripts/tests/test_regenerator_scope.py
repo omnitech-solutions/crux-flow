@@ -129,6 +129,98 @@ def _third_party_imports(tree_or_path) -> set[str]:
     return found
 
 
+def _root_modules(root: Path) -> set[str]:
+    return {p.stem for p in root.glob("*.py")} | {
+        p.name for p in root.iterdir() if p.is_dir() and (p / "__init__.py").is_file()
+    }
+
+
+def _module_files(name: str, level: int, origin: Path, imported: tuple[str, ...],
+                  root: Path = SCRIPTS) -> list[Path]:
+    """The sibling source files one import statement executes, or [] for a non-sibling.
+
+    Importing `a.b.c` runs `a/__init__.py`, `a/b/__init__.py` and then `a/b/c.py` (or
+    its package initializer); `from a.b import c` may name the submodule `c`. A relative
+    import resolves against the importing file's own package directory."""
+    if level:
+        base = origin.parent
+        for _ in range(level - 1):
+            base = base.parent
+        if not base.is_relative_to(root):
+            return []
+        parts = name.split(".") if name else []
+    else:
+        parts = name.split(".")
+        if not parts or parts[0] not in _root_modules(root):
+            return []
+        base = root
+    files: list[Path] = []
+    here = base
+    for part in parts:
+        if (here / part / "__init__.py").is_file():
+            here = here / part
+            files.append(here / "__init__.py")
+        elif (here / f"{part}.py").is_file():
+            files.append(here / f"{part}.py")
+            return files
+        else:
+            return files
+    for leaf in imported:
+        if (here / leaf / "__init__.py").is_file():
+            files.append(here / leaf / "__init__.py")
+        elif (here / f"{leaf}.py").is_file():
+            files.append(here / f"{leaf}.py")
+    return files
+
+
+def _unguarded_imports(source: ast.AST):
+    """Every import statement outside a `try` body, deferred ones included."""
+    guarded: set[int] = set()
+    for node in ast.walk(source):
+        if isinstance(node, ast.Try):
+            for stmt in node.body:
+                for inner in ast.walk(stmt):
+                    guarded.add(id(inner))
+    return [n for n in ast.walk(source)
+            if id(n) not in guarded and isinstance(n, (ast.Import, ast.ImportFrom))]
+
+
+def _closure_third_party_imports(path: Path, root: Path = SCRIPTS) -> dict[str, list[str]]:
+    """Third-party imports reachable from `path` through sibling modules.
+
+    The closure follows every unguarded import of a sibling module or package under
+    `crux/scripts/`, deferred imports included, because `uv run <script>` provisions
+    only the entry point's PEP 723 block and a sibling's import runs in that same
+    process. Returns each third-party module name with the files that import it."""
+    seen: set[Path] = set()
+    queue = [Path(path).resolve()]
+    found: dict[str, list[str]] = {}
+    while queue:
+        current = queue.pop()
+        if current in seen or not current.is_file():
+            continue
+        seen.add(current)
+        tree = ast.parse(current.read_text(encoding="utf-8"))
+        for name in _third_party_imports(tree) - _root_modules(root):
+            found.setdefault(name, []).append(
+                current.relative_to(PLUGIN_ROOT).as_posix()
+                if current.is_relative_to(PLUGIN_ROOT) else current.name)
+        for node in _unguarded_imports(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    queue.extend(_module_files(alias.name, 0, current, (), root))
+            else:
+                queue.extend(_module_files(node.module or "", node.level, current,
+                                           tuple(a.name for a in node.names), root))
+    return found
+
+
+def _undeclared_in_closure(path: Path, root: Path = SCRIPTS) -> dict[str, list[str]]:
+    declared = {d.lower() for d in (_declared_dependencies(path) or set())}
+    return {name: sorted(set(files)) for name, files in _closure_third_party_imports(path, root).items()
+            if name not in declared and _DISTRIBUTION.get(name, name) not in declared}
+
+
 def _declared_dependencies(path: Path) -> set[str] | None:
     """The PEP 723 `dependencies` list, or None when the file declares no block."""
     lines = path.read_text(encoding="utf-8").splitlines()
@@ -196,6 +288,58 @@ class DependencyDeclarationTests(unittest.TestCase):
                 "        return None\n    return yaml\n", encoding="utf-8")
             self.assertEqual(set(), _third_party_imports(guarded),
                              "a guarded import degrades or reports; it is not undeclared")
+
+
+# Entry points outside the regenerator roster that the clause-migration pilot added or
+# changed. Each reaches a third-party import only through a sibling module, which is the
+# class the direct scan above cannot see.
+CLOSURE_CHECKED_ENTRY_POINTS = (
+    "implementation-migration.py",
+    "implementation-decisions.py",
+    "advance-run.py",
+    "authority-view.py",
+)
+
+
+class ImportClosureDeclarationTests(unittest.TestCase):
+    """rule:regenerator-declares-its-third-party-imports, over the import closure.
+
+    `uv run <script>` provisions the entry point's PEP 723 block and nothing else, so an
+    import a sibling module performs is the entry point's import. `generate-reviews-index.py`
+    declared no dependencies while it reached PyYAML through a sibling, and the direct scan
+    called it clean while it exited 2 in its declared environment."""
+
+    def test_every_enrolled_regenerator_declares_its_import_closure(self):
+        for name in ENROLLED + CLOSURE_CHECKED_ENTRY_POINTS:
+            with self.subTest(script=name):
+                path = SCRIPTS / name
+                self.assertEqual(
+                    {}, _undeclared_in_closure(path),
+                    f"{name} reaches third-party modules through sibling imports without "
+                    f"declaring them in its PEP 723 dependencies (declared: "
+                    f"{sorted(_declared_dependencies(path) or set())})",
+                )
+
+    def test_positive_control_a_sibling_import_is_followed(self):
+        """The closure sees a deferred third-party import two sibling hops away, and a
+        guarded sibling import is not followed."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pkg = root / "probe_pkg"
+            pkg.mkdir()
+            (pkg / "__init__.py").write_text("", encoding="utf-8")
+            (pkg / "inner.py").write_text("def f():\n    import httpx\n", encoding="utf-8")
+            (pkg / "outer.py").write_text("from . import inner\n", encoding="utf-8")
+            entry = root / "entry.py"
+            entry.write_text(
+                "# /// script\n# dependencies = [\"pyyaml>=6.0,<7\"]\n# ///\n"
+                f"import {pkg.name}.outer\nimport yaml\n", encoding="utf-8")
+            self.assertEqual(["httpx"], sorted(_undeclared_in_closure(entry, root)))
+            entry.write_text(
+                "# /// script\n# dependencies = []\n# ///\n"
+                f"try:\n    import {pkg.name}.outer\nexcept ImportError:\n    pass\n",
+                encoding="utf-8")
+            self.assertEqual({}, _undeclared_in_closure(entry, root))
 
 
 class ExtractorImportDeclarationTests(unittest.TestCase):

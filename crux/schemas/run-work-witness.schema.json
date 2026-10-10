@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "crux run-work witness (format_version 1)",
+  "description": "The record of files a run wrote and later passes as council subjects: for each, the repository-relative path and the sha256 of the bytes the run wrote, appended by the vendored witness writer (crux/scripts/run-work-witness.py) at the step that wrote them. Lives at <run_dir>/run-work-witness.json, never under council/. It is never council evidence. The council runner returns the `commit-run-work` repair for a dirty subject only when the subject's working-tree bytes equal the latest entry for its path; the conductor then commits exactly those bytes, path-limited, after re-checking them.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["record_type", "format_version", "book", "run_id", "entries"],
+  "properties": {
+    "record_type": { "const": "run-work-witness" },
+    "format_version": { "const": "1" },
+    "book": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "content_hash"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^(?:(?!(?:PB|ADR|RUN|BRIEF)-)[A-Z][A-Z0-9]{1,9}-)?PB-\\d{4}(?![\\s\\S])" },
+        "content_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])" }
+      }
+    },
+    "run_id": { "type": "string", "pattern": "^RUN-\\d{3}(?![\\s\\S])" },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "prompt", "written_at"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1, "$comment": "Repository-relative, POSIX separators." },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}(?![\\s\\S])" },
+          "prompt": { "type": "integer", "minimum": 1 },
+          "written_at": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z(?![\\s\\S])" }
+        }
+      }
+    }
+  }
+}

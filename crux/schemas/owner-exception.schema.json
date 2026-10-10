@@ -1,0 +1,225 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "crux owner exception (format_version 1)",
+  "description": "An owner's exception, of one of two kinds. A `place` exception authorizes one council place outside the round bound: a round above three, or a council at an adr module's round 3. A round in the authorized place is read as any round within the bound. A council at an adr module's round 3 that an exception authorizes closes only on convergence, because no adjudicator follows it. A `void_attempt` exception voids one open council attempt, named by its attempt record's repository path and sha256; a voided attempt takes no place, and the gate refuses it while a council record naming that attempt exists in the working tree or as a pending copy. An exception carries exactly one of `place` and `void_attempt`. Lives in the run's council directory. The gate cannot verify its authenticity: no vendored writer exists, so owner authorship is asserted, not proven.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_type",
+    "format_version",
+    "book",
+    "run_id",
+    "module_tag",
+    "prompt",
+    "owner",
+    "date",
+    "reason"
+  ],
+  "properties": {
+    "record_type": {
+      "const": "owner-exception"
+    },
+    "format_version": {
+      "const": "1"
+    },
+    "book": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "content_hash"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^(?:(?!(?:PB|ADR|RUN|BRIEF)-)[A-Z][A-Z0-9]{1,9}-)?PB-\\d{4}(?![\\s\\S])"
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
+        }
+      }
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^RUN-\\d{3}(?![\\s\\S])"
+    },
+    "module_tag": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^(adr|implementation|verify)-\\d+(?![\\s\\S])",
+      "$comment": "adr, implementation or verify module, or null for a patch. Implementation admits only the existing round-above-three exception."
+    },
+    "prompt": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "$comment": "The patch verify prompt it authorizes a place in; null for an adr or verify module."
+    },
+    "place": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "round"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "round-above-three",
+            "adr-round-3-council"
+          ]
+        },
+        "round": {
+          "type": "integer",
+          "minimum": 3
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "round-above-three"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "round": {
+                "minimum": 4
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "adr-round-3-council"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "round": {
+                "const": 3
+              }
+            }
+          }
+        }
+      ]
+    },
+    "void_attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "$comment": "The council attempt record this exception voids: its repository-relative path and the sha256 of its committed bytes.",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        }
+      }
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}(?![\\s\\S])"
+    },
+    "reason": {
+      "type": "string"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "module_tag"
+        ],
+        "properties": {
+          "module_tag": {
+            "type": "null"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "prompt": {
+            "type": "integer"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "prompt": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "$comment": "Exactly one of place and void_attempt.",
+      "if": {
+        "required": [
+          "void_attempt"
+        ]
+      },
+      "then": {
+        "properties": {
+          "place": false
+        }
+      },
+      "else": {
+        "required": [
+          "place"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "module_tag"
+        ],
+        "properties": {
+          "module_tag": {
+            "type": "string",
+            "pattern": "^implementation-\\d+(?![\\s\\S])"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "place": {
+            "properties": {
+              "kind": {
+                "const": "round-above-three"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

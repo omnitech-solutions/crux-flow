@@ -160,7 +160,7 @@ def _parse_frontmatter(text: str) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
-def _tree_name(root: Path) -> str:
+def _tree_name(root: Path, *, _source_io=None) -> str:
     """Resolve the tree directory via bionic_config, falling back to the default."""
     _PATH = Path(__file__).resolve().parent / "bionic_config.py"
     import importlib.util as _ilu
@@ -172,7 +172,8 @@ def _tree_name(root: Path) -> str:
         _m = _ilu.module_from_spec(_s)
         _s.loader.exec_module(_m)
         _sys.modules[_key] = _m
-    return _m.resolve_tree_name(root)
+    return (_m.resolve_tree_name(root) if _source_io is None
+            else _m.load_config(root, _source_io=_source_io).docs_dir)
 
 
 _valid_evidence_path = _OE.valid_evidence_path
@@ -188,7 +189,7 @@ def _parse_date(value) -> date | None:
         return None
 
 
-def _adr_id_set(root: Path, docs_dir: str) -> set[str]:
+def _adr_id_set(root: Path, docs_dir: str, *, _source_io=None) -> set[str]:
     """Every ADR id under `<docs_dir>/adrs/` and `adrs/archive/`, in BOTH §14.3
     spellings: the id as written, plus its bare `ADR-NNNN` form when the id
     carries an artifact prefix. Built ONCE per `check()` run.
@@ -201,10 +202,10 @@ def _adr_id_set(root: Path, docs_dir: str) -> set[str]:
     ids: set[str] = set()
     for sub in ("adrs", "adrs/archive"):
         d = root / docs_dir / sub
-        if not d.is_dir():
+        if not (d.is_dir() if _source_io is None else _source_io.kind(d) == "directory"):
             continue
-        for page in sorted(d.glob("*.md")):
-            fm = _parse_frontmatter(page.read_text(encoding="utf-8"))
+        for page in sorted(d.glob("*.md") if _source_io is None else _source_io.glob(d, "*.md")):
+            fm = _parse_frontmatter(page.read_text(encoding="utf-8") if _source_io is None else _source_io.read_text(page))
             if not fm or "id" not in fm:
                 continue
             fid = str(fm["id"])
@@ -237,7 +238,7 @@ def _survey_module():
     return importlib.import_module("survey_sheet")
 
 
-def _observation_log_ids(root: Path, docs_dir: str) -> set[str]:
+def _observation_log_ids(root: Path, docs_dir: str, *, _source_io=None) -> set[str]:
     """Every observation id an `observation` op entry in `log.md` names, in
     either §14.3 spelling — CHK-OBS-SURVEY-RECORD's second disjunct.
 
@@ -252,12 +253,12 @@ def _observation_log_ids(root: Path, docs_dir: str) -> set[str]:
     times over in the evidence grammar (see `observation_evidence`).
     """
     path = root / docs_dir / "log.md"
-    if not path.is_file():
+    if not (path.is_file() if _source_io is None else _source_io.kind(path) == "file"):
         return set()
     _ensure_scripts_on_path()
     import summaries_projection as _sp
     out: set[str] = set()
-    for entry in _sp._log_entries(path.read_text(encoding="utf-8")):
+    for entry in _sp._log_entries(path.read_text(encoding="utf-8") if _source_io is None else _source_io.read_text(path)):
         if entry["op"] != "observation":
             continue
         text = f"{entry['subject']}\n{entry['body']}"
@@ -267,7 +268,7 @@ def _observation_log_ids(root: Path, docs_dir: str) -> set[str]:
 
 def _survey_findings(root: Path, docs_dir: str, obs_dir: Path,
                      records: dict[str, dict], stub_days: int,
-                     today: date) -> tuple[list[str], list[str]]:
+                     today: date, *, _source_io=None) -> tuple[list[str], list[str]]:
     """The four CHK-OBS-SURVEY-* rules (§17.3), over the batch surfaces.
 
     Returns `(broken, warning)`. Runs unconditionally once the concern is
@@ -278,18 +279,19 @@ def _survey_findings(root: Path, docs_dir: str, obs_dir: Path,
     warning: list[str] = []
     ss = _survey_module()
 
-    for bid in ss.batch_ids(obs_dir):
-        paths = ss.receipt_paths(obs_dir, bid)
+    options = {} if _source_io is None else {"_source_io": _source_io}
+    for bid in ss.batch_ids(obs_dir, **options):
+        paths = ss.receipt_paths(obs_dir, bid, **options)
         receipt_path = paths["receipt"]
-        if not receipt_path.is_file():
+        if not ss._source_file(receipt_path, _source_io):
             # A batch directory with no receipt is S0 — the scaffold has run
             # and the sign-off has not. §17.5 cell 1 makes that a legitimate
             # resting state, and the holding area is frozen rather than owned
             # (`batch_ids`), so it is not this rule's finding to make.
             continue
         try:
-            state = ss.batch_state(receipt_path, obs_dir)
-            receipt = ss.read_receipt(receipt_path)
+            state = ss.batch_state(receipt_path, obs_dir, **options)
+            receipt = ss.read_receipt(receipt_path, **options)
         except (ss.SurveySheetError, ValueError) as exc:
             # Attributed to the STUB rule because the receipt is that rule's
             # subject and this is its fail-closed edge: a receipt nobody can
@@ -347,7 +349,7 @@ def _survey_findings(root: Path, docs_dir: str, obs_dir: Path,
                 if not rel:
                     continue
                 name = Path(rel).name
-                if (obs_dir / name).is_file():
+                if ss._source_file(obs_dir / name, _source_io):
                     broken.append(
                         f"CHK-OBS-SURVEY-VISIBLE: {redact(bid, quoted=False)} record {redact(name, quoted=False)} is "
                         f"visible under {docs_dir}/observations/ while the "
@@ -357,13 +359,13 @@ def _survey_findings(root: Path, docs_dir: str, obs_dir: Path,
         # it. Runs at EVERY state: a signed sheet edited after the fact is the
         # same finding whether the publish finished or not.
         sheet_path = paths["sheet"]
-        if not sheet_path.is_file():
+        if not ss._source_file(sheet_path, _source_io):
             broken.append(
                 f"CHK-OBS-SURVEY-DIGEST: {redact(bid, quoted=False)} has a receipt but no archived "
                 "sheet.yml, so the digest it records binds nothing")
             continue
         try:
-            recomputed = ss.sheet_digest(ss.read_sheet(sheet_path))
+            recomputed = ss.sheet_digest(ss.read_sheet(sheet_path, **options))
         except ss.SurveySheetError as exc:
             broken.append(
                 f"CHK-OBS-SURVEY-DIGEST: {redact(bid, quoted=False)} archived sheet.yml is "
@@ -381,12 +383,12 @@ def _survey_findings(root: Path, docs_dir: str, obs_dir: Path,
     # single-record route (§17.2) writes no receipt, so a conjunction would
     # report BROKEN on every record that route has ever written.
     try:
-        covered = ss.receipt_covered_anchors(obs_dir)
+        covered = ss.receipt_covered_anchors(obs_dir, **options)
     except ss.SurveySheetError:
         # Already reported above, per batch, with the parse error attached.
         covered = None
     if covered is not None:
-        log_ids = _observation_log_ids(root, docs_dir)
+        log_ids = _observation_log_ids(root, docs_dir, **options)
         for oid in sorted(records):
             fm = records[oid]
             if fm.get("status") != "ratified":
@@ -434,10 +436,25 @@ def _load_manifest(root: Path, docs_dir: str) -> dict:
 
 
 def check(root: Path, docs_dir: str | None = None) -> dict:
-    if docs_dir is None:
-        docs_dir = _tree_name(root)
+    _ensure_scripts_on_path()
+    import observation_admission as admission
+    root = Path(root).resolve()
+    source_io = admission._AdmissionIO(root)
+    try:
+        selected = _tree_name(root, _source_io=source_io) if docs_dir is None else docs_dir
+        layout = admission._layout_inputs(root, selected, source_io)
+        return _check(layout)
+    except (ValueError, OSError, RuntimeError) as exc:
+        raise ObservationsRefusal("admission-context-or-source-refused") from exc
+    finally:
+        source_io.close()
 
-    manifest = _load_manifest(root, docs_dir)
+
+def _check(layout) -> dict:
+    import observation_admission as admission
+    root, source_io = layout["root"], layout["source_io"]
+    docs_dir = layout["tree"].relative_to(root).as_posix()
+    manifest = layout["manifest"]
     concerns = manifest.get("concerns_enabled") or []
 
     if "observations" not in concerns:
@@ -454,10 +471,10 @@ def check(root: Path, docs_dir: str | None = None) -> dict:
     _ensure_scripts_on_path()
     import summaries_projection as _sp
     try:
-        obs_dir = _sp.observations_root(root / docs_dir)
+        obs_dir = layout["observations"]
     except ValueError as exc:
         raise ObservationsRefusal(str(exc)) from exc
-    if not obs_dir.is_dir():
+    if source_io.kind(obs_dir) != "directory":
         return {"broken": [], "warning": [], "survey_debt": 0, "records": 0,
                 "concern_enabled": True, "note": "observations directory absent"}
 
@@ -481,12 +498,15 @@ def check(root: Path, docs_dir: str | None = None) -> dict:
     records: dict[str, dict] = {}
     seen_ids: dict[str, str] = {}
 
-    for page in sorted(obs_dir.glob("*.md")):
+    for page in sorted(source_io.glob(obs_dir, "*.md")):
         if page.name == "index.md":
             continue
-        fm = _parse_frontmatter(page.read_text(encoding="utf-8"))
+        fm = _parse_frontmatter(source_io.read_text(page))
         if not fm or "id" not in fm:
             broken.append(f"CHK-OBS-BIJECTION: {redact(page.name, quoted=False)} has no parseable record id")
+            continue
+        if "record_type" in fm:
+            broken.append("CHK-OBS-BIJECTION: implementation payload cannot supply an observation record")
             continue
         oid = str(fm["id"])
         if oid in seen_ids:
@@ -508,8 +528,8 @@ def check(root: Path, docs_dir: str | None = None) -> dict:
     # nothing to scan, and the reverse direction stays silent rather than
     # emitting one finding per record for a tree that has no index yet.
     index_path = obs_dir / "index.md"
-    if index_path.is_file():
-        idx_text = index_path.read_text(encoding="utf-8")
+    if source_io.kind(index_path) == "file":
+        idx_text = source_io.read_text(index_path)
         index_refs = _index_record_ids(idx_text)
         for ref in sorted(index_refs):
             if ref not in records:
@@ -542,6 +562,14 @@ def check(root: Path, docs_dir: str | None = None) -> dict:
 
     adr_ids: set[str] | None = None
     observed_count = 0
+    admission_context = None
+    if any(fm.get("status") == "ratified" for fm in records.values()):
+        import observation_admission as admission
+        try:
+            admission_context = admission._complete_context(layout)
+        except (ValueError, OSError, RuntimeError):
+            broken.append("CHK-OBS-EVIDENCE: admission-context-or-source-refused")
+
     for oid, fm in records.items():
         status = fm.get("status")
         evidence = fm.get("evidence")
@@ -573,8 +601,23 @@ def check(root: Path, docs_dir: str | None = None) -> dict:
                     path, _start, _end = parsed
                     # Containment on the RESOLVED path: `is_file()` alone
                     # follows a symlink straight out of the repository.
-                    if not _OE.evidence_path_resolves(root, path):
+                    if not admission._evidence_path_resolves(root, path, source_io):
                         broken.append(f"CHK-OBS-EVIDENCE: {redact(oid, quoted=False)} ratified evidence path {redact(path)} does not resolve inside the repo root")
+            if status == "ratified" and admission_context is not None:
+                try:
+                    admission_problems = admission._source_problems(admission_context, evidence)
+                    page = obs_dir / seen_ids[oid]
+                    admission._own_handle(admission_context, page, None)
+                    for entry in _sp.governs_entries(fm):
+                        slug = _sp.slug_of(entry["handle"])
+                        admission_problems += admission._slug_problems(admission_context["reservations"], slug,
+                            own_handle=admission._own_handle(admission_context, page, slug),
+                            removed=admission_context["removed"])
+                    broken.extend(f"CHK-OBS-EVIDENCE: {redact(oid, quoted=False)} {problem}"
+                                  for problem in admission_problems if problem not in {
+                                  "admission-evidence-grammar-refused", "admission-evidence-containment-refused"})
+                except (ValueError, OSError, RuntimeError):
+                    broken.append("CHK-OBS-EVIDENCE: admission-context-or-source-refused")
 
         # CHK-OBS-DECIDED
         decided_by = fm.get("decided_by")
@@ -583,7 +626,7 @@ def check(root: Path, docs_dir: str | None = None) -> dict:
                 broken.append(f"CHK-OBS-DECIDED: {redact(oid, quoted=False)} is decided but decided_by is null")
             else:
                 if adr_ids is None:
-                    adr_ids = _adr_id_set(root, docs_dir)
+                    adr_ids = _adr_id_set(root, docs_dir, _source_io=source_io)
                 if str(decided_by) not in adr_ids:
                     broken.append(f"CHK-OBS-DECIDED: {redact(oid, quoted=False)} names decided_by {redact(decided_by)} which does not exist")
         elif decided_by:
@@ -600,7 +643,7 @@ def check(root: Path, docs_dir: str | None = None) -> dict:
     # ratified records. Last, so `records` is the validated map the id/status
     # checks above already built rather than a second walk of the directory.
     s_broken, s_warning = _survey_findings(
-        root, docs_dir, obs_dir, records, survey_stub_days, date.today())
+        root, docs_dir, obs_dir, records, survey_stub_days, date.today(), _source_io=source_io)
     broken.extend(s_broken)
     warning.extend(s_warning)
 

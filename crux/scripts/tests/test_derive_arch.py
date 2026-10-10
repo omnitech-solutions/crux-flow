@@ -10,6 +10,7 @@ import shutil
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1]      # crux/scripts
 REPO = SCRIPTS.parents[1]                            # repo root
@@ -87,11 +88,22 @@ except ImportError:  # pragma: no cover
 # '.../.crux-arch-scratch'`. Ignoring the names means copytree never descends and
 # the window closes. Both directories are gitignored scratch and never a derive
 # input.
-_SCRATCH_IGNORE = shutil.ignore_patterns(
+_SCRATCH_IGNORE_PATTERNS = shutil.ignore_patterns(
     ".git", "__pycache__", "*.pyc", "node_modules",
     ".venv", ".cache", "logs", ".pytest_cache", ".ruff_cache",
     ".crux-arch-scratch", ".crux-selftest-scratch",
 )
+
+
+def _scratch_ignore(directory: str, names: list[str]) -> set[str]:
+    ignored = _SCRATCH_IGNORE_PATTERNS(directory, names)
+    # Other checkouts are isolation state. Keep similarly named project fixtures.
+    if Path(directory).resolve() == (REPO / ".claude").resolve():
+        ignored.update({"worktrees"}.intersection(names))
+    return ignored
+
+
+_SCRATCH_IGNORE = _scratch_ignore
 
 
 class ScratchNameEnrollmentTests(unittest.TestCase):
@@ -129,6 +141,35 @@ class ScratchNameEnrollmentTests(unittest.TestCase):
             with self.subTest(kept=kept):
                 self.assertNotIn(kept, ignored)
 
+    def test_worktree_exclusion_names_only_this_checkout_harness_directory(self):
+        names = ["worktrees", "skills", "source.py"]
+        self.assertEqual(_SCRATCH_IGNORE(str(REPO / ".claude"), names), {"worktrees"})
+        for directory in (REPO, REPO / "crux", REPO / ".claude" / "skills",
+                          REPO / "fixtures" / ".claude"):
+            with self.subTest(directory=directory):
+                self.assertNotIn("worktrees", _SCRATCH_IGNORE(str(directory), names))
+
+    def test_copy_keeps_source_docs_skills_and_nonmatching_worktrees(self):
+        root = Path(self.enterContext(_tmpdir()))
+        fixture = root / "source"
+        keep = {".claude/skills/check/SKILL.md": b"skill context\n",
+                "crux/source.py": b"VALUE = 1\n", "bionic/record.md": b"decision context\n",
+                "fixtures/.claude/worktrees/example.txt": b"project fixture\n",
+                "crux/worktrees/example.txt": b"project source\n"}
+        omit = ".claude/worktrees/other-checkout/payload.txt"
+        for relative, content in {**keep, omit: b"unrelated checkout\n"}.items():
+            path = fixture / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+        destination = root / "copy"
+        with patch(__name__ + ".REPO", fixture):
+            _copy_repo(destination)
+        self.assertFalse((destination / omit).exists())
+        actual = {p.relative_to(destination).as_posix(): p.read_bytes()
+                  for p in destination.rglob("*") if p.is_file()}
+        self.assertEqual(actual, keep)
+        self.assertEqual(sum(map(len, actual.values())), sum(map(len, keep.values())))
+
     def test_gitignore_carries_both_names(self):
         gitignore = REPO / ".gitignore"
         if IS_STAGED_ARTIFACT:
@@ -157,14 +198,46 @@ class ScratchNameEnrollmentTests(unittest.TestCase):
         self.assertNotIn("bionic/.seed-control", text)
 
 
-def _copy_repo(scratch: Path) -> None:
+def _copy_repo(scratch: Path, *, into_existing: bool = False) -> None:
     """Copy the repo to *scratch* for a write-path test.
 
     `symlinks=True` copies links as links. The default follows them, which for a
     venv means reading files outside the repo — a scratch copy of this repo
     should not reach past the repo.
     """
-    shutil.copytree(REPO, scratch, ignore=_SCRATCH_IGNORE, symlinks=True)
+    shutil.copytree(REPO, scratch, ignore=_SCRATCH_IGNORE, symlinks=True,
+                    dirs_exist_ok=into_existing)
+
+
+def _committed_copy_repo(scratch: Path) -> None:
+    """Retain all copied inputs in an isolated repository for authority readers.
+
+    A tree that has published an implementation migration proves it from Git
+    history: the publication commit and the approval chain behind it. A fresh
+    `git init` holds none of that history, so the derive refuses with
+    `approval-evidence-invalid`, and it is right to. Where this checkout has its
+    own history, the copy therefore starts as a `--shared --no-checkout` clone
+    of it, and the live working-tree bytes are copied on top and committed. The
+    commit records the live tree exactly, uncommitted edits and deletions
+    included, as a descendant of the real HEAD. The staged release artifact has
+    no `.git`, and it carries no documentation tree to publish from, so there it
+    keeps the fresh repository.
+    """
+    import _council_gate_support as support
+    if (REPO / ".git").exists():
+        scratch.parent.mkdir(parents=True, exist_ok=True)
+        support.git(scratch.parent, "clone", "-q", "--shared", "--no-checkout",
+                    str(REPO), str(scratch))
+        _copy_repo(scratch, into_existing=True)
+    else:
+        _copy_repo(scratch)
+        support.init_repo(scratch)
+    support.git(scratch, "config", "gc.auto", "0")
+    support.git(scratch, "config", "maintenance.auto", "false")
+    support.git(scratch, "add", "-A")
+    # A clean live tree can equal HEAD's tree; the baseline commit still lands.
+    support.git(scratch, "commit", "-q", "--allow-empty", "-m",
+                "synthetic copied source baseline")
 
 
 # ADR-0078 clause 3, postcondition — "the arch tests pass against the distributed
@@ -230,8 +303,11 @@ def _populated_fixture(root: Path, *, with_adrs: bool = True) -> Path:
 
 
 class ArchDeriveTests(unittest.TestCase):
-    def setUp(self):
-        self.tree = D._build(REPO, "bionic")
+    @classmethod
+    def setUpClass(cls):
+        # These assertions only read the rendered strings. Mutation tests build
+        # their own temporary repositories; determinism still rebuilds explicitly.
+        cls.tree = D._build(REPO, "bionic")
 
     # ADR-0066 point 7 — the crux pack wraps the existing extractors UNCHANGED:
     # resolving each spine concern through the seam is byte-identical to calling
@@ -357,7 +433,7 @@ class ArchDeriveTests(unittest.TestCase):
     # derive is byte-identical (fixed point on the tree's own output).
     def test_ac2_ac8_write_then_clean_and_fixed_point(self):
         scratch = Path(self.enterContext(_tmpdir())) / "repo"
-        _copy_repo(scratch)
+        _committed_copy_repo(scratch)
         D.derive(scratch, "bionic")
         self.assertEqual(D.dry_run(scratch, "bionic"), [], "dry_run dirty after derive")
         before = _tree_hash(scratch / "bionic" / "arch")
@@ -367,7 +443,7 @@ class ArchDeriveTests(unittest.TestCase):
     # AC-3 — tampering a spine file makes dry_run report drift (the gate fires).
     def test_ac3_gate_fires_on_tamper(self):
         scratch = Path(self.enterContext(_tmpdir())) / "repo"
-        _copy_repo(scratch)
+        _populated_fixture(scratch)
         D.derive(scratch, "bionic")
         tampered = scratch / "bionic" / "arch" / "data-model.md"
         tampered.write_text(tampered.read_text() + "\n<!-- tamper -->\n")
@@ -389,15 +465,6 @@ class ArchDeriveTests(unittest.TestCase):
             # this stack" is reserved for an unsupported stack, and an ADR-less tree
             # under a registered pack is `precondition_missing`.
             self.assertIn("_stub: precondition_missing", di)
-
-    # Fix B (PB-0069) — coverage.json determinism: a second build with no source
-    # change is byte-identical (parallels test_ac2_deterministic_rebuild).
-    def test_coverage_deterministic_rebuild(self):
-        again = D._build(REPO, "bionic")
-        self.assertEqual(
-            self.tree["_meta/coverage.json"], again["_meta/coverage.json"],
-            "second build's coverage.json differs — non-deterministic",
-        )
 
     # Fix B (PB-0069) — no timestamps anywhere in coverage.json (parallels
     # test_ac4_manifest_has_no_timestamp).
@@ -524,7 +591,7 @@ class ArchDeriveTests(unittest.TestCase):
     # test_ac3_gate_fires_on_tamper).
     def test_coverage_drift_gate_fires_on_tamper(self):
         scratch = Path(self.enterContext(_tmpdir())) / "repo"
-        _copy_repo(scratch)
+        _populated_fixture(scratch)
         D.derive(scratch, "bionic")
         self.assertEqual(D.dry_run(scratch, "bionic"), [], "dry_run dirty right after derive")
         coverage = scratch / "bionic" / "arch" / "_meta" / "coverage.json"
@@ -603,9 +670,13 @@ class ArchDriftTriggerTests(unittest.TestCase):
     """
 
     def _derived_repo(self) -> Path:
-        """A scratch copy of this repo with a freshly derived, clean arch tree."""
+        """A populated fixture with a freshly derived, clean arch tree.
+
+        These tests exercise the drift comparison, not this checkout's history.
+        The write-path integration tests above still derive a committed copy.
+        """
         scratch = Path(self.enterContext(_tmpdir())) / "repo"
-        _copy_repo(scratch)
+        _populated_fixture(scratch)
         D.derive(scratch, "bionic")
         self.assertEqual(D.dry_run(scratch, "bionic"), [], "dry_run dirty right after derive")
         return scratch
@@ -633,7 +704,7 @@ class ArchDriftTriggerTests(unittest.TestCase):
         import json
         scratch = self._derived_repo()
         before = json.loads(self._manifest_path(scratch).read_text(encoding="utf-8"))
-        src = scratch / "crux" / "scripts" / "crux" / "core" / "data_classes.py"
+        src = scratch / "crux" / "scripts" / "crux" / "core" / "thing.py"
         src.write_text(src.read_text(encoding="utf-8")
                        + "\n# drift-gate fixture: semantically inert comment\n",
                        encoding="utf-8")

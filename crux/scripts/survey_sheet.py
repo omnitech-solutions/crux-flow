@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import stat
 import sys
 import unicodedata
 from pathlib import Path
@@ -377,7 +378,7 @@ def _str_cell(row, key, label, problems):
 
 # ── the one configuration this lane does not support ────────────────────────
 
-def assert_unprefixed_tree(root: Path) -> None:
+def assert_unprefixed_tree(root: Path, *, _source_io=None) -> None:
     """Refuse a tree running a non-empty §14.3 `artifact_prefix`.
 
     §17.1 permits an observation id to carry the prefix, and two readers of the
@@ -411,7 +412,8 @@ def assert_unprefixed_tree(root: Path) -> None:
     version is that `bionic_config.load_config` requires a `config_version`
     this lane never has.
     """
-    prefix = _sp.artifact_prefix(root)
+    prefix = (_sp.artifact_prefix(root) if _source_io is None
+              else _sp.artifact_prefix(root, _source_io=_source_io))
     if prefix:
         raise EnvironmentError(
             f"this tree runs artifact_prefix {redact(prefix)}, and the survey batch "
@@ -450,7 +452,7 @@ def seed_cells(cand: dict) -> dict:
             "evidence": ", ".join(cell_canon(e) for e in entries)}
 
 
-def tree_identity(root: Path, tree: Path) -> dict:
+def tree_identity(root: Path, tree: Path, *, _source_io=None) -> dict:
     """`{"tree": ..., "tree_id": ...}` — the identity of the tree a batch was
     scaffolded into, recorded in the sheet's provenance and therefore inside
     the digest and on the receipt.
@@ -477,7 +479,8 @@ def tree_identity(root: Path, tree: Path) -> dict:
     resume."""
     root = Path(root)
     try:
-        rel = Path(tree).resolve().relative_to(root.resolve()).as_posix()
+        rel = (Path(tree).resolve().relative_to(root.resolve()).as_posix() if _source_io is None
+               else _source_io.resolve(tree).relative_to(_source_io.root).as_posix())
     except ValueError:                    # not under the root; name it anyway
         rel = Path(tree).name
     h = hashlib.sha256()
@@ -487,12 +490,13 @@ def tree_identity(root: Path, tree: Path) -> dict:
         h.update(b"\0")
         h.update(name.encode("utf-8"))
         h.update(b"\0")
-        h.update(cfg.read_bytes() if cfg.is_file() else b"")
+        h.update((cfg.read_bytes() if cfg.is_file() else b"") if _source_io is None
+                 else (_source_io.read_bytes(cfg) if _source_io.kind(cfg) == "file" else b""))
     return {"tree": rel, "tree_id": h.hexdigest()}
 
 
 def assert_tree_identity(provenance: dict, root: Path, tree: Path, *,
-                         subject: str) -> None:
+                         subject: str, _source_io=None) -> None:
     """Refuse a batch whose provenance names another tree.
 
     A v1 provenance carries neither key and is skipped — a v1 sheet cannot be
@@ -502,7 +506,8 @@ def assert_tree_identity(provenance: dict, root: Path, tree: Path, *,
     prov = provenance or {}
     if prov.get("tree") is None and prov.get("tree_id") is None:
         return
-    want = tree_identity(root, tree)
+    want = (tree_identity(root, tree) if _source_io is None
+            else tree_identity(root, tree, _source_io=_source_io))
     if (str(prov.get("tree")), str(prov.get("tree_id"))) == (want["tree"],
                                                              want["tree_id"]):
         return
@@ -550,7 +555,7 @@ def assert_signable(sheet: dict) -> None:
 
 # ── paths ───────────────────────────────────────────────────────────────────
 
-def receipt_paths(obs_dir: Path, batch_id: str) -> dict:
+def receipt_paths(obs_dir: Path, batch_id: str, *, _source_io=None) -> dict:
     """The five paths one batch owns, derived from the observations directory
     and the batch id alone — the one place the `_surveys/` layout is spelled.
 
@@ -575,7 +580,9 @@ def receipt_paths(obs_dir: Path, batch_id: str) -> dict:
     obs_dir = Path(obs_dir)
     base = obs_dir / SURVEYS_DIRNAME / batch_id
     for rel in (SURVEYS_DIRNAME, f"{SURVEYS_DIRNAME}/{batch_id}"):
-        if _oe.resolve_contained(obs_dir, rel) is None:
+        resolved = (_oe.resolve_contained(obs_dir, rel) if _source_io is None
+                    else _oe.resolve_contained(obs_dir, rel, _source_io=_source_io))
+        if resolved is None:
             raise SurveySheetError([
                 f"refusing to use the survey holding area "
                 f"{redact(rel, quoted=False)} under "
@@ -592,44 +599,53 @@ def receipt_paths(obs_dir: Path, batch_id: str) -> dict:
     }
 
 
-def batch_ids(obs_dir: Path) -> list[str]:
+def batch_ids(obs_dir: Path, *, _source_io=None) -> list[str]:
     """Every batch id with a directory under `_surveys/`, sorted. A directory
     whose name is not a batch id is ignored rather than refused — the holding
     area is frozen, not owned, and an unrelated directory there is not this
     module's finding to make."""
     base = Path(obs_dir) / SURVEYS_DIRNAME
-    if not base.is_dir():
+    if (base.is_dir() if _source_io is None else _source_io.kind(base) == "directory") is False:
         return []
-    return sorted(p.name for p in base.iterdir()
-                  if p.is_dir() and BATCH_ID_RE.match(p.name))
+    paths = base.iterdir() if _source_io is None else _source_io.glob(base, "*")
+    return sorted(p.name for p in paths if BATCH_ID_RE.match(p.name)
+                  and (p.is_dir() if _source_io is None else _source_io.kind(p) == "directory"))
 
 
 # ── the sheet ───────────────────────────────────────────────────────────────
 
-def _load_yaml_doc(path: Path, label: str) -> dict:
+def _load_yaml_doc(path: Path, label: str, *, _source_io=None) -> dict:
     """Read one strict-minimal-YAML document (§7.A).
 
     `load_catalog_yaml` is the loader ADR-0098 clause 4 names: it already
     refuses anchors, aliases, merge keys, explicit tags, a second document and
     a duplicate key at any level — the exact refusal set a signed artifact
     needs, and one this module must not reimplement."""
-    if not path.is_file():
+    if _source_io is None:
+        present = path.is_file()
+        linked = path.is_symlink() if present else False
+    else:
+        metadata = _source_io.metadata(path)
+        linked = metadata is not None and stat.S_ISLNK(metadata["st_mode"])
+        present = linked or (metadata is not None and stat.S_ISREG(metadata["st_mode"]))
+    if not present:
         raise SurveySheetError(
             [f"{label} {redact(path, quoted=False)} does not exist"])
-    if path.is_symlink():
+    if linked:
         raise SurveySheetError([
             f"refusing to read {label} {redact(path, quoted=False)}: it is a "
             "symlink — a signed "
             "artifact is read from the tree, never through a link out of it"])
     try:
-        return load_catalog_yaml(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8") if _source_io is None else _source_io.read_text(path)
+        return load_catalog_yaml(text)
     except CatalogYamlError as exc:
         raise SurveySheetError([
             f"{label} {redact(path, quoted=False)} is not readable: "
             f"{redact(exc, quoted=False)}"]) from exc
 
 
-def read_sheet(path: Path) -> dict:
+def read_sheet(path: Path, *, _source_io=None) -> dict:
     """Read and validate a review sheet. Raises `SurveySheetError`.
 
     Validates SHAPE only — the cells a machine wrote and the cells a human may
@@ -638,7 +654,8 @@ def read_sheet(path: Path) -> dict:
     validation is `signed_rows`, which the sign-off runs and the scaffold does
     not."""
     path = Path(path)
-    doc = _load_yaml_doc(path, "review sheet")
+    doc = (_load_yaml_doc(path, "review sheet") if _source_io is None
+           else _load_yaml_doc(path, "review sheet", _source_io=_source_io))
     problems = _keyset_problems(doc, SHEET_KEYS, "the review sheet")
     _refuse(problems)
 
@@ -1102,10 +1119,11 @@ def validate_receipt(doc, subject: str = "batch receipt", *,
     _refuse(problems)
 
 
-def read_receipt(path: Path) -> dict:
+def read_receipt(path: Path, *, _source_io=None) -> dict:
     """Read one receipt off disk and validate it. Raises `SurveySheetError`."""
     path = Path(path)
-    doc = _load_yaml_doc(path, "batch receipt")
+    doc = (_load_yaml_doc(path, "batch receipt") if _source_io is None
+           else _load_yaml_doc(path, "batch receipt", _source_io=_source_io))
     validate_receipt(doc, concern_dir=_concern_dir_of(path))
     return doc
 
@@ -1232,7 +1250,7 @@ def read_counter(manifest: dict, block: str, key: str, default: int) -> int:
 
 
 def write_counter(path: Path, block: str, key: str, value: int, *,
-                  contained_under: Path) -> None:
+                  contained_under: Path, _source_io=None) -> None:
     """Set `<block>.<key>` to `value` in `manifest.yml`, textually.
 
     Line-oriented on purpose, on `signoff-backfill._write_ledger_and_marker`'s
@@ -1243,7 +1261,7 @@ def write_counter(path: Path, block: str, key: str, value: int, *,
     end), and the block is absent (append the block).
     """
     path = Path(path)
-    lines = path.read_text(encoding="utf-8").splitlines()
+    lines = _source_text(path, _source_io).splitlines()
     start = next((i for i, line in enumerate(lines)
                   if line.rstrip() == f"{block}:"), None)
     if start is None:
@@ -1358,20 +1376,21 @@ def new_receipt(sheet: dict, rows: list[dict], *, signed: str,
 
 # ── disposition, across every batch the tree has signed ─────────────────────
 
-def _disposed(obs_dir: Path, key: str) -> dict:
+def _disposed(obs_dir: Path, key: str, *, _source_io=None) -> dict:
     out: dict[str, str] = {}
     obs_dir = Path(obs_dir)
-    for bid in batch_ids(obs_dir):
-        receipt_path = receipt_paths(obs_dir, bid)["receipt"]
-        if not receipt_path.is_file():
+    options = {} if _source_io is None else {"_source_io": _source_io}
+    for bid in batch_ids(obs_dir, **options):
+        receipt_path = receipt_paths(obs_dir, bid, **options)["receipt"]
+        if not _source_file(receipt_path, _source_io):
             continue
-        for row in read_receipt(receipt_path)["rows"]:
+        for row in read_receipt(receipt_path, **options)["rows"]:
             if row["verdict"] in DISPOSING_VERDICTS:
                 out[str(row[key] or row["anchor_id"])] = bid
     return out
 
 
-def disposed_candidates(obs_dir: Path) -> dict:
+def disposed_candidates(obs_dir: Path, *, _source_io=None) -> dict:
     """`{candidate key: batch_id}` for every CANDIDATE a receipt has disposed.
 
     `ratify` and `reject` dispose; `defer` does not, which is the whole of
@@ -1389,10 +1408,11 @@ def disposed_candidates(obs_dir: Path) -> dict:
     guards that matter still hold: `build_plan` refuses a second LIVE record on
     one anchor, and one anchor may still appear in a batch at most once.
     """
-    return _disposed(obs_dir, "candidate_id")
+    return (_disposed(obs_dir, "candidate_id") if _source_io is None
+            else _disposed(obs_dir, "candidate_id", _source_io=_source_io))
 
 
-def record_paths(obs_dir: Path) -> dict:
+def record_paths(obs_dir: Path, *, _source_io=None) -> dict:
     """`{record id: path}` over every `OBS-*.md` under the concern.
 
     `read_recorded_observations` keys on `anchor_id` and never returns the
@@ -1401,9 +1421,9 @@ def record_paths(obs_dir: Path) -> dict:
     depend on. Reads only the id line's frontmatter, on that reader's shape."""
     out: dict[str, Path] = {}
     d = Path(obs_dir)
-    if not d.is_dir():
+    if not (d.is_dir() if _source_io is None else _source_io.kind(d) == "directory"):
         return out
-    for path in sorted(d.glob("OBS-*.md")):
+    for path in sorted(d.glob("OBS-*.md") if _source_io is None else _source_io.glob(d, "OBS-*.md")):
         # [SECURITY:S5] `glob` returns a symlink and `read_text` follows it, so
         # a link planted in the concern directory put a file from OUTSIDE the
         # repository into this map — and `build_plan` turns a map entry into
@@ -1412,13 +1432,14 @@ def record_paths(obs_dir: Path) -> dict:
         # sees it, because it guards a write target, which is contained by
         # construction. `resolve_contained` is the shared remedy, and its own
         # docstring names this case.
-        if _oe.resolve_contained(d, path.name) is None:
+        options = {} if _source_io is None else {"_source_io": _source_io}
+        if _oe.resolve_contained(d, path.name, **options) is None:
             raise SurveySheetError([
                 f"refusing to read {redact(path.name, quoted=False)}: it "
                 f"does not resolve to a file inside {redact(d, quoted=False)} "
                 "— an observation record is read from the concern "
                 "directory, never through a link out of it"])
-        m = re.match(r"^---\n(.*?)\n---\n", path.read_text(encoding="utf-8"),
+        m = re.match(r"^---\n(.*?)\n---\n", _source_text(path, _source_io),
                      re.DOTALL)
         if not m:
             continue
@@ -1437,7 +1458,7 @@ def record_paths(obs_dir: Path) -> dict:
     return out
 
 
-def unfinished_batch_anchors(obs_dir: Path) -> dict:
+def unfinished_batch_anchors(obs_dir: Path, *, _source_io=None) -> dict:
     """`{anchor_id: batch_id}` for every anchor a batch BELOW S9 has bound.
 
     The scaffold's "one live sheet at a time" refusal is the interlock that
@@ -1459,43 +1480,53 @@ def unfinished_batch_anchors(obs_dir: Path) -> dict:
     hold."""
     out: dict[str, str] = {}
     obs_dir = Path(obs_dir)
-    for bid in batch_ids(obs_dir):
-        receipt_path = receipt_paths(obs_dir, bid)["receipt"]
-        if not receipt_path.is_file():
+    options = {} if _source_io is None else {"_source_io": _source_io}
+    for bid in batch_ids(obs_dir, **options):
+        receipt_path = receipt_paths(obs_dir, bid, **options)["receipt"]
+        if not _source_file(receipt_path, _source_io):
             continue
-        if batch_state(receipt_path, obs_dir) == "S9":
+        if batch_state(receipt_path, obs_dir, **options) == "S9":
             continue
-        for row in read_receipt(receipt_path)["rows"]:
+        for row in read_receipt(receipt_path, **options)["rows"]:
             out.setdefault(str(row["anchor_id"]), bid)
     return out
 
 
-def receipt_covered_anchors(obs_dir: Path) -> set[str]:
+def receipt_covered_anchors(obs_dir: Path, *, _source_io=None) -> set[str]:
     """Every anchor any receipt names, whatever the verdict — the set
     CHK-OBS-SURVEY-RECORD's first disjunct tests membership in."""
     covered: set[str] = set()
     obs_dir = Path(obs_dir)
-    for bid in batch_ids(obs_dir):
-        receipt_path = receipt_paths(obs_dir, bid)["receipt"]
-        if not receipt_path.is_file():
+    options = {} if _source_io is None else {"_source_io": _source_io}
+    for bid in batch_ids(obs_dir, **options):
+        receipt_path = receipt_paths(obs_dir, bid, **options)["receipt"]
+        if not _source_file(receipt_path, _source_io):
             continue
-        for row in read_receipt(receipt_path)["rows"]:
+        for row in read_receipt(receipt_path, **options)["rows"]:
             covered.add(str(row["anchor_id"]))
     return covered
 
 
 # ── the state derivation (§17.5's state table) ──────────────────────────────
 
-def _log_has_batch(tree_dir: Path, batch_id: str) -> bool:
+def _source_file(path, source_io):
+    return path.is_file() if source_io is None else source_io.kind(path) == "file"
+
+
+def _source_text(path, source_io):
+    return path.read_text(encoding="utf-8") if source_io is None else source_io.read_text(path)
+
+
+def _log_has_batch(tree_dir: Path, batch_id: str, *, _source_io=None) -> bool:
     log_path = Path(tree_dir) / "log.md"
-    if not log_path.is_file():
+    if not _source_file(log_path, _source_io):
         return False
     subject = f"survey batch {batch_id}"
     return any(e["op"] == "observation" and e["subject"] == subject
-               for e in _sp._log_entries(log_path.read_text(encoding="utf-8")))
+               for e in _sp._log_entries(_source_text(log_path, _source_io)))
 
 
-def _journal_has_batch(tree_dir: Path, batch_id: str, signed: str) -> bool:
+def _journal_has_batch(tree_dir: Path, batch_id: str, signed: str, *, _source_io=None) -> bool:
     """Whether the journal carries this batch's review hook.
 
     The month file is keyed on the receipt's OWN `signed` date, never on today.
@@ -1504,14 +1535,14 @@ def _journal_has_batch(tree_dir: Path, batch_id: str, signed: str) -> bool:
     nothing, and re-write a duplicate hook on every later day.
     `signoff-survey.write_journal_hook` writes to the same key."""
     path = Path(tree_dir) / "journal" / f"{str(signed)[:7]}.md"
-    if not path.is_file():
+    if not _source_file(path, _source_io):
         return False
     subject = f"survey sign-off {batch_id}"
     return any(e["category"] == "review" and e["subject"] == subject
-               for e in _sp._journal_entries(path.read_text(encoding="utf-8")))
+               for e in _sp._journal_entries(_source_text(path, _source_io)))
 
 
-def _state_file_disposed(tree_dir: Path, receipt: dict) -> bool:
+def _state_file_disposed(tree_dir: Path, receipt: dict, *, _source_io=None) -> bool:
     """Whether every disposing row's candidate carries its disposed state.
 
     An ABSENT state file is disposed by definition — there is nothing left to
@@ -1528,9 +1559,10 @@ def _state_file_disposed(tree_dir: Path, receipt: dict) -> bool:
     and the writer agree about which row a verdict owns."""
     from crux.arch.recover import StateFile
     path = Path(tree_dir).joinpath(*STATE_FILE_REL)
-    if not path.is_file():
+    if not _source_file(path, _source_io):
         return True
-    rows = StateFile(path).rows
+    rows = (StateFile(path).rows if _source_io is None
+            else StateFile(path, _source_io=_source_io).rows)
     wanted = {"ratify": "ratified", "reject": "rejected"}
     for row in receipt["rows"]:
         want = wanted.get(row["verdict"])
@@ -1555,7 +1587,7 @@ def planned_record_names(receipt: dict) -> list[str]:
     return sorted(names)
 
 
-def batch_state(receipt_path: Path, obs_dir: Path) -> str:
+def batch_state(receipt_path: Path, obs_dir: Path, *, _source_io=None) -> str:
     """The §17.5 state this batch is in, derived from disk on every call.
 
     This is the one derivation. The sign-off's resume, the CHK-OBS-SURVEY-*
@@ -1568,12 +1600,19 @@ def batch_state(receipt_path: Path, obs_dir: Path) -> str:
     """
     receipt_path = Path(receipt_path)
     obs_dir = Path(obs_dir)
-    if not receipt_path.is_file():
+    if _source_io is not None:
+        metadata = _source_io.metadata(receipt_path)
+        present = metadata is not None and (stat.S_ISREG(metadata["st_mode"]) or stat.S_ISLNK(metadata["st_mode"]))
+    else:
+        present = receipt_path.is_file()
+    if not present:
         return "S0"
-    receipt = read_receipt(receipt_path)
+    receipt = (read_receipt(receipt_path) if _source_io is None
+               else read_receipt(receipt_path, _source_io=_source_io))
     tree_dir = obs_dir.parent
     batch_id = receipt["batch_id"]
-    staged = receipt_paths(obs_dir, batch_id)["staged"]
+    staged = (receipt_paths(obs_dir, batch_id) if _source_io is None
+              else receipt_paths(obs_dir, batch_id, _source_io=_source_io))["staged"]
 
     ratify_rows = [r for r in receipt["rows"] if r["verdict"] == "ratify"]
     # No `bool(ratify_rows)` conjunct: ADR-0098 clause 1 admits an all-`reject`
@@ -1587,22 +1626,29 @@ def batch_state(receipt_path: Path, obs_dir: Path) -> str:
     if receipt.get("completed") is None:
         if not ids_allocated:
             return "S1"
-        staged_ok = (staged.is_dir()
-                     and all((staged / name).is_file() for name in planned)
-                     and (staged / "index.md").is_file())
+        staged_ok = ((staged.is_dir() if _source_io is None else _source_io.kind(staged) == "directory")
+                     and all(_source_file(staged / name, _source_io) for name in planned)
+                     and _source_file(staged / "index.md", _source_io))
         return "S3" if staged_ok else "S2"
 
     # Past the commit point. Visibility is what separates S4 from S5.
-    promoted = all((obs_dir / name).is_file() for name in planned)
+    promoted = all(_source_file(obs_dir / name, _source_io) for name in planned)
     if not promoted:
         return "S4"
-    if staged.exists():
+    staging_present = staged.exists() if _source_io is None else _source_io.kind(staged) is not None
+    if staging_present:
         return "S5"
-    if not _log_has_batch(tree_dir, batch_id):
+    log_present = (_log_has_batch(tree_dir, batch_id) if _source_io is None
+                   else _log_has_batch(tree_dir, batch_id, _source_io=_source_io))
+    if not log_present:
         return "S6"
-    if not _journal_has_batch(tree_dir, batch_id, receipt["signed"]):
+    journal_present = (_journal_has_batch(tree_dir, batch_id, receipt["signed"]) if _source_io is None
+                       else _journal_has_batch(tree_dir, batch_id, receipt["signed"], _source_io=_source_io))
+    if not journal_present:
         return "S7"
-    if not _state_file_disposed(tree_dir, receipt):
+    disposed = (_state_file_disposed(tree_dir, receipt) if _source_io is None
+                else _state_file_disposed(tree_dir, receipt, _source_io=_source_io))
+    if not disposed:
         return "S8"
     return "S9"
 
@@ -1672,7 +1718,8 @@ def build_plan(sheet: dict, candidates: dict, recorded: dict, *,
                own_record_ids: dict | None = None,
                bound_candidates: dict | None = None,
                live_slugs: dict | None = None,
-               retired_slugs: dict | None = None) -> list[dict]:
+               retired_slugs: dict | None = None,
+               _admission_context: dict | None = None) -> list[dict]:
     """Validate one batch end-to-end and return its per-row plan.
 
     `candidates` is `StateFile.rows` (candidate key -> row); `recorded` is
@@ -1748,10 +1795,15 @@ def build_plan(sheet: dict, candidates: dict, recorded: dict, *,
     live_slugs = live_slugs or {}
     retired_slugs = retired_slugs or {}
     own_record_ids = own_record_ids or {}
+    import observation_admission as admission
+    reservations = (_admission_context["reservations"] if _admission_context is not None
+                    else dict(slugs=live_slugs, retired_slugs=retired_slugs))
     # slug -> the anchor of the row that claimed it, over THIS batch only.
     batch_slugs: dict[str, str] = {}
     batch_id = sheet["batch_id"]
-    _record_index = record_paths(obs_dir)
+    source_io = _admission_context["source_io"] if _admission_context is not None else None
+    options = {} if source_io is None else {"_source_io": source_io}
+    _record_index = record_paths(obs_dir, **options)
     by_anchor: dict[str, list[tuple[str, dict]]] = {}
     for cid, cand in candidates.items():
         by_anchor.setdefault(anchor_of(cid), []).append((cid, cand))
@@ -1871,13 +1923,20 @@ def build_plan(sheet: dict, candidates: dict, recorded: dict, *,
                                 "path:line-range grammar")
                 bad_evidence = True
                 continue
-            if not _oe.evidence_path_resolves(root, parsed[0]):
+            resolves = (_oe.evidence_path_resolves(root, parsed[0]) if source_io is None
+                        else admission._evidence_path_resolves(root, parsed[0], source_io))
+            if not resolves:
                 problems.append(
                     f"{label} evidence path {redact(parsed[0])} does not resolve to a "
                     "file inside the repository root")
                 bad_evidence = True
         if bad_evidence:
             continue
+        if _admission_context is not None:
+            source_problems = admission._source_problems(_admission_context, evidence)
+            if source_problems:
+                problems.extend(f"{label}: {problem}" for problem in source_problems)
+                continue
 
         # The record THIS row allocated on a previous run of this batch, and
         # the only record any exemption below admits.
@@ -1964,7 +2023,15 @@ def build_plan(sheet: dict, candidates: dict, recorded: dict, *,
         # The second row to name a slug refuses, both rows are named, and the
         # findings list refuses the whole batch — so neither publishes.
         claimed_by = batch_slugs.get(slug)
-        if claimed_by is not None:
+        own_handle = f"{own_id}/{slug}" if own_id else None
+        if _admission_context is not None:
+            own_path = Path(obs_dir) / f"{own_id}-{slug}.md" if own_id else None
+            own_path = own_path if own_path is not None and _source_file(own_path, source_io) else None
+            own_handle = admission._own_handle(_admission_context, own_path, slug,
+                expected_id=own_id, expected_anchor=anchor, expected_claim=live_digest)
+        collision = admission._slug_problems(reservations, slug, own_handle=own_handle, peer=claimed_by,
+            removed=_admission_context["removed"] if _admission_context is not None else None)
+        if collision == ["admission-peer-slug-collision"]:
             problems.append(
                 f"{label} {where} {redact(slug)} is already claimed by row "
                 f"{redact(claimed_by, quoted=False)} in this same batch — the "
@@ -1974,23 +2041,25 @@ def build_plan(sheet: dict, candidates: dict, recorded: dict, *,
                 "until you do")
             continue
         batch_slugs[slug] = anchor
-        owner = live_slugs.get(slug)
+        owner = reservations["slugs"].get(slug)
         # The exemption is this row's own record and nothing else: a peer
         # row's record owns a slug this row may not take.
-        own_handle = f"{own_id}/{slug}" if own_id else None
-        if owner is not None and owner != own_handle:
+        if collision == ["admission-live-slug-reserved"]:
             problems.append(
                 f"{label} {where} {redact(slug)} is already taken by the "
                 f"live handle {redact(owner, quoted=False)} — the slug half "
                 "of every live handle is unique across the whole resolver")
             continue
-        if slug in retired_slugs:
-            displaced_by = ", ".join(retired_slugs[slug]) or "(no live displacer)"
+        if collision == ["admission-retired-slug-reserved"]:
+            displaced_by = ", ".join(reservations["retired_slugs"][slug]) or "(no live displacer)"
             problems.append(
                 f"{label} {where} {redact(slug)} is a retired slug, displaced "
                 f"by {redact(displaced_by, quoted=False)} — a retired slug is "
                 "never reused, because a citation of it must keep naming the "
                 "rules that displaced it")
+            continue
+        if collision:
+            problems.extend(f"{label} {where} {redact(slug)}: {problem}" for problem in collision)
             continue
         entry["title"] = title
         entry["slug"] = slug

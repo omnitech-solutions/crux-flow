@@ -15,6 +15,12 @@ nothing.
 The files read here all cross the sync boundary (`crux/agents/`,
 `crux/templates/`), so the suite runs unchanged against the staged artifact.
 
+A second class pins the base-SHA handoff: the dev-lead names its HEAD SHA in
+every developer dispatch, and the developer fast-forwards to it or reports
+`BLOCKED` before any edit. Its absence check (each file's statements stay out of
+the other) has its positive control in the presence assertions over the same
+needles, run by the same matcher against the owning file.
+
 Stdlib unittest plus PyYAML, which the test package already requires.
 """
 
@@ -311,6 +317,103 @@ class DevLeadDisciplineTests(unittest.TestCase):
         self.assertIn("skills: [forge-skill, log-work]\n", self.text)
 
 
+COMMANDER_MD = AGENTS_DIR / "commander.md"
+
+# The base-SHA handoff. A harness worktree can branch from the remote default
+# branch rather than the lead's HEAD, so a developer dispatched with isolation
+# starts without the lead's unpushed commits. The lead names its HEAD SHA in
+# every dispatch; the developer fast-forwards to it or reports BLOCKED before
+# any edit.
+DEV_LEAD_BASE_SHA = {
+    "dispatch carries the SHA": (
+        "Every developer dispatch carries your `git rev-parse HEAD` SHA as the "
+        "base the developer starts from."
+    ),
+    "commit first": (
+        "Commit what the developer needs before you dispatch; the SHA carries "
+        "committed work only."
+    ),
+}
+DEVELOPER_BASE_SHA = {
+    "compare before any edit": (
+        "Before any edit, run `git rev-parse HEAD` and compare it to that SHA:"
+    ),
+    "SHA format checked": (
+        "The SHA must be 40 or 64 lowercase hex characters; anything else gets "
+        "`BLOCKED` before you run a git command with it."
+    ),
+    "equal proceeds": "If HEAD equals the SHA, proceed.",
+    "ancestor condition": (
+        "If HEAD is an ancestor of the SHA (`git merge-base --is-ancestor HEAD "
+        "<sha>` exits 0), run `git merge --ff-only <sha>`."
+    ),
+    "failed merge blocks": (
+        "If the merge fails, or HEAD still differs from the SHA, report "
+        "`BLOCKED` and edit nothing; otherwise proceed."
+    ),
+    "otherwise blocked": (
+        "Otherwise, report `BLOCKED` with both SHAs and edit nothing."
+    ),
+    "no SHA needs context": (
+        "A dispatch that names no base SHA gets `NEEDS_CONTEXT` before any edit."
+    ),
+}
+BASE_SHA_HEADING = "\n## First: start from your lead's commit\n"
+
+
+class BaseShaHandoffTests(unittest.TestCase):
+    """The lead names its HEAD SHA; the developer starts from it or stops."""
+
+    def test_dev_lead_dispatch_carries_head_sha(self):
+        text = body(DEV_LEAD_MD)
+        for label, needle in DEV_LEAD_BASE_SHA.items():
+            with self.subTest(statement=label):
+                self.assertEqual(occurrences(text, needle), 1, needle)
+
+    def test_developer_checks_base_sha_before_any_edit(self):
+        text = body(DEVELOPER_MD)
+        for label, needle in DEVELOPER_BASE_SHA.items():
+            with self.subTest(statement=label):
+                self.assertEqual(occurrences(text, needle), 1, needle)
+
+    def test_developer_steps_run_in_order(self):
+        text = normalize(body(DEVELOPER_MD))
+        order = [
+            normalize(DEVELOPER_BASE_SHA[k])
+            for k in ("no SHA needs context", "SHA format checked",
+                      "compare before any edit", "equal proceeds",
+                      "ancestor condition", "failed merge blocks",
+                      "otherwise blocked")
+        ]
+        positions = [text.index(n) for n in order]
+        self.assertEqual(positions, sorted(positions))
+
+    def test_developer_base_check_is_the_first_section(self):
+        text = body(DEVELOPER_MD)
+        self.assertEqual(text.count(BASE_SHA_HEADING), 1)
+        first = text.index(BASE_SHA_HEADING)
+        self.assertLess(first, text.index("\n## Before you write the first test\n"))
+        self.assertLess(first, text.index("\n## Embedded disciplines\n"))
+
+    def test_base_sha_statements_stay_in_their_own_file(self):
+        lead, dev = body(DEV_LEAD_MD), body(DEVELOPER_MD)
+        for needle in DEVELOPER_BASE_SHA.values():
+            self.assertEqual(occurrences(lead, needle), 0, needle)
+        for needle in DEV_LEAD_BASE_SHA.values():
+            self.assertEqual(occurrences(dev, needle), 0, needle)
+
+    def test_commander_dispatching_developers_carries_the_sha(self):
+        # The commander reaches developers only through the dev-lead today. If
+        # it ever gains a direct developer dispatch, it owes the same handoff.
+        text = body(COMMANDER_MD)
+        if "Agent(developer)" in text:
+            self.assertEqual(
+                occurrences(text, DEV_LEAD_BASE_SHA["dispatch carries the SHA"]), 1
+            )
+        else:
+            self.assertEqual(occurrences(text, "Agent(dev-lead)"), 1)
+
+
 class PatchTemplateImplementPromptTests(unittest.TestCase):
     """The patch template's implement prompt states the proof and its remedy."""
 
@@ -351,6 +454,159 @@ class PatchTemplateImplementPromptTests(unittest.TestCase):
         sample = "Implement it.\n  rule:some-slug opens this line\n"
         opening = [ln for ln in sample.splitlines() if ln.lstrip().startswith("rule:")]
         self.assertEqual(len(opening), 1)
+
+
+HISTORIAN_MD = AGENTS_DIR / "historian.md"
+
+# The historian reads the objectives before any work, verbatim transcription
+# included. The contract route was chosen over a carve-out in the rule.
+HISTORIAN_READ = (
+    "Read the resolved `<docs_dir>/objectives.md` before starting any work, "
+    "including verbatim transcription of another agent's report."
+)
+HISTORIAN_WRITE_ONLY = (
+    "Read the objectives before any write, except verbatim transcription."
+)
+HISTORIAN_CARVE_OUTS = (
+    "before any write",
+    "except verbatim",
+    "transcription is exempt",
+    "except transcription",
+)
+
+
+class HistorianObjectivesTests(unittest.TestCase):
+    def setUp(self):
+        self.text = body(HISTORIAN_MD)
+
+    def test_read_sentence_appears_once(self):
+        self.assertEqual(occurrences(self.text, HISTORIAN_READ), 1)
+
+    def test_section_sits_between_the_intro_and_what_you_do(self):
+        text = normalize(self.text)
+        head = text.index("## Mission and objectives")
+        read = text.index(normalize(HISTORIAN_READ))
+        what = text.index("## What you do")
+        self.assertLess(head, read)
+        self.assertLess(read, what)
+
+    def test_no_carve_out_for_transcription(self):
+        for phrase in HISTORIAN_CARVE_OUTS:
+            with self.subTest(phrase=phrase):
+                self.assertEqual(occurrences(self.text, phrase), 0)
+
+    def test_rules_and_populate_clause_appear_once(self):
+        for needle in (
+            "`rule:objectives-read-before-work`",
+            "`rule:objectives-context-travels-with-every-delegation`",
+            "you never populate it",
+        ):
+            with self.subTest(needle=needle):
+                self.assertEqual(occurrences(self.text, needle), 1)
+
+    def test_bash_clause_matches_the_tool_allowlist(self):
+        self.assertIn("Bash", self.text.split("---")[1].split("tools:")[1].split("\n")[0])
+        self.assertEqual(occurrences(self.text, "you hold `Bash`"), 1)
+
+    def test_detector_controls(self):
+        wrapped = "  " + HISTORIAN_READ.replace(" before starting ", "\n  before starting ")
+        self.assertEqual(occurrences(wrapped, HISTORIAN_READ), 1)
+        self.assertGreaterEqual(occurrences(HISTORIAN_WRITE_ONLY, "before any write"), 1)
+        self.assertGreaterEqual(occurrences(HISTORIAN_WRITE_ONLY, "except verbatim"), 1)
+
+
+GATES_MD = REPO_ROOT / "crux" / "skills" / "run-promptbook" / "references" / "gates.md"
+
+# The deferral check against the book's Outcome and Evidence sentences.
+COMMANDER_CHECK = (
+    "Before you record any deferral or known limitation, check it against each "
+    "Outcome and Evidence sentence of the book's `goal`, and against any "
+    "narrowing the run snapshot records."
+)
+COMMANDER_NOTES = (
+    "Record the check in the run Notes, by one of the two routes above, as one "
+    'line beside the deferral: "checked against Outcome/Evidence: no conflict", '
+    "or the sentence it contradicts."
+)
+# The rule supports "a finding" (a contradicted item is a finding); the known-limitation
+# clause is the contract's own, so the citation sits before it.
+COMMANDER_FINDING = (
+    "A deferral that contradicts an Outcome or Evidence sentence is a finding "
+    "(`rule:completion-separates-verified-from-unobserved`), never a known "
+    "limitation."
+)
+COMMANDER_OPEN_FINDING = (
+    "it enters the next council round's question as an open blocking finding "
+    "that names its originating item and the Outcome or Evidence sentence it "
+    "contradicts."
+)
+COMMANDER_STOP = (
+    "report a contradicted-premise stop so the owner decides, and never record "
+    "it as a known limitation."
+)
+COMMANDER_RECORDING = (
+    "Have the historian record notes, deferrals with their Outcome/Evidence "
+    "check lines, and gate tokens after the advance."
+)
+COMMANDER_PENDING = (
+    "When its `adr_acceptance_pending` list is non-empty, do not issue the "
+    "prompt. For an entry whose `remedy` is `transition-adr` and whose module "
+    "has not yet run `transition-adr`, dispatch the accepting architect to run "
+    "it per `references/gates.md`. Every other entry takes a "
+    "contradicted-premise stop for the owner, including an entry whose "
+    "`transition-adr` already failed."
+)
+GATES_DEFERRAL = (
+    "Before a deferral is recorded, check it against the book's Outcome and "
+    "Evidence sentences, and against any narrowing the run snapshot records. "
+    "Write the check as one line in the run Notes beside it."
+)
+SEEDED_OLD_ROUTE = "so the council or the owner decides"
+# Retired wording: a write instruction to a role with no write tool, and "limit" for
+# "known limitation".
+RETIRED_COMMANDER = ("Write the check into the run Notes", "never a limit (")
+
+
+class CommanderDeferralCheckTests(unittest.TestCase):
+    def setUp(self):
+        self.commander = body(COMMANDER_MD)
+        self.gates = body(GATES_MD)
+
+    def test_commander_carries_each_deferral_statement_once(self):
+        for needle in (COMMANDER_CHECK, COMMANDER_NOTES, COMMANDER_FINDING, COMMANDER_OPEN_FINDING,
+                       COMMANDER_STOP, COMMANDER_RECORDING, COMMANDER_PENDING):
+            with self.subTest(needle=needle[:40]):
+                self.assertEqual(occurrences(self.commander, needle), 1)
+
+    def test_old_route_is_absent(self):
+        self.assertEqual(occurrences(self.commander, SEEDED_OLD_ROUTE), 0)
+        for retired in RETIRED_COMMANDER:
+            with self.subTest(retired=retired):
+                self.assertEqual(occurrences(self.commander, retired), 0)
+
+    def test_gates_carries_the_deferral_sentence_once(self):
+        self.assertEqual(occurrences(self.gates, GATES_DEFERRAL), 1)
+        for clause in (
+            "A deferral that contradicts an Outcome or Evidence sentence is a finding.",
+            "it enters the next council round's question as an open blocking finding "
+            "that names its originating item and the sentence it contradicts",
+            "When none is ahead, it is a contradicted-premise stop for the owner.",
+            "It is never recorded as a known limitation.",
+        ):
+            with self.subTest(clause=clause[:40]):
+                self.assertEqual(occurrences(self.gates, clause), 1)
+
+
+class DeferralDetectorControlTests(unittest.TestCase):
+    def test_wrapped_copies_still_count_once(self):
+        wrapped = "  " + COMMANDER_CHECK.replace(" check it ", "\n  check it ")
+        self.assertEqual(occurrences(wrapped, COMMANDER_CHECK), 1)
+        wrapped = "  " + HISTORIAN_READ.replace(" before starting ", "\n  before starting ")
+        self.assertEqual(occurrences(wrapped, HISTORIAN_READ), 1)
+
+    def test_seeded_old_route_is_found(self):
+        sample = "Raise it " + SEEDED_OLD_ROUTE + "."
+        self.assertGreaterEqual(occurrences(sample, SEEDED_OLD_ROUTE), 1)
 
 
 if __name__ == "__main__":

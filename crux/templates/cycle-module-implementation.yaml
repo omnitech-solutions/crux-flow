@@ -1,0 +1,136 @@
+# Implementation review module: four prompts, format-two books only.
+# Concatenate before dev/review modules and assign sequential n values.
+# {M} is a positive module integer; {IMPLEMENTATION_TOPIC} is the scoped topic.
+# Every implementation module requires a frozen implementation_slots declaration.
+
+- title: "Implementation {M}: author the implementation reasoning"
+  module_tag: implementation-{M}
+  purpose: |
+    Preserve reasoning for {IMPLEMENTATION_TOPIC} under unchanged architectural constraints.
+  prompt: |
+    Read the whole goal and objectives. Read current architecture, doctrine,
+    summaries and the live architectural constraints for this module's declared slot.
+    Author an Implementation Decision from implementation-decision-template.yaml
+    under <run_dir>/implementations/<RUN-NNN>/<slug>/revision-<NNN>.yaml.
+    Its identity is this book, run and local slug. Match the frozen slot's scope
+    and direct Accepted architectural constraint handles.
+    Include reasoning, alternatives, approach, assumptions and intended evidence.
+    After every initial or revised subject write, record its bytes immediately:
+
+      uv run "${CRUX_PLUGIN_ROOT}/scripts/run-work-witness.py" record <run-RUN-NNN.yaml> --prompt <n> --path <decision-path>
+
+    Then commit the exact revision before council review. Never create a witness
+    after a preflight refusal to claim ownership. Drafts remain mutable until reviewed.
+    A reviewed revision is immutable. Material edits require another revision and
+    fresh council approval at a lawful gate. Preserve every earlier revision.
+    Do not revoke, deprecate or supersede an earlier implementation choice.
+    If the proposal conflicts with architecture, stop and route to the architectural
+    decision process. Implementation reasoning never authors governs rules.
+  expected_output: |
+    A tracked revision matching the declared slot, with alternatives and direct constraints.
+  side_effects: [query-docs]
+
+- title: "Implementation {M}: council-review the exact revision"
+  module_tag: implementation-{M}
+  purpose: |
+    Obtain council review of the implementation choice before implementation begins.
+  prompt: |
+    Ask advance-run.py <run> --book <book> --gate-info --prompt <n> before acting.
+    Finish any open Git merge or other sequence before convening council.
+    Council runs only through run-council.py; reviewer reports never replace council.
+    Write a question naming the exact revision and its digest.
+    Every seat assesses Completeness, Correctness, Consistency, Clarity and Security.
+    The question explicitly asks about architectural conflict: does the approach violate a live constraint?
+    Include reasoning, alternatives, constraints, scope and intended evidence as subjects.
+    When the frozen slot carries no_governing_constraint, the question contains the exact words
+    "declared-empty constraint set". It states that the slot claims no architectural rule governs
+    its scope and asks whether that claim holds. The reason is author-written text: the council
+    reads it inside the fenced decision subject, and it is never pasted into the question.
+    Name only the decision's digest in the question. Generate the unchecked-rules subject,
+    record its run-work witness, as for the revision, commit it, and pass it as a further --subject:
+
+      uv run "${CRUX_PLUGIN_ROOT}/scripts/implementation-decisions.py" unchecked-rules --decision <decision-path> --output <run_dir>/implementations/<RUN-NNN>/<slug>/unchecked-rules-<NNN>.md
+
+    It lists the text and scope of each live Accepted rule whose scope names no path, because
+    the path-overlap check cannot test such a rule. The council judges whether the stated reason
+    covers them. A live rule whose path scope overlaps the declared scope ends the convening
+    with a preflight-needs-owner record (stop 4); the frozen slot cannot be repaired here. The
+    owner abandons the run and authors a successor book whose slot cites that rule.
+    Run the council runner in the background with --prompt <n> --round <round>
+    Include --question <question-file> --subject <decision-path> --retain-subjects.
+    Pass --implementation-revision <decision-path> to select the exact formal revision.
+    The actual module determines council_kind: implementation, including in a combined ADR book.
+    Count only outcome: ran records in this module; a could-not-run record takes no place.
+    The council runner commits the attempt record and the council record itself,
+    including retained subjects. Never stage, commit, edit or delete either record.
+    Its attempt commit precedes every request. Follow run-promptbook's
+    references/gates.md for preflight repairs, process checks, lock probes and recovery.
+    Repair only causes the runner authorizes. The third preflight refusal at this
+    convening prompt takes the escalation-loop stop. An open attempt holds the scope.
+    Persistence failure permits recovery of the original bytes, never another deliberation:
+
+      uv run "${CRUX_PLUGIN_ROOT}/scripts/run-council.py" --recover <run-RUN-NNN.yaml> --prompt <n> --probe --book <book.yaml>
+      uv run "${CRUX_PLUGIN_ROOT}/scripts/run-council.py" --recover <run-RUN-NNN.yaml> --prompt <n> --book <book.yaml>
+
+    Check the process before probing; recover only when the lock is free.
+    Recovery reads no key and makes no council request. Route its result by gates.md.
+    A failed quorum or secret scan stops for the owner; no agent fills a council seat.
+    ARCHITECTURAL takes contradicted-premise stop 4 and routes to the architectural
+    decision process. Never silently convert the implementation module.
+    Follow the gate verdict: pass permits done; route requires blocked and findings;
+    stop requires blocked and escalation; refuse writes nothing.
+    Three counted rounds without convergence stop at the existing boundary.
+    No ADR refutation or adjudicator closes this module. Existing owner exceptions
+    may authorize an above-three place; they cannot erase a permanent stop.
+  expected_output: |
+    A committed runner receipt retaining the exact revision and each seat's findings.
+  side_effects: [council]
+
+- title: "Implementation {M}: address findings on a new revision"
+  module_tag: implementation-{M}
+  purpose: |
+    Resolve findings without changing the reasoning an earlier council reviewed.
+  prompt: |
+    Read every counted round and its blocking findings. When reasoning changes,
+    author another revision under the same local identity. Immediately record
+    its write before committing it:
+
+      uv run "${CRUX_PLUGIN_ROOT}/scripts/run-work-witness.py" record <run-RUN-NNN.yaml> --prompt <n> --path <decision-path>
+
+    Commit that revision before reconvening. Resolve every open attempt first.
+    Re-convene the council at the next lawful counted place with that exact revision
+    retained in the new receipt. Earlier-round subject inclusion is insufficient.
+    Fold material findings into reviewed reasoning; subject hashes alone do not
+    establish question quality or approval. Independent review checks the question.
+    Editorial annotations admit only the annotation schema's operations and targets.
+    They never replace approved reasoning. Delivery review includes every annotation.
+    If the existing council passed, record that no blocking finding remains.
+    After three nonconverging rounds, preserve evidence and escalate.
+  expected_output: |
+    Finding dispositions and any new revision and council receipt, preserving earlier bytes.
+  side_effects: []
+
+- title: "Implementation {M}: close the implementation review"
+  module_tag: implementation-{M}
+  purpose: |
+    Bind successful council approval to the exact revision without asserting delivery.
+  prompt: |
+    Run the gate-information query. Attach the latest deciding counted converged
+    council receipt with --artifacts, and explicitly select --implementation-revision
+    <decision-path> on advance-run.py <run> --book <book> --outcome done.
+    The deciding receipt must itself retain this exact revision.
+    Only a successful gate advance appends the approval binding atomically with DONE.
+    The binding includes slot, book/run/hash, revision, gate, receipt, retained subject
+    and the actual evaluated context. New closes retain context three with approval
+    profile four. Historical context two/profile three and context one/profile two remain immutable and replay-only.
+    The historian commits the close and retained context before consumers read it.
+    Runner evidence remains committed by the runner or recovery alone.
+    A raw council receipt or hand-written DONE grants no approval.
+    Approval establishes reviewed intent. Dev modules implement it next; append-only
+    results require independent delivery review. Current state requires source proof
+    at the queried revision. Neither approval nor historical completion supplies it.
+    Never reopen a completed prompt. Material changes with no lawful gate route
+    require escalation or a successor book. Keep earlier implementation reasoning.
+  expected_output: |
+    A committed successful close and exact approval binding; delivery remains unobserved.
+  side_effects: []

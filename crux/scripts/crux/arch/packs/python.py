@@ -48,6 +48,8 @@ from ..core import (
     _cell,
     _extract_module_graph,
     _iter_py_files,
+    _retained_source_resolver,
+    _retained_source_walk,
     _rel,
     _render_openapi,
     _safe_read_bytes,
@@ -146,13 +148,14 @@ def _pyproject_pkg_name(root: Path, d: Path) -> str | None:
     return None
 
 
-def _resolve_pkg_dir(root: Path, name: str) -> tuple[Path, str] | None:
+def _resolve_pkg_dir(root: Path, name: str, admit=None) -> tuple[Path, str] | None:
     """Map a distribution name to an import package dir: `src/<name>/__init__.py`
     then `<name>/__init__.py` (with `-`→`_` normalization)."""
     norm = name.replace("-", "_")
+    admit = admit if admit is not None else _retained_source_resolver(root)
     for base in (root / "src", root):
         cand = base / norm
-        if cand.is_dir() and (cand / "__init__.py").is_file():
+        if admit(cand) is not None and cand.is_dir() and admit(cand / "__init__.py") is not None and (cand / "__init__.py").is_file():
             return cand, norm
     return None
 
@@ -218,6 +221,7 @@ def _manifest_dirs(root: Path, max_depth: int = 2) -> list[Path]:
     never contributes a declaration.
     """
     out: list[Path] = []
+    admit = _retained_source_resolver(root)
     frontier = [root]
     for _depth in range(max_depth):
         nxt: list[Path] = []
@@ -225,7 +229,7 @@ def _manifest_dirs(root: Path, max_depth: int = 2) -> list[Path]:
             try:
                 children = sorted(
                     (c for c in parent.iterdir()
-                     if c.is_dir() and not c.name.startswith(".")
+                     if admit(c) is not None and c.is_dir() and not c.name.startswith(".")
                      and c.name not in _SKIP_DIRS),
                     key=lambda p: p.name,
                 )
@@ -304,9 +308,10 @@ def detect_packages(root: Path) -> tuple[tuple[Path, str], ...]:
     filesystem walk.
     """
     root = Path(root)
+    admit = _retained_source_resolver(root)
     hint = _pyproject_pkg_name(root, root)
     if hint:
-        resolved = _resolve_pkg_dir(root, hint)
+        resolved = _resolve_pkg_dir(root, hint, admit)
         if resolved is not None:
             return (resolved,)
 
@@ -315,7 +320,7 @@ def detect_packages(root: Path) -> tuple[tuple[Path, str], ...]:
         name = _declared_pkg_name(root, d)
         if not name:
             continue
-        resolved = _resolve_pkg_dir(d, name)
+        resolved = _resolve_pkg_dir(d, name, admit)
         if resolved is not None:
             nested.append(resolved)
     if nested:
@@ -323,16 +328,16 @@ def detect_packages(root: Path) -> tuple[tuple[Path, str], ...]:
 
     candidates: list[Path] = []
     src = root / "src"
-    if src.is_dir():
+    if admit(src) is not None and src.is_dir():
         candidates.extend(
             d for d in src.iterdir()
-            if d.is_dir() and (d / "__init__.py").is_file()
+            if admit(d) is not None and d.is_dir() and admit(d / "__init__.py") is not None and (d / "__init__.py").is_file()
         )
     try:
         candidates.extend(
             d for d in root.iterdir()
-            if d.is_dir() and not d.name.startswith(".")
-            and d.name not in _SKIP_DIRS and (d / "__init__.py").is_file()
+            if admit(d) is not None and d.is_dir() and not d.name.startswith(".")
+            and d.name not in _SKIP_DIRS and admit(d / "__init__.py") is not None and (d / "__init__.py").is_file()
         )
     except OSError:
         pass
@@ -1563,6 +1568,8 @@ def _has_migration(root: Path, d: Path) -> bool:
     repository root is. Without it an off-root symlink inside a `versions/` dir
     could be the sole evidence that selected that directory.
     """
+    if _retained_source_resolver(root)(d) is None:
+        return False
     for py in d.glob("*.py"):
         if py.name.startswith("__"):
             continue
@@ -1578,10 +1585,13 @@ def _has_migration(root: Path, d: Path) -> bool:
 def _detect_alembic_versions(root: Path) -> Path | None:
     """Locate the Alembic migration `versions/` dir: the two conventional
     locations, then a bounded search skipping VCS/venv dirs."""
+    admit = _retained_source_resolver(root)
     for c in (root / "alembic" / "versions", root / "migrations" / "versions"):
-        if c.is_dir() and _has_migration(root, c):
+        if admit(c) is not None and c.is_dir() and _has_migration(root, c):
             return c
-    for d in sorted(root.rglob("versions")):
+    for d in sorted(Path(directory) / name
+                    for directory, children, files in _retained_source_walk(root, root)
+                    for name in children + files if name == "versions"):
         rel = d.relative_to(root).parts
         if any(part in _SKIP_DIRS or part.startswith(".") for part in rel):
             continue

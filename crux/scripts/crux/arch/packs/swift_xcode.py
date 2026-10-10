@@ -46,7 +46,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
-from ..core import _cell
+from ..core import _cell, _retained_source_filter
 from . import swift_pbxproj, swift_prune
 from .swift_xcinputs import (UNRESOLVED_DIR, CollectionBudget, DirectoryVerdicts, ResidualSink,
                              WorkBoundExceeded, charge, charge_excluded, contained,
@@ -885,6 +885,9 @@ def _scan_swift_files(base, root, explicit_folders, budget=None):
     builds every parent of `base` as a `Path`, which is quadratic in the
     path's depth (the same fix as `swift_xcinputs.contained`). A `base`
     outside the root raises `ValueError`, as `relative_to` does."""
+    held = _retained_source_filter(root)
+    if held(base):
+        return
     root_r = os.path.realpath(root)
     base_r = os.path.realpath(base)
     if base_r == root_r:
@@ -902,6 +905,8 @@ def _scan_swift_files(base, root, explicit_folders, budget=None):
             continue
         try:
             if entry.is_symlink():
+                continue
+            if held(entry.path):
                 continue
             child_rel = rel_parts + (entry.name,)
             if entry.is_dir(follow_symlinks=False):

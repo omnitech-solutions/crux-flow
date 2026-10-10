@@ -44,6 +44,7 @@ Key design points, honored exactly:
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import sys
 from pathlib import Path
@@ -99,20 +100,62 @@ _FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.S)
 _ADR_ID_RE = re.compile(r"ADR-\d{4}")
 
 
+# Private operation I/O seam. Parsers and authority policy remain in this module.
+def _source_text(path: Path, source_io) -> str:
+    return path.read_text(encoding="utf-8") if source_io is None else source_io.read_text(path)
+
+
+def _source_bytes(path: Path, source_io) -> bytes:
+    return path.read_bytes() if source_io is None else source_io.read_bytes(path)
+
+
+def _source_is_file(path: Path, source_io) -> bool:
+    return path.is_file() if source_io is None else source_io.kind(path) == "file"
+
+
+def _source_is_dir(path: Path, source_io) -> bool:
+    return path.is_dir() if source_io is None else source_io.kind(path) == "directory"
+
+
+def _source_exists(path: Path, source_io) -> bool:
+    return path.exists() if source_io is None else source_io.kind(path) is not None
+
+
+def _source_glob(path: Path, pattern: str, source_io):
+    return path.glob(pattern) if source_io is None else source_io.glob(path, pattern)
+
+
+def _source_resolve(path: Path, source_io) -> Path:
+    return path.resolve() if source_io is None else source_io.resolve(path)
+
+
+def _source_contained(root: Path, name: str, source_io) -> Path | None:
+    if source_io is None:
+        return _evidence_module().resolve_contained(root, name)
+    if not _evidence_module().valid_evidence_path(name):
+        return None
+    try:
+        root_r = source_io.resolve(root)
+        resolved = source_io.resolve(root_r / name)
+    except (OSError, RuntimeError):
+        return None
+    return resolved if root_r in resolved.parents else None
+
+
 # ── tree resolution ────────────────────────────────────────────────────────
 
-def tree_name(root: Path) -> str:
+def tree_name(root: Path, *, _source_io=None) -> str:
     """Resolve `docs_dir` from `.bionic.yml`, defaulting to `bionic`."""
     cfg = root / ".bionic.yml"
-    if cfg.exists():
-        m = re.search(r"^docs_dir\s*:\s*[\"']?([^\"'\s#]+)", cfg.read_text(encoding="utf-8"),
+    if _source_exists(cfg, _source_io):
+        m = re.search(r"^docs_dir\s*:\s*[\"']?([^\"'\s#]+)", _source_text(cfg, _source_io),
                       re.MULTILINE)
         if m:
             return m.group(1)
     return "bionic"
 
 
-def artifact_prefix(root: Path) -> str:
+def artifact_prefix(root: Path, *, _source_io=None) -> str:
     """The §14.3 `artifact_prefix` this tree runs, or "" when it runs none.
 
     Read the way `tree_name` reads `docs_dir`, from the same two files, and
@@ -129,16 +172,16 @@ def artifact_prefix(root: Path) -> str:
     """
     for name in (".bionic.yml", ".crux"):
         cfg = Path(root) / name
-        if not cfg.is_file():
+        if not _source_is_file(cfg, _source_io):
             continue
         m = re.search(r"^artifact_prefix\s*:\s*[\"']?([^\"'\s#]+)",
-                      cfg.read_text(encoding="utf-8"), re.MULTILINE)
+                      _source_text(cfg, _source_io), re.MULTILINE)
         if m:
             return m.group(1)
     return ""
 
 
-def resolve_tree(root: Path) -> Path:
+def resolve_tree(root: Path, *, _source_io=None) -> Path:
     """Return the tree path for `root`, proven contained under it.
 
     A committed `.bionic.yml` is repo content, and every governs lane reads
@@ -156,7 +199,7 @@ def resolve_tree(root: Path) -> Path:
     Raises GovernsValidationError — the document-verdict lane every driver
     already surfaces as exit-1 findings, never a traceback.
     """
-    raw = tree_name(root)
+    raw = tree_name(root, _source_io=_source_io)
     segments = raw.replace("\\", "/").split("/")
     if (raw.startswith(("/", "~")) or re.match(r"^[A-Za-z]:", raw)
             or any(seg in ("", ".", "..") for seg in segments)):
@@ -165,8 +208,8 @@ def resolve_tree(root: Path) -> Path:
             "path — absolute, ~-prefixed, and empty/dot/dot-dot-carrying "
             "values are refused")])
     joined = Path(root) / raw
-    root_r = Path(root).resolve()
-    resolved = joined.resolve()
+    root_r = _source_resolve(Path(root), _source_io)
+    resolved = _source_resolve(joined, _source_io)
     if resolved == root_r or root_r not in resolved.parents:
         raise GovernsValidationError([_gate_problem(
             f".bionic.yml docs_dir {raw!r} resolves to {resolved}, which is "
@@ -175,15 +218,15 @@ def resolve_tree(root: Path) -> Path:
     return joined
 
 
-def adrs_dir(root: Path) -> Path:
-    return resolve_tree(root) / "adrs"
+def adrs_dir(root: Path, *, _source_io=None) -> Path:
+    return resolve_tree(root, _source_io=_source_io) / "adrs"
 
 
-def runs_dir(root: Path) -> Path:
-    return resolve_tree(root) / "promptbooks" / "runs"
+def runs_dir(root: Path, *, _source_io=None) -> Path:
+    return resolve_tree(root, _source_io=_source_io) / "promptbooks" / "runs"
 
 
-def observations_root(tree: Path) -> Path:
+def observations_root(tree: Path, *, _source_io=None) -> Path:
     """The observations concern directory under an ALREADY-RESOLVED tree,
     proven contained under it.
 
@@ -209,7 +252,7 @@ def observations_root(tree: Path) -> Path:
     it as a problem string, exactly as it already does for the two legs one
     level down."""
     tree = Path(tree)
-    if _evidence_module().resolve_contained(tree, "observations") is None:
+    if _source_contained(tree, "observations", _source_io) is None:
         raise ValueError(
             f"refusing to read the observations concern under "
             f"{redact(tree, quoted=False)}: `observations` does not resolve "
@@ -218,10 +261,10 @@ def observations_root(tree: Path) -> Path:
     return tree / "observations"
 
 
-def observations_dir(root: Path) -> Path:
+def observations_dir(root: Path, *, _source_io=None) -> Path:
     """The observations concern directory for a repository root, proven
     contained. See `observations_root`."""
-    return observations_root(resolve_tree(root))
+    return observations_root(resolve_tree(root, _source_io=_source_io), _source_io=_source_io)
 
 
 # ── the observations half of the input domain (docs/AGENTS.md §17) ─────────
@@ -239,10 +282,10 @@ OBSERVATION_PROVENANCE_ENUM = ("recovered", "reconstructed")
 # `_meta.json`'s `input_domain`. A declared member outside this set is a
 # projection this build does not understand, and it refuses to rewrite it.
 INPUT_DOMAIN_KNOWN = ("adrs", "backfill-reviews", "observations",
-                      "survey-receipts")
+                      "survey-receipts", "implementation-migration")
 
 
-def observation_paths(obs: Path) -> list[Path]:
+def observation_paths(obs: Path, *, _source_io=None) -> list[Path]:
     """Sorted observation record files under `obs` — every `*.md` except the
     concern index, the same file set `check_observations.py` walks. An absent
     directory yields [].
@@ -264,31 +307,31 @@ def observation_paths(obs: Path) -> list[Path]:
     this module runs after that lane has already passed.
     """
     out = []
-    for p in sorted(obs.glob("*.md")):
+    for p in sorted(_source_glob(obs, "*.md", _source_io)):
         if p.name == "index.md":
             continue
-        resolved = _evidence_module().resolve_contained(obs, p.name)
+        resolved = _source_contained(obs, p.name, _source_io)
         if resolved is None:
             raise ValueError(
                 f"refusing to read {redact(p.name, quoted=False)}: it does "
                 f"not resolve to a file inside {redact(obs, quoted=False)} "
                 "— an observation record is read from the "
                 "concern directory, never through a link out of it")
-        if not resolved.is_file():
+        if not _source_is_file(resolved, _source_io):
             continue        # a directory named `*.md`, as the old `is_file`
         out.append(p)       # leg skipped, or a dangling link landing inside
     return out
 
 
-def observations_sha256(obs: Path) -> str:
+def observations_sha256(obs: Path, *, _source_io=None) -> str:
     """SHA-256 over the frontmatter blocks of the observation records, in
     filename order — the same construction as `adr_frontmatter_sha256`
     (filename, NUL, frontmatter block, NUL), so a ratification, a retirement,
     or a ratified successor drifts the projection exactly as an ADR
     frontmatter mutation does. An empty corpus hashes to the empty digest."""
     h = hashlib.sha256()
-    for path in observation_paths(obs):
-        block = _frontmatter_block(path.read_text(encoding="utf-8"))
+    for path in observation_paths(obs, _source_io=_source_io):
+        block = _frontmatter_block(_source_text(path, _source_io))
         if block is None:
             continue
         h.update(path.name.encode("utf-8"))
@@ -298,7 +341,7 @@ def observations_sha256(obs: Path) -> str:
     return h.hexdigest()
 
 
-def survey_receipt_paths(obs: Path) -> list[Path]:
+def survey_receipt_paths(obs: Path, *, _source_io=None) -> list[Path]:
     """Every batch receipt under `observations/_surveys/*/receipt.yml`, sorted
     by batch id (ADR-0098 clause 2 — the per-batch receipts are one declared
     source in this input domain).
@@ -321,7 +364,7 @@ def survey_receipt_paths(obs: Path) -> list[Path]:
     see this: it guards a write target.
     """
     base = Path(obs) / "_surveys"
-    resolved_base = _evidence_module().resolve_contained(obs, "_surveys")
+    resolved_base = _source_contained(obs, "_surveys", _source_io)
     if resolved_base is None:
         raise ValueError(
             f"refusing to read the survey holding area under "
@@ -329,26 +372,26 @@ def survey_receipt_paths(obs: Path) -> list[Path]:
             "`_surveys` does not resolve to a directory inside the concern — "
             "a batch receipt is read from the concern directory, never "
             "through a link out of it")
-    if not resolved_base.is_dir():
+    if not _source_is_dir(resolved_base, _source_io):
         return []
     out = []
-    for batch in sorted(base.iterdir()):
-        if not batch.is_dir():
+    batches = base.iterdir() if _source_io is None else _source_glob(base, "*", _source_io)
+    for batch in sorted(batches):
+        if not _source_is_dir(batch, _source_io):
             continue
-        resolved = _evidence_module().resolve_contained(
-            obs, f"_surveys/{batch.name}/receipt.yml")
+        resolved = _source_contained(obs, f"_surveys/{batch.name}/receipt.yml", _source_io)
         if resolved is None:
             raise ValueError(
                 f"refusing to read {redact(batch.name, quoted=False)}"
                 "/receipt.yml: it does not resolve to a file inside "
                 f"{redact(base, quoted=False)} — a batch receipt is read "
                 "from the concern directory, never through a link out of it")
-        if resolved.is_file():
+        if _source_is_file(resolved, _source_io):
             out.append(batch / "receipt.yml")
     return out
 
 
-def survey_receipts_sha256(obs: Path) -> str | None:
+def survey_receipts_sha256(obs: Path, *, _source_io=None) -> str | None:
     """SHA-256 over the receipts' raw bytes in batch-id order, or None when the
     tree has signed no batch.
 
@@ -357,19 +400,19 @@ def survey_receipts_sha256(obs: Path) -> str | None:
     are N receipts rather than one file, so each contributes (batch id, NUL,
     bytes, NUL), the same framing `adr_frontmatter_sha256` uses to keep a
     rename from colliding with a content change."""
-    paths = survey_receipt_paths(obs)
+    paths = survey_receipt_paths(obs, _source_io=_source_io)
     if not paths:
         return None
     h = hashlib.sha256()
     for path in paths:
         h.update(path.parent.name.encode("utf-8"))
         h.update(b"\0")
-        h.update(path.read_bytes())
+        h.update(_source_bytes(path, _source_io))
         h.update(b"\0")
     return h.hexdigest()
 
 
-def survey_receipts_problem(root: Path, manifest: dict) -> str | None:
+def survey_receipts_problem(root: Path, manifest: dict, *, _source_io=None) -> str | None:
     """Why this build cannot read the survey receipts, or None when it can.
 
     §17.5 row 17: while a batch is below S9 the projection refuses rather than
@@ -385,14 +428,15 @@ def survey_receipts_problem(root: Path, manifest: dict) -> str | None:
     concerns = manifest.get("concerns_enabled") or []
     if "observations" not in concerns:
         return None
-    obs = observations_dir(root)
-    if not obs.is_dir():
+    obs = observations_dir(root, _source_io=_source_io)
+    if not _source_is_dir(obs, _source_io):
         return None
     import survey_sheet as _ss
-    for path in survey_receipt_paths(obs):
+    for path in survey_receipt_paths(obs, _source_io=_source_io):
         batch_id = path.parent.name
         try:
-            state = _ss.batch_state(path, obs)
+            state = (_ss.batch_state(path, obs) if _source_io is None else
+                     _ss.batch_state(path, obs, _source_io=_source_io))
         except _ss.SurveySheetError as exc:
             return (f"survey batch receipt "
                     f"{redact(batch_id, quoted=False)}/receipt.yml is not "
@@ -406,7 +450,7 @@ def survey_receipts_problem(root: Path, manifest: dict) -> str | None:
     return None
 
 
-def observations_source_problem(root: Path, manifest: dict) -> str | None:
+def observations_source_problem(root: Path, manifest: dict, *, _source_io=None) -> str | None:
     """Why this build cannot read the observations source, or None when it
     can: the concern is absent from `concerns_enabled`, the directory is
     absent, a record's frontmatter does not parse to a mapping with an `id`,
@@ -416,7 +460,7 @@ def observations_source_problem(root: Path, manifest: dict) -> str | None:
     if "observations" not in concerns:
         return "`observations` is not in manifest.yml concerns_enabled"
     try:
-        obs = observations_dir(root)
+        obs = observations_dir(root, _source_io=_source_io)
     except ValueError as exc:
         # The ROOT containment refusal, on the same terms as the record walk's
         # and the holding area's below: a problem string, not a raise. This
@@ -424,12 +468,12 @@ def observations_source_problem(root: Path, manifest: dict) -> str | None:
         # None", and a raise here would reach each driver's generic handler
         # and be reported as an unhandled type.
         return str(exc)
-    if not obs.is_dir():
+    if not _source_is_dir(obs, _source_io):
         return ("the observations directory "
                 f"{redact(obs, quoted=False)} is absent")
     import yaml
     try:
-        paths = observation_paths(obs)
+        paths = observation_paths(obs, _source_io=_source_io)
     except ValueError as exc:
         # The containment refusal arrives here as a PROBLEM STRING, not as a
         # raise. This function's contract is "why this build cannot read the
@@ -440,7 +484,7 @@ def observations_source_problem(root: Path, manifest: dict) -> str | None:
         return str(exc)
     for path in paths:
         try:
-            fm = read_frontmatter(path.read_text(encoding="utf-8"))
+            fm = read_frontmatter(_source_text(path, _source_io))
         except yaml.YAMLError as exc:
             # [SECURITY:S4] PyYAML's `str(exc)` embeds `Mark.get_snippet()` —
             # the offending SOURCE LINE. This walk reads a concern directory
@@ -456,14 +500,14 @@ def observations_source_problem(root: Path, manifest: dict) -> str | None:
             return (f"observation record {redact(path.name, quoted=False)} has "
                 "no parseable frontmatter id")
     try:
-        return survey_receipts_problem(root, manifest)
+        return survey_receipts_problem(root, manifest, _source_io=_source_io)
     except ValueError as exc:
         # `survey_receipt_paths`'s containment refusal, on the same terms as
         # the record walk's above: a problem string, not a raise.
         return str(exc)
 
 
-def observations_source(root: Path, manifest: dict) -> Path | None:
+def observations_source(root: Path, manifest: dict, *, _source_io=None) -> Path | None:
     """THE one resolution of the observations input source, shared by every
     reader of the widened domain (ADR-0095 requirement 4).
 
@@ -484,13 +528,13 @@ def observations_source(root: Path, manifest: dict) -> Path | None:
     concerns = manifest.get("concerns_enabled") or []
     if "observations" not in concerns:
         return None
-    problem = observations_source_problem(root, manifest)
+    problem = observations_source_problem(root, manifest, _source_io=_source_io)
     if problem is not None:
         raise FileNotFoundError(f"cannot read the observations source: {problem}")
-    return observations_dir(root)
+    return observations_dir(root, _source_io=_source_io)
 
 
-def declared_input_domain(summaries: Path) -> list[str] | None:
+def declared_input_domain(summaries: Path, *, _source_io=None) -> list[str] | None:
     """The `input_domain` an existing `<summaries>/_meta.json` declares, or
     None when there is no declaration: the file is absent, is not a JSON
     mapping, or predates the declaration (a schema-2 projection). A
@@ -498,15 +542,26 @@ def declared_input_domain(summaries: Path) -> list[str] | None:
     caller's known-set check refuses it."""
     import json
     path = summaries / "_meta.json"
-    if not path.is_file():
+    if not _source_is_file(path, _source_io):
         return None
+    # A guarded read refusal is not a missing declaration. Keep the legacy
+    # unguarded read fallback while letting operation I/O failures propagate.
+    guarded_text = _source_text(path, _source_io) if _source_io is not None else None
     try:
-        doc = json.loads(path.read_text(encoding="utf-8"))
+        doc = json.loads(path.read_text(encoding="utf-8") if _source_io is None else guarded_text)
     except (ValueError, OSError):
         return None
     if not isinstance(doc, dict) or "input_domain" not in doc:
         return None
     return doc["input_domain"]
+
+
+class _DomainRefusal(str):
+    """A refusal reason that also carries the migration refusal's path-free remedy, if any."""
+    def __new__(cls, reason: str, remedy: str | None):
+        text = super().__new__(cls, reason)
+        text.remedy = remedy
+        return text
 
 
 def declared_domain_refusal(root: Path, manifest: dict, summaries: Path) -> str | None:
@@ -531,6 +586,15 @@ def declared_domain_refusal(root: Path, manifest: dict, summaries: Path) -> str 
             return (f"_meta.json declares `observations` in its input_domain but "
                     f"this build cannot read that source: {problem} — refusing to "
                     "rewrite the projection without it")
+    if "implementation-migration" in declared:
+        import implementation_migration as migration
+        try:
+            view = migration.authority_view(root)
+        except migration.Refused as exc:
+            return _DomainRefusal(f"_meta.json declares migration inputs but their proof refuses: {exc}",
+                                  getattr(exc, "remedy", None))
+        if view["state"] != "published":
+            return "_meta.json declares migration inputs but no proved publication is available"
     return None
 
 
@@ -563,7 +627,7 @@ def derived_adr_ids(batch: dict) -> list[str]:
                   | set(batch["no_rule"]), key=adr_num)
 
 
-def adr_paths(adrs: Path) -> list[Path]:
+def adr_paths(adrs: Path, *, _source_io=None) -> list[Path]:
     """Sorted active ADR files (top-level only; excludes archive/).
 
     [SECURITY:S5] The old `p.is_file()` leg FOLLOWED a symlink, so an ADR
@@ -589,15 +653,15 @@ def adr_paths(adrs: Path) -> list[Path]:
     committed artifacts, which is the same escape pointed the other way.
     """
     out = []
-    for p in sorted(adrs.glob("ADR-*.md")):
-        resolved = _evidence_module().resolve_contained(adrs, p.name)
+    for p in sorted(_source_glob(adrs, "ADR-*.md", _source_io)):
+        resolved = _source_contained(adrs, p.name, _source_io)
         if resolved is None:
             raise ValueError(
                 f"refusing to read {redact(p.name, quoted=False)}: it does "
                 f"not resolve to a file inside {redact(adrs, quoted=False)} "
                 "— an ADR is read from the adrs directory, never through a "
                 "link out of it")
-        if not resolved.is_file():
+        if not _source_is_file(resolved, _source_io):
             continue        # a directory named `ADR-*.md`, as the old `is_file`
         out.append(p)       # leg skipped, or a dangling link landing inside
     return out
@@ -623,15 +687,15 @@ def raw_governs_entries(fm: dict) -> list:
 
 # ── input hash (frontmatter direct; NEVER the index) ───────────────────────
 
-def adr_frontmatter_sha256(adrs: Path) -> str:
+def adr_frontmatter_sha256(adrs: Path, *, _source_io=None) -> str:
     """SHA-256 over the frontmatter blocks of the active ADRs, in filename order.
 
     Reads ADR frontmatter DIRECTLY. Deliberately never reads adrs/index.md, so
     the summaries hash cannot drift behind that gated downstream index.
     """
     h = hashlib.sha256()
-    for path in adr_paths(adrs):
-        block = _frontmatter_block(path.read_text(encoding="utf-8"))
+    for path in adr_paths(adrs, _source_io=_source_io):
+        block = _frontmatter_block(_source_text(path, _source_io))
         if block is None:
             continue
         h.update(path.name.encode("utf-8"))
@@ -1152,7 +1216,7 @@ def record_sort_key(r: dict) -> tuple:
 
 # ── handle retirement (ADR-0097 part 6) ────────────────────────────────────
 
-def signed_reconciliation_handles(adrs: Path) -> set[str]:
+def signed_reconciliation_handles(adrs: Path, *, _source_io=None) -> set[str]:
     """The slot-B handles every SIGNED record in `adrs/doctrine/
     reconciliations.yml` names — the input to the signature-orphan refusal.
 
@@ -1181,11 +1245,11 @@ def signed_reconciliation_handles(adrs: Path) -> set[str]:
     readers of this file can never disagree about whether it parses.
     """
     path = adrs / "doctrine" / RECONCILIATIONS_FILENAME
-    if not path.is_file():
+    if not _source_is_file(path, _source_io):
         return set()
     import yaml
-    text = path.read_text(encoding="utf-8")
-    from _yaml_min import CatalogYamlError, _refuse_catalog_duplicate_keys
+    text = _source_text(path, _source_io)
+    from _yaml_min import CatalogYamlError, _refuse_duplicate_keys_bounded as _refuse_catalog_duplicate_keys
     try:
         _refuse_catalog_duplicate_keys(text, yaml)
     except CatalogYamlError as exc:
@@ -1230,7 +1294,7 @@ def signed_reconciliation_handles(adrs: Path) -> set[str]:
     return out
 
 
-def archived_handles(adrs: Path) -> set[str]:
+def archived_handles(adrs: Path, *, _source_io=None) -> set[str]:
     """Every governs handle declared by an ARCHIVED ADR (`adrs/archive/`).
 
     The fourth leg of the retirement handle history, and it is load-bearing
@@ -1249,19 +1313,19 @@ def archived_handles(adrs: Path) -> set[str]:
     """
     out: set[str] = set()
     archive = adrs / "archive"
-    if not archive.is_dir():
+    if not _source_is_dir(archive, _source_io):
         return out
-    for path in sorted(archive.glob("ADR-*.md")):
-        resolved = _evidence_module().resolve_contained(archive, path.name)
+    for path in sorted(_source_glob(archive, "ADR-*.md", _source_io)):
+        resolved = _source_contained(archive, path.name, _source_io)
         if resolved is None:
             raise ValueError(
                 f"refusing to read {redact(path.name, quoted=False)}: it does "
                 f"not resolve to a file inside {redact(archive, quoted=False)} "
                 "— an archived ADR is read from the archive directory, never "
                 "through a link out of it")
-        if not resolved.is_file():
+        if not _source_is_file(resolved, _source_io):
             continue
-        fm = read_frontmatter(resolved.read_text(encoding="utf-8"))
+        fm = read_frontmatter(_source_text(resolved, _source_io))
         for e in governs_entries(fm):
             handle = e.get("handle")
             if isinstance(handle, str) and handle.strip():
@@ -1407,13 +1471,14 @@ def live_records(records: list[dict]) -> list[dict]:
     withdrawn without a tombstone. Idempotent, so double application is a
     no-op.
     """
-    return [r for r in records if not r.get("retired_by")]
+    return [r for r in records if not r.get("retired_by") and not r.get("historical")]
 
 
 def retired_records(records: list[dict]) -> list[dict]:
     """The complement of `live_records`, in `record_sort_key` order — the
     retired roster's rows."""
-    return sorted((r for r in records if r.get("retired_by")), key=record_sort_key)
+    return sorted((r for r in records if r.get("retired_by") and not r.get("historical")),
+                  key=record_sort_key)
 
 
 def slug_of(handle: str) -> str:
@@ -1507,7 +1572,7 @@ def live_and_retired_slugs(
 
 
 def collect_records(adrs: Path, governs_from: int | None = None,
-                    observations: Path | None = None) -> list[dict]:
+                    observations: Path | None = None, *, _source_io=None) -> list[dict]:
     """One record per governs entry across active ADRs UNION `ratified`
     observations (docs/AGENTS.md §17; ADR-0095 requirement 4).
 
@@ -1550,10 +1615,12 @@ def collect_records(adrs: Path, governs_from: int | None = None,
     records: list[dict] = []
     entries_by_adr: list[tuple[str, list]] = []
     anchored_by_adr: list[tuple[str, list, str]] = []
-    for path in adr_paths(adrs):
-        text = path.read_text(encoding="utf-8")
+    for path in adr_paths(adrs, _source_io=_source_io):
+        text = _source_text(path, _source_io)
         fm = read_frontmatter(text)
         src = str(fm.get("id") or "")
+        _projection_require("record_type" not in fm,
+                            "summaries typed non-ADR payload cannot supply architectural authority")
         if not src:
             continue
         num = adr_num(src)
@@ -1568,8 +1635,10 @@ def collect_records(adrs: Path, governs_from: int | None = None,
     entries_by_obs: list[tuple[str, str, list]] = []
     id_problems: list[dict] = []
     if observations is not None:
-        for path in observation_paths(observations):
-            fm = read_frontmatter(path.read_text(encoding="utf-8"))
+        for path in observation_paths(observations, _source_io=_source_io):
+            fm = read_frontmatter(_source_text(path, _source_io))
+            _projection_require("record_type" not in fm,
+                                "summaries implementation payload cannot supply observation authority")
             oid = str(fm.get("id") or "")
             if not oid or fm.get("status") != OBSERVATION_PROJECTED_STATUS:
                 continue
@@ -1634,16 +1703,435 @@ def collect_records(adrs: Path, governs_from: int | None = None,
     # here rather than threaded by each caller, so no caller can supply a
     # narrower history than the one the refusals are stated over.
     retirement = retirement_problems(
-        records, removed_handles(read_reviews(adrs)),
-        signed_reconciliation_handles(adrs), archived_handles(adrs))
+        records, removed_handles(read_reviews(adrs, _source_io=_source_io)),
+        signed_reconciliation_handles(adrs, _source_io=_source_io), archived_handles(adrs, _source_io=_source_io))
     if retirement:
         raise GovernsValidationError(retirement)
     _stamp_retirements(records)
     return records
 
 
+def _projection_require(condition: bool, problem: str) -> None:
+    if not condition:
+        raise GovernsValidationError([{"source_adr": None, "handle": None,
+                                       "problem": problem}])
+
+
+def _summary_authority_records(records: list[dict], facts: dict, removed: dict,
+                               aliases: dict) -> dict:
+    """Pure overlay of already validated migration facts, never an approval API.
+
+    Raw admission records remain available to receipt readers. Original retirements
+    precede selected historical edges; demotion cannot resurrect a predecessor.
+    """
+    import copy
+    rows = copy.deepcopy(records)
+    _projection_require(len({r["handle"] for r in rows}) == len(rows),
+                        "summaries duplicate source handle")
+    _stamp_retirements(rows)
+    original_retired = {r["handle"] for r in retired_records(rows)}
+    historical = copy.deepcopy(facts["historical_handles"])
+    retired = set(facts["retired_handles"]) | original_retired
+    _projection_require(not set(historical).intersection(retired | set(removed)),
+                        "summaries historical handle conflicts with retirement or removal")
+    _projection_require(not retired.intersection(removed), "summaries retirement conflicts with removal")
+    for row in rows:
+        _projection_require(not set(row.get("retires") or []).intersection(historical),
+                            "summaries historical handle cannot be retired again")
+    edges = {}
+    for fact in facts["historical_displacements"]:
+        _projection_require(set(fact) in ({"target_handle", "source_displacer", "source_identity", "source_ref"},
+            {"target_handle", "source_displacer", "source_identity", "source_ref", "publication_ref"}),
+            "summaries displacement shape invalid")
+        target, displacer = fact["target_handle"], fact["source_displacer"]
+        _projection_require(isinstance(target, str) and isinstance(displacer, str) and
+            _HANDLE_ANCHOR_RE.fullmatch(target) is not None and
+            _HANDLE_ANCHOR_RE.fullmatch(displacer) is not None and target in retired and
+            displacer not in removed and target not in historical and
+            isinstance(fact["source_identity"], str) and _DIGEST_RE.fullmatch(fact["source_identity"]),
+            "summaries displacement identities invalid")
+        ref = fact["source_ref"]
+        _projection_require(isinstance(ref, dict) and set(ref) == {"path", "source_adr", "clause_sha256"}
+            and all(isinstance(v, str) for v in ref.values()) and
+            _DIGEST_RE.fullmatch(ref["clause_sha256"]) and
+            displacer.split("/")[0] == ref["source_adr"], "summaries displacement source invalid")
+        key = (target, displacer)
+        _projection_require(key not in edges or edges[key] == fact,
+                            "summaries conflicting displacement provenance")
+        edges[key] = copy.deepcopy(fact)
+    proven_targets = {target for target, _ in edges}
+    _projection_require(retired - original_retired <= proven_targets,
+                        "summaries retirement lacks historical displacement provenance")
+    for row in rows:
+        if row["handle"] in retired:
+            row["retired_by"] = sorted(set(row.get("retired_by", [])) | {
+                fact["source_ref"]["source_adr"] for (target, _), fact in edges.items()
+                if target == row["handle"]}, key=adr_num)
+        if row["handle"] in historical:
+            row["historical"] = True
+    slugs, retired_slugs = live_and_retired_slugs(rows)
+    live_displacers = {}
+    for row in live_records(rows):
+        if row.get("source_status") == "Accepted":
+            for target in row.get("retires") or []:
+                live_displacers.setdefault(slug_of(target), set()).add(row["handle"])
+    for target in proven_targets:
+        slug = slug_of(target)
+        retired_slugs[slug] = sorted(set(retired_slugs.get(slug, [])) |
+                                     live_displacers.get(slug, set()))
+    historical_slugs = {}
+    for handle, fact in sorted(historical.items()):
+        _projection_require(isinstance(fact, dict) and set(fact) == {
+            "destination", "source_identity", "replacements"} and
+            _HANDLE_ANCHOR_RE.fullmatch(handle) is not None and
+            isinstance(fact["source_identity"], str) and _DIGEST_RE.fullmatch(fact["source_identity"]),
+            "summaries historical identity invalid")
+        destination = fact["destination"]
+        _projection_require(isinstance(destination, dict) and set(destination) == {"source_adr", "clause_sha256"}
+            and destination["source_adr"] == handle.split("/")[0] and
+            isinstance(destination["clause_sha256"], str) and _DIGEST_RE.fullmatch(destination["clause_sha256"]),
+            "summaries historical destination invalid")
+        replacements = fact["replacements"]
+        live_handles = {row["handle"] for row in live_records(rows)
+                        if row.get("source_status") == "Accepted" and row.get("source_kind", "adr") == "adr"}
+        _projection_require(isinstance(replacements, list) and replacements and
+            all(isinstance(h, str) and h in live_handles for h in replacements) and
+            len(set(replacements)) == len(replacements), "summaries replacement is not live architecture")
+        slug = slug_of(handle)
+        _projection_require(slug not in historical_slugs and slug not in slugs and
+            slug not in retired_slugs and slug not in {slug_of(h) for h in removed},
+            "summaries historical slug conflicts with another lane")
+        historical_slugs[slug] = dict(source_handle=handle, **fact)
+    _projection_require(set(historical_slugs) == set(facts["reserved_slugs"]),
+                        "summaries historical reservation mismatch")
+    _projection_require(not {r["handle"] for r in live_records(rows)}.intersection(removed) and
+        not (set(slugs) | set(retired_slugs)).intersection({slug_of(h) for h in removed}),
+        "summaries live or retired lane conflicts with removal")
+    _projection_require(not set(slugs).intersection(retired_slugs),
+                        "summaries live slug conflicts with retirement")
+    for handle, alias in aliases.items():
+        _projection_require(handle not in historical and handle not in retired and handle not in removed and
+            not set(alias["alias_handles"]).intersection(set(historical) | retired | set(removed)) and
+            slug_of(handle) not in historical_slugs,
+            "summaries alias conflicts with historical, retired or removed lane")
+    by_target = {}
+    for (target, _), fact in sorted(edges.items()):
+        by_target.setdefault(target, []).append(fact)
+    return dict(records=rows, slugs=slugs, retired_slugs=retired_slugs,
+                historical_slugs=historical_slugs, historical_displacements=by_target)
+
+
+class _PublicationCommitSlot:
+    """Private ASCII commit substitution; never an authority-bearing value."""
+    __slots__ = ()
+
+
+class _SummaryHashSlot(tuple):
+    __slots__ = ()
+
+    def __new__(cls, frame):
+        return tuple.__new__(cls, frame)
+
+    @property
+    def frame(self): return self
+
+
+class _SummaryOutputPlan(tuple):
+    __slots__ = ()
+
+    def __new__(cls, outputs):
+        return tuple.__new__(cls, outputs)
+
+    @property
+    def outputs(self): return self
+
+
+class _CommittedPublicationRef(tuple):
+    __slots__ = ()
+
+    def __new__(cls, commit):
+        _projection_require(isinstance(commit, str) and re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", commit),
+                            "summaries committed publication domain invalid")
+        return tuple.__new__(cls, (commit,))
+
+    @property
+    def commit(self): return self[0]
+
+
+def _plain_summary_value(value, ancestors=()) -> None:
+    """Validate finite plain models and encoding before any deferred slot exists."""
+    _projection_require(type(value) in (dict, list, str, int, bool, type(None)),
+                        "summaries model contains a non-plain or deferred input")
+    if isinstance(value, str):
+        try:
+            value.encode("utf-8")
+        except UnicodeError:
+            _projection_require(False, "summaries model is not UTF-8 encodable")
+    elif isinstance(value, (dict, list)):
+        _projection_require(id(value) not in ancestors, "summaries cyclic model refused")
+        if isinstance(value, dict):
+            _projection_require(all(type(key) is str for key in value), "summaries model key is not text")
+            for key in value: _plain_summary_value(key)
+        for item in (value.values() if isinstance(value, dict) else value):
+            _plain_summary_value(item, ancestors + (id(value),))
+
+
+def _summary_relative_path(value) -> bool:
+    return (isinstance(value, str) and bool(value) and not value.startswith("/")
+            and not any(part in ("", ".", "..") for part in value.split("/"))
+            and "\\" not in value and ":" not in value)
+
+
+def _summary_pending_publication(pending) -> None:
+    _plain_summary_value(pending)
+    _projection_require(isinstance(pending, dict) and set(pending) == {"path", "sha256", "close_identity"}
+        and _summary_relative_path(pending["path"]) and isinstance(pending["sha256"], str)
+        and _DIGEST_RE.fullmatch(pending["sha256"]), "summaries pending witness invalid")
+    close = pending["close_identity"]
+    _projection_require(isinstance(close, dict) and set(close) == {
+        "batch", "book_id", "run_id", "book_content_hash", "slot", "gate_prompt"},
+        "summaries pending close identity invalid")
+    _projection_require(isinstance(close["batch"], dict) and set(close["batch"]) == {"path", "sha256"}
+        and _summary_relative_path(close["batch"]["path"]) and
+        isinstance(close["batch"]["sha256"], str) and _DIGEST_RE.fullmatch(close["batch"]["sha256"])
+        and isinstance(close["book_id"], str) and re.fullmatch(r"(?:[A-Z][A-Z0-9]{1,9}-)?PB-\d{4}", close["book_id"])
+        and isinstance(close["run_id"], str) and re.fullmatch(r"RUN-\d{3,}", close["run_id"])
+        and isinstance(close["book_content_hash"], str) and re.fullmatch(r"sha256:[0-9a-f]{64}", close["book_content_hash"])
+        and isinstance(close["slot"], str) and re.fullmatch(r"implementation-\d+", close["slot"])
+        and type(close["gate_prompt"]) is int and close["gate_prompt"] > 0,
+        "summaries pending close fields invalid")
+
+
+def _committed_publication_ref(pending: dict, actual: dict) -> _CommittedPublicationRef:
+    """Domain check only. External proof boundary establishes this commit's provenance."""
+    _summary_pending_publication(pending)
+    _plain_summary_value(actual)
+    _projection_require(isinstance(actual, dict) and set(actual) == {"path", "sha256", "publication_commit"}
+        and actual["path"] == pending["path"] and actual["sha256"] == pending["sha256"] and
+        isinstance(actual["publication_commit"], str) and
+        re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", actual["publication_commit"]),
+        "summaries committed witness substitution invalid")
+    return _CommittedPublicationRef(actual["publication_commit"])
+
+
+def _compile_summary_json(value, *, pretty=True, level=0):
+    """Compile validated JSON into literal segments and closed private substitutions."""
+    if isinstance(value, (_PublicationCommitSlot, _SummaryHashSlot)):
+        return ('"', value, '"')
+    if not isinstance(value, (dict, list)):
+        return (json.dumps(value, ensure_ascii=True, allow_nan=False),)
+    if not value:
+        return ("{}" if isinstance(value, dict) else "[]",)
+    mapping = isinstance(value, dict)
+    parts = ["{" if mapping else "["]
+    items = sorted(value.items()) if mapping else [(None, v) for v in value]
+    for index, (key, item) in enumerate(items):
+        if index: parts.append(",")
+        if pretty: parts.append("\n" + "  " * (level + 1))
+        if mapping: parts.extend((json.dumps(key), ": " if pretty else ":"))
+        parts.extend(_compile_summary_json(item, pretty=pretty, level=level + 1))
+    if pretty: parts.append("\n" + "  " * level)
+    parts.append("}" if mapping else "]")
+    return tuple(parts)
+
+
+def _render_summary_parts(parts, commit):
+    return "".join(commit if isinstance(part, _PublicationCommitSlot) else
+        hashlib.sha256(_render_summary_parts(part.frame, commit).encode("utf-8")).hexdigest()
+        if isinstance(part, _SummaryHashSlot) else part for part in parts)
+
+
+def _materialize_summary_outputs(plan: _SummaryOutputPlan,
+                                 committed_publication_ref: _CommittedPublicationRef | None) -> dict[Path, bytes]:
+    """Only substitutions, canonical hashes and serialization; no content decisions."""
+    commit = committed_publication_ref.commit if committed_publication_ref is not None else None
+    return {path: _render_summary_parts(parts, commit).encode("utf-8") for path, parts in plan.outputs}
+
+
+def _plan_summary_outputs(loaded_inputs: dict, migration_facts: dict,
+                          pending_publication: dict | None) -> _SummaryOutputPlan:
+    """Compile four output contracts before visibility, with provenance-only slots.
+
+    Inputs are private loaded facts, not public approval overrides. U9 constructs a
+    candidate only after the migration proof boundary has validated those facts.
+    """
+    expected = {"tree", "paths", "records", "reviews", "aliases", "governs_from",
+        "implementation_map", "metadata", "archived_handles", "signed_handles",
+        "historical_clauses", "publication_history"}
+    _projection_require(isinstance(loaded_inputs, dict) and set(loaded_inputs) == expected,
+                        "summaries loaded input shape invalid")
+    data = {k: v for k, v in loaded_inputs.items() if k not in ("tree", "paths")}
+    _plain_summary_value(data); _plain_summary_value(migration_facts)
+    fact_keys = {"historical_handles", "historical_displacements", "retired_handles", "reserved_slugs",
+                 "retained_handles", "source_refs", "dependency_fingerprints"}
+    _projection_require(isinstance(migration_facts, dict) and fact_keys <= set(migration_facts)
+        and isinstance(migration_facts["historical_handles"], dict) and all(isinstance(migration_facts[k], list)
+            for k in fact_keys - {"historical_handles"}), "summaries migration fact shape invalid")
+    migration_facts = dict(migration_facts)
+    dependencies = {}
+    for ref in migration_facts["dependency_fingerprints"]:
+        _projection_require(isinstance(ref, dict) and set(ref) == {"path", "sha256"}
+            and _summary_relative_path(ref["path"]) and isinstance(ref["sha256"], str)
+            and _DIGEST_RE.fullmatch(ref["sha256"]), "summaries dependency reference invalid")
+        _projection_require(ref["path"] not in dependencies or dependencies[ref["path"]] == ref["sha256"],
+                            "summaries conflicting dependency fingerprints")
+        dependencies[ref["path"]] = ref["sha256"]
+    migration_facts["dependency_fingerprints"] = [dict(path=p, sha256=s) for p, s in sorted(dependencies.items())]
+    selected = {}
+    for ref in migration_facts["source_refs"]:
+        _projection_require(isinstance(ref, dict) and set(ref) == {
+            "path", "source_adr", "tier", "status", "source_identity", "clause_sha256"}
+            and _summary_relative_path(ref["path"]) and isinstance(ref["source_adr"], str)
+            and _ADR_ID_SHAPE_RE.fullmatch(ref["source_adr"]) and ref["tier"] in ("active", "archive")
+            and (ref["status"] is None or isinstance(ref["status"], str)) and
+            all(isinstance(ref[k], str) and _DIGEST_RE.fullmatch(ref[k])
+                for k in ("source_identity", "clause_sha256")), "summaries selected source reference invalid")
+        _projection_require(ref["source_identity"] not in selected, "summaries duplicate selected source")
+        selected[ref["source_identity"]] = ref
+    tree, paths = loaded_inputs["tree"], loaded_inputs["paths"]
+    _plain_summary_value(str(tree))
+    names = {"rule-table.md", "resolver.json", "implementation-map.md", "_meta.json"}
+    _projection_require(isinstance(tree, Path) and tree.is_absolute() and isinstance(paths, dict)
+        and set(paths) == names and all(isinstance(path, Path) and path.is_absolute() and
+            path == tree / "adrs/summaries" / name and ".." not in path.parts
+            for name, path in paths.items()), "summaries destinations are not contained canonical paths")
+    rows, reviews, aliases, gf = (data[k] for k in ("records", "reviews", "aliases", "governs_from"))
+    _projection_require(isinstance(rows, list) and isinstance(reviews, dict) and isinstance(aliases, dict)
+        and (gf is None or type(gf) is int and gf >= 0) and isinstance(data["implementation_map"], str),
+        "summaries corpus fields invalid")
+    _projection_require(set(reviews) == {"batches", "receipts", "no_rule"} and
+        isinstance(reviews["batches"], dict) and isinstance(reviews["receipts"], list) and
+        isinstance(reviews["no_rule"], list), "summaries loaded review model invalid")
+    _projection_require(all(isinstance(h, str) and _HANDLE_ANCHOR_RE.fullmatch(h)
+        for h in migration_facts["retired_handles"] + migration_facts["retained_handles"]) and
+        all(isinstance(slug, str) for slug in migration_facts["reserved_slugs"]),
+        "summaries migration handle lanes invalid")
+    for row in rows:
+        _projection_require(isinstance(row, dict) and all(isinstance(row.get(k), str)
+            for k in ("handle", "source_adr", "domain", "rule", "scope", "provenance"))
+            and type(row.get("adr_num")) is int and row["adr_num"] == adr_num(row["source_adr"])
+            and row["handle"].startswith(row["source_adr"] + "/")
+            and "historical" not in row and (row.get("source_status") is None or isinstance(row["source_status"], str))
+            and (_HANDLE_ANCHOR_RE.fullmatch(row["handle"]) or _OBS_HANDLE_ANCHOR_RE.fullmatch(row["handle"]))
+            and row["provenance"] in PROVENANCE_ENUM and
+            row.get("source_kind", "adr") in ("adr", "observation") and
+            isinstance(row.get("retires", []), list) and all(isinstance(h, str)
+                and _HANDLE_ANCHOR_RE.fullmatch(h) for h in row.get("retires", [])),
+            "summaries source record invalid")
+    for key in ("archived_handles", "signed_handles"):
+        _projection_require(isinstance(data[key], list) and all(isinstance(h, str)
+            and _HANDLE_ANCHOR_RE.fullmatch(h) for h in data[key]), "summaries retirement history invalid")
+    for handle, alias in aliases.items():
+        _projection_require(isinstance(alias, dict) and set(alias) == {"alias_of", "alias_handles"}
+            and _OBS_HANDLE_ANCHOR_RE.fullmatch(handle) and isinstance(alias["alias_of"], str)
+            and _ADR_ID_SHAPE_RE.fullmatch(alias["alias_of"]) and isinstance(alias["alias_handles"], list)
+            and all(isinstance(h, str) and h in {r["handle"] for r in rows}
+                and h.startswith(alias["alias_of"] + "/") for h in alias["alias_handles"])
+            and len(set(alias["alias_handles"])) == len(alias["alias_handles"]), "summaries alias shape invalid")
+    problems = retirement_problems(rows, removed_handles(reviews), set(data["signed_handles"]),
+                                   set(data["archived_handles"]))
+    if problems: raise GovernsValidationError(problems)
+    overlay = _summary_authority_records(rows, migration_facts, removed_handles(reviews), aliases)
+    for group in overlay["historical_displacements"].values():
+        for edge in group:
+            source = selected.get(edge["source_identity"])
+            _projection_require(source is not None and edge["source_ref"] == {
+                k: source[k] for k in ("path", "source_adr", "clause_sha256")} and
+                edge["source_displacer"] in (set(migration_facts["historical_handles"]) |
+                                             set(migration_facts["retained_handles"])) and
+                edge["target_handle"] not in data["signed_handles"] and
+                edge["target_handle"].split("/")[0] != source["source_adr"],
+                "summaries historical retirement source or signature invalid")
+    for fact in migration_facts["historical_handles"].values():
+        source = selected.get(fact["source_identity"])
+        _projection_require(source is not None and fact["destination"] == {
+            "source_adr": source["source_adr"], "clause_sha256": source["clause_sha256"]},
+            "summaries historical handle is not a selected source")
+    metadata = dict(data["metadata"])
+    _projection_require(set(metadata) == {"adr_frontmatter_sha256", "backfill_reviews_sha256",
+        "observations_sha256", "survey_receipts_sha256", "input_domain", "schema", "tool"}
+        and metadata["schema"] == "6" and metadata["tool"] == "summarize-adrs.py"
+        and isinstance(metadata["input_domain"], list) and all(isinstance(x, str)
+            and x in INPUT_DOMAIN_KNOWN for x in metadata["input_domain"])
+        and len(set(metadata["input_domain"])) == len(metadata["input_domain"]),
+        "summaries metadata contract invalid")
+    for key in ("adr_frontmatter_sha256", "backfill_reviews_sha256", "observations_sha256", "survey_receipts_sha256"):
+        _projection_require((key != "adr_frontmatter_sha256" and metadata[key] is None) or
+            isinstance(metadata[key], str) and _DIGEST_RE.fullmatch(metadata[key]), "summaries input digest invalid")
+    clauses = data["historical_clauses"]
+    _projection_require(isinstance(clauses, list), "summaries historical clause roster invalid")
+    accepted = {r["handle"] for r in live_records(overlay["records"])
+                if r.get("source_status") == "Accepted" and r.get("source_kind", "adr") == "adr"}
+    for clause in clauses:
+        _projection_require(isinstance(clause, dict) and set(clause) == {
+            "source_identity", "source_ref", "destination", "replacements"} and
+            isinstance(clause["source_identity"], str) and _DIGEST_RE.fullmatch(clause["source_identity"])
+            and clause["source_ref"] in [{k: s[k] for k in ("path", "source_adr", "clause_sha256")}
+                                        for s in migration_facts["source_refs"]]
+            and clause["destination"] == {k: clause["source_ref"][k] for k in ("source_adr", "clause_sha256")}
+            and selected.get(clause["source_identity"]) is not None and
+            {k: selected[clause["source_identity"]][k] for k in ("path", "source_adr", "clause_sha256")} == clause["source_ref"]
+            and isinstance(clause["replacements"], list) and all(isinstance(h, str) and h in accepted
+                for h in clause["replacements"]) and len(set(clause["replacements"])) == len(clause["replacements"]),
+            "summaries historical clause is not a selected source")
+    _projection_require(len({c["source_identity"] for c in clauses}) == len(clauses),
+                        "summaries duplicate historical clause")
+    _projection_require(isinstance(data["publication_history"], list), "summaries publication history invalid")
+    for ref in data["publication_history"]:
+        _projection_require(isinstance(ref, dict) and set(ref) == {"path", "sha256", "publication_commit"}
+            and _summary_relative_path(ref["path"]) and isinstance(ref["sha256"], str)
+            and _DIGEST_RE.fullmatch(ref["sha256"]) and isinstance(ref["publication_commit"], str)
+            and re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", ref["publication_commit"]),
+            "summaries publication history fields invalid")
+    rows = overlay["records"]
+    table = build_rule_table(rows, reviews, gf)
+    resolver = {**build_resolver(rows, reviews, gf, aliases), "slugs": overlay["slugs"],
+        "retired_slugs": overlay["retired_slugs"], "historical_slugs": overlay["historical_slugs"],
+        "historical_displacements": overlay["historical_displacements"], "historical_clauses": clauses}
+    if overlay["historical_slugs"]:
+        table += "\n## Historical implementation handles\n\n| handle | source identity | replacements |\n|---|---|---|\n"
+        for value in overlay["historical_slugs"].values():
+            table += f"| {_cell(value['source_handle'])} | {value['source_identity']} | {_cell(', '.join(value['replacements']))} |\n"
+    if clauses:
+        table += "\n## Historical implementation clauses\n\n| source | clause digest | source identity |\n|---|---|---|\n"
+        for clause in sorted(clauses, key=lambda c: c["source_identity"]):
+            table += f"| {_cell(clause['source_ref']['source_adr'])} | {clause['source_ref']['clause_sha256']} | {clause['source_identity']} |\n"
+    if pending_publication is None:
+        _projection_require(not migration_facts["historical_handles"] and not
+            migration_facts["historical_displacements"] and not migration_facts["source_refs"] and
+            not migration_facts["dependency_fingerprints"] and not clauses and not data["publication_history"],
+            "summaries migration facts lack publication provenance")
+    else:
+        _summary_pending_publication(pending_publication)
+        _projection_require(dependencies.get(pending_publication["close_identity"]["batch"]["path"]) ==
+            pending_publication["close_identity"]["batch"]["sha256"], "summaries pending batch absent from input snapshot")
+        publication = dict(path=pending_publication["path"], sha256=pending_publication["sha256"],
+                           publication_commit=_PublicationCommitSlot())
+        for group in resolver["historical_displacements"].values():
+            for edge in group:
+                if "publication_ref" in edge:
+                    _committed_publication_ref(pending_publication, edge["publication_ref"])
+                edge["publication_ref"] = publication
+        frame = dict(publication=publication, close_identity=pending_publication["close_identity"],
+            publication_history=data["publication_history"], source_refs=migration_facts["source_refs"],
+            dependency_fingerprints=migration_facts["dependency_fingerprints"],
+            historical_displacements=resolver["historical_displacements"],
+            historical_slugs=resolver["historical_slugs"], historical_clauses=clauses)
+        metadata["migration"] = frame
+        metadata["migration_inputs_sha256"] = _SummaryHashSlot(_compile_summary_json(frame, pretty=False))
+        metadata["input_domain"] = sorted(set(metadata["input_domain"]) | {"implementation-migration"})
+    output_parts = ((paths["rule-table.md"], (table,)),
+        (paths["resolver.json"], _compile_summary_json(resolver) + ("\n",)),
+        (paths["implementation-map.md"], (data["implementation_map"],)),
+        (paths["_meta.json"], _compile_summary_json(metadata) + ("\n",)))
+    for _, parts in output_parts:
+        for part in parts:
+            if isinstance(part, str): part.encode("utf-8")
+    return _SummaryOutputPlan(output_parts)
+
+
 def collect_observation_alias_rows(observations: Path | None,
-                                   records: list[dict]) -> dict[str, dict]:
+                                   records: list[dict], *, _source_io=None) -> dict[str, dict]:
     """Resolver ALIAS rows for `decided` observations (ADR-0095 requirement 4).
 
     A decided record contributes no rule row but keeps each of its handles in
@@ -1662,8 +2150,10 @@ def collect_observation_alias_rows(observations: Path | None,
         return {}
     rows: dict[str, dict] = {}
     problems: list[dict] = []
-    for path in observation_paths(observations):
-        fm = read_frontmatter(path.read_text(encoding="utf-8"))
+    for path in observation_paths(observations, _source_io=_source_io):
+        fm = read_frontmatter(_source_text(path, _source_io))
+        _projection_require("record_type" not in fm,
+                            "summaries implementation payload cannot supply an observation alias")
         oid = str(fm.get("id") or "")
         if not oid or fm.get("status") != OBSERVATION_ALIAS_STATUS:
             continue
@@ -1711,11 +2201,11 @@ def collect_observation_alias_rows(observations: Path | None,
     return rows
 
 
-def collect_adr_ids(adrs: Path) -> list[str]:
+def collect_adr_ids(adrs: Path, *, _source_io=None) -> list[str]:
     """Sorted active ADR ids (by number)."""
     ids: list[str] = []
-    for path in adr_paths(adrs):
-        fm = read_frontmatter(path.read_text(encoding="utf-8"))
+    for path in adr_paths(adrs, _source_io=_source_io):
+        fm = read_frontmatter(_source_text(path, _source_io))
         aid = fm.get("id")
         if aid:
             ids.append(str(aid))
@@ -1794,14 +2284,14 @@ def reviews_path(adrs: Path) -> Path:
     return adrs / "summaries" / REVIEWS_FILENAME
 
 
-def backfill_reviews_sha256(adrs: Path) -> str | None:
+def backfill_reviews_sha256(adrs: Path, *, _source_io=None) -> str | None:
     """SHA-256 of the reviews manifest's raw bytes; None when the file is
     absent (the input hash covers it as primary authored data per the ADR-0086
     Decision 3 amendment)."""
     path = reviews_path(adrs)
-    if not path.is_file():
+    if not _source_is_file(path, _source_io):
         return None
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return hashlib.sha256(_source_bytes(path, _source_io)).hexdigest()
 
 
 def _reviews_problem(handle: str | None, problem: str) -> dict:
@@ -1829,7 +2319,7 @@ def _normalize_signed(value, batch_id: str, problems: list[dict]) -> str | None:
     return None
 
 
-def read_reviews(adrs: Path) -> dict:
+def read_reviews(adrs: Path, *, _source_io=None) -> dict:
     """Read and shape-validate `adrs/summaries/backfill-reviews.yml`.
 
     Returns a normalized manifest:
@@ -1853,16 +2343,20 @@ def read_reviews(adrs: Path) -> dict:
     never an error.
     """
     path = reviews_path(adrs)
-    if not path.is_file():
+    if not _source_is_file(path, _source_io):
         return {"batches": {}, "receipts": [], "no_rule": []}
+    return parse_reviews(_source_text(path, _source_io))
+
+
+def parse_reviews(text: str) -> dict:
+    """Parse the existing backfill grammar from supplied source text, without authority."""
     import yaml
-    text = path.read_text(encoding="utf-8")
     # The duplicate-key refusal runs on the composer node graph (no object
     # construction), the same guard the catalog read path carries — the
     # reviews manifest is likewise an authored source of truth. The full
     # strict catalog loader is NOT used: it refuses the manifest's flow
     # sequences, which are legal here.
-    from _yaml_min import CatalogYamlError, _refuse_catalog_duplicate_keys
+    from _yaml_min import CatalogYamlError, _refuse_duplicate_keys_bounded as _refuse_catalog_duplicate_keys
     try:
         _refuse_catalog_duplicate_keys(text, yaml)
     except CatalogYamlError as exc:
@@ -2513,20 +3007,121 @@ def backfill_problems(root: Path, adrs: Path, manifest: dict) -> tuple[list[dict
 
 # ── run-snapshot artifact bindings (.yaml only) ────────────────────────────
 
-def read_run_bindings(runs: Path) -> dict[str, dict]:
+def _run_binding_domain(runs: Path, repo_root: Path | None, *, _source_io=None) -> tuple[str, set[str], Path | None]:
+    """Resolve only explicit configuration or immediately adjacent source identities."""
+    prefix = ""
+    tree = runs.parent.parent if runs.name == "runs" and runs.parent.name == "promptbooks" else None
+    if repo_root is not None:
+        root = _source_resolve(Path(repo_root), _source_io)
+        tree = resolve_tree(root, _source_io=_source_io)
+        expected = tree / "promptbooks" / "runs"
+        resolved = _source_resolve(runs, _source_io)
+        if resolved != _source_resolve(expected, _source_io) or not resolved.is_relative_to(_source_resolve(tree, _source_io)):
+            raise GovernsValidationError([_gate_problem(
+                "run bindings require the configured tree's promptbooks/runs path")])
+        prefix = artifact_prefix(root, _source_io=_source_io)
+    identities: set[str] = set()
+    if tree is not None:
+        adrs = tree / "adrs"
+        if _source_contained(tree, "adrs", _source_io) is None:
+            raise GovernsValidationError([_gate_problem("run-binding sources escape their tree")])
+        for path in sorted(_source_glob(adrs, "*.md", _source_io)):
+            if not re.match(r"(?:[A-Z][A-Z0-9]{1,9}-)?ADR-\d{4}(?:-|\.md$)", path.name):
+                continue
+            if _source_contained(adrs, path.name, _source_io) is None:
+                raise GovernsValidationError([_gate_problem("run-binding source escapes its ADR directory")])
+            if not _source_is_file(path, _source_io):
+                continue
+            aid = read_frontmatter(_source_text(path, _source_io)).get("id")
+            if isinstance(aid, str) and re.fullmatch(r"(?:[A-Z][A-Z0-9]{1,9}-)?ADR-\d{4}", aid):
+                identities.add(aid)
+    return prefix, identities, tree
+
+
+def _run_artifact_is_held(tree: Path | None, artifact, repo_root, source_io) -> bool:
+    """Classify before identity matching, without discovering parent config."""
+    if tree is None:
+        return False
+    import importlib.util
+    key = "_retained_evidence"
+    retained = sys.modules.get(key)
+    if retained is None:
+        spec = importlib.util.spec_from_file_location(key, Path(__file__).with_name("retained_evidence.py"))
+        retained = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(retained)
+        sys.modules[key] = retained
+    try:
+        # Traversal refuses before any not-held answer, in every mode.
+        path = retained._candidate(Path(str(artifact)))
+    except retained.RetainedEvidenceRefusal:
+        raise GovernsValidationError([_gate_problem("retained-evidence-layout-refused")]) from None
+    # An ASCII code point has exactly one encoding and no normalization or
+    # case-fold length variant. A leading name of more than 255 ASCII
+    # characters therefore exceeds the 255-unit name limit of APFS and ext4
+    # under every lookup, and cannot name an existing entry. Nothing beneath
+    # it exists either, so it is an ordinary reference and is never probed.
+    # Only the leading name qualifies, because a shorter prefix can exist and
+    # reach a holding, and that spelling keeps the probe's answer. A
+    # non-ASCII name keeps the fail-closed probe: APFS matches names
+    # normalization-insensitively, so a long spelling can resolve to a
+    # shorter stored name.
+    names = [part for part in path.parts if part != path.anchor]
+    if names and names[0].isascii() and len(names[0]) > 255:
+        return False
+    resolved_root = None
+    if repo_root is not None:
+        resolved_root = _source_resolve(Path(repo_root), source_io)
+    excluded = ()
+    if source_io is not None:
+        from admission_source_io import SourceIOExcluded
+        excluded = (SourceIOExcluded,)
+    try:
+        if resolved_root is not None:
+            if not path.is_absolute():
+                path = resolved_root / path
+            elif source_io is not None and not (
+                    path.is_relative_to(Path(repo_root)) or path.is_relative_to(resolved_root)):
+                # Guarded IO cannot see outside its root, so an outside
+                # absolute is classified by spelling alone, with no filesystem
+                # access. A spelled holding refuses. An outside symlink that
+                # spells no holding reads as an ordinary reference: an
+                # accepted, recorded mode divergence from the default probe.
+                if retained.spells_holding(path):
+                    retained._refuse()
+                return False
+        return retained.is_retained_evidence_path(tree, path, _source_io=source_io)
+    except retained.RetainedEvidenceRefusal:
+        raise GovernsValidationError([_gate_problem("retained-evidence-layout-refused")]) from None
+    except excluded:
+        return True
+
+
+def read_run_bindings(runs: Path, *, repo_root: Path | None = None, _source_io=None) -> dict[str, dict]:
     """Map ADR id -> {"books": set, "runs": set} from run-snapshot artifacts.
 
     Scans every `run-*.yaml` snapshot, walks each prompt's `artifacts` list, and
-    binds any ADR id referenced by an artifact string to that run's book and run
-    ids. Legacy `.md` runs are ignored (ADR-0085 Decision 2, .yaml runs only).
+    binds complete identities in the configured namespace or active source domain.
+    Without an explicit root, complete bare legacy references remain readable,
+    including absent source records; no parent configuration is searched.
+    Legacy `.md` runs are ignored (ADR-0085 Decision 2, .yaml runs only).
     """
     import yaml
+    runs = Path(runs)
+    prefix, identities, tree = _run_binding_domain(runs, repo_root, _source_io=_source_io)
+    namespace = f"{prefix}-ADR-" if prefix else "ADR-"
+    tokens = re.compile(r"(?<![\w-])(?:[A-Z][A-Z0-9]{1,9}-)?ADR-\d{4}(?!\w)")
     bindings: dict[str, dict] = {}
-    if not runs.is_dir():
+    if not _source_is_dir(runs, _source_io):
         return bindings
-    for snap in sorted(runs.glob("*/run-*.yaml")):
+    if _source_io is None:
+        snapshots = runs.glob("*/run-*.yaml")
+    else:
+        snapshots = [snap for directory in _source_glob(runs, "*", _source_io)
+                     if _source_is_dir(directory, _source_io)
+                     for snap in _source_glob(directory, "run-*.yaml", _source_io)]
+    for snap in sorted(snapshots):
         try:
-            doc = yaml.safe_load(snap.read_text(encoding="utf-8")) or {}
+            doc = yaml.safe_load(_source_text(snap, _source_io)) or {}
         except yaml.YAMLError:
             continue
         if not isinstance(doc, dict):
@@ -2538,7 +3133,11 @@ def read_run_bindings(runs: Path) -> dict[str, dict]:
             if not isinstance(prompt, dict):
                 continue
             for art in prompt.get("artifacts") or []:
-                for aid in _ADR_ID_RE.findall(str(art)):
+                if _run_artifact_is_held(tree, art, repo_root, _source_io):
+                    continue
+                for aid in tokens.findall(str(art)):
+                    if not aid.startswith(namespace) and aid not in identities:
+                        continue
                     slot = bindings.setdefault(aid, {"books": set(), "runs": set()})
                     if book_id:
                         slot["books"].add(book_id)
@@ -2716,13 +3315,14 @@ def build_resolver(records: list[dict], reviews: dict | None = None,
     return resolver
 
 
-def build_implementation_map(adrs: Path, runs: Path) -> str:
+def build_implementation_map(adrs: Path, runs: Path, *, repo_root: Path | None = None, _source_io=None) -> str:
     """ADR <-> run map: one row per active ADR, sorted by ADR number.
 
     implemented = yes when the ADR has >=1 run binding (an artifact of some
     .yaml run references it).
     """
-    bindings = read_run_bindings(runs)
+    bindings = (read_run_bindings(runs, repo_root=repo_root) if _source_io is None else
+                read_run_bindings(runs, repo_root=repo_root, _source_io=_source_io))
     out = [
         "# ADR <-> run implementation map",
         "",
@@ -2732,7 +3332,7 @@ def build_implementation_map(adrs: Path, runs: Path) -> str:
         "| ADR | implemented | promptbooks | runs |",
         "|-----|-------------|-------------|------|",
     ]
-    for aid in collect_adr_ids(adrs):
+    for aid in collect_adr_ids(adrs, _source_io=_source_io):
         slot = bindings.get(aid)
         if slot and slot["runs"]:
             implemented = "yes"
@@ -2746,13 +3346,13 @@ def build_implementation_map(adrs: Path, runs: Path) -> str:
 
 # ── manifest + coverage ────────────────────────────────────────────────────
 
-def read_manifest(root: Path) -> dict:
+def read_manifest(root: Path, *, _source_io=None) -> dict:
     """Parse <docs_dir>/manifest.yml into a dict ({} when absent)."""
-    path = resolve_tree(root) / "manifest.yml"
-    if not path.exists():
+    path = resolve_tree(root, _source_io=_source_io) / "manifest.yml"
+    if not _source_exists(path, _source_io):
         return {}
     import yaml
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return yaml.safe_load(_source_text(path, _source_io)) or {}
 
 
 def governs_from(manifest: dict) -> int | None:

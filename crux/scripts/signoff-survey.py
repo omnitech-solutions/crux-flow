@@ -56,6 +56,7 @@ import argparse
 import datetime
 import json
 import os
+import stat
 import sys
 from pathlib import Path
 
@@ -94,16 +95,24 @@ class Contradiction(ss.SurveySheetError):
 
 def make_context(root: Path, docs_dir: str | None, batch_id: str | None,
                  today: str) -> dict:
-    root = Path(root).resolve()
+    import observation_admission as admission
+    layout = admission._load_layout(root, docs_dir=docs_dir)
+    try:
+        return _make_context(layout, batch_id, today)
+    except BaseException:
+        layout["source_io"].close()
+        raise
+
+
+def _make_context(layout, batch_id, today):
+    root, tree, source_io = layout["root"], layout["tree"], layout["source_io"]
     # `--docs-dir` is an operator-supplied component joined onto a validated
     # root, and a guard that validates a prefix and then concatenates an
     # unvalidated suffix has validated nothing. It takes the SAME verdict the
     # configured value takes, through the one shared implementation — not a
     # local re-check, and not the write guards below, which cannot see it: every
     # write here is `contained_under=tree` and the traversed path IS `tree`.
-    tree = (sp.resolve_tree(root) if docs_dir is None
-            else validate_docs_dir_override(root, docs_dir))
-    manifest = sp.read_manifest(root)
+    manifest = layout["manifest"]
     if "observations" not in (manifest.get("concerns_enabled") or []):
         raise EnvironmentError(
             "`observations` is absent from manifest.yml concerns_enabled — "
@@ -112,40 +121,41 @@ def make_context(root: Path, docs_dir: str | None, batch_id: str | None,
     # this lane cannot ratify into. It is re-taken HERE rather than trusted
     # from the scaffold, because the sign-off is the writer and it re-reads the
     # concern on every cell.
-    ss.assert_unprefixed_tree(root)
+    ss.assert_unprefixed_tree(root, _source_io=source_io)
     # [SECURITY:S5] The concern directory is RESOLVED and proven contained
     # before anything resolves against it. Every reader below joins names
     # onto `obs`, and `resolve_contained(obs, name)` resolves `obs` too — so
     # a symlinked concern directory compares an outside directory against
     # itself and admits everything under it. One implementation, shared with
     # the projection that reads the same directory.
-    obs = sp.observations_root(tree)
-    if not obs.is_dir():
+    obs = layout["observations"]
+    if source_io.kind(obs) != "directory":
         raise EnvironmentError(f"the observations directory {redact(obs, quoted=False)} is absent")
     if batch_id is None:
-        batch_id = _infer_batch(obs)
+        batch_id = _infer_batch(obs, _source_io=source_io)
     if not ss.BATCH_ID_RE.match(batch_id):
         raise ValueError(f"batch id {redact(batch_id)} is not SVY-NNNN")
     return {"root": root, "tree": tree, "obs": obs, "batch_id": batch_id,
-            "paths": ss.receipt_paths(obs, batch_id), "date": today,
-            "writes": []}
+            "paths": ss.receipt_paths(obs, batch_id, _source_io=source_io), "date": today,
+            "writes": [], "_layout": layout, "_docs_dir": layout["docs_dir"]}
 
 
-def _infer_batch(obs: Path) -> str:
+def _infer_batch(obs: Path, *, _source_io) -> str:
     """The one batch this invocation means: the live sheet if there is one,
     else the one incomplete batch. Ambiguity refuses rather than guesses — a
     sign-off that picked the wrong batch would sign a human's name onto a
     review they did not read."""
-    live = sorted(ss.SHEET_RE.match(p.name).group(1) for p in obs.glob("survey-*.yml")
+    live = sorted(ss.SHEET_RE.match(p.name).group(1) for p in _source_io.glob(obs, "survey-*.yml")
                   if ss.SHEET_RE.match(p.name))
     if len(live) == 1:
         return live[0]
     if live:
         raise ValueError(f"more than one live sheet ({redact(', '.join(live), quoted=False)}) — "
                          "name the batch with --batch")
-    known = list(ss.batch_ids(obs))
+    known = list(ss.batch_ids(obs, _source_io=_source_io))
     pending = [bid for bid in known
-               if ss.batch_state(ss.receipt_paths(obs, bid)["receipt"], obs) != "S9"]
+               if ss.batch_state(ss.receipt_paths(obs, bid, _source_io=_source_io)["receipt"], obs,
+                                 _source_io=_source_io) != "S9"]
     if len(pending) == 1:
         return pending[0]
     if pending:
@@ -169,6 +179,27 @@ def _infer_batch(obs: Path) -> str:
 
 # ── the plan ───────────────────────────────────────────────────────────────
 
+def _io(ctx):
+    """Keep each read operation anchored; a completed cell starts a new snapshot."""
+    if ctx.get("_layout") is None:
+        import observation_admission as admission
+        layout = admission._load_layout(ctx["root"], docs_dir=ctx["_docs_dir"])
+        if layout["tree"] != ctx["tree"] or layout["observations"] != ctx["obs"]:
+            layout["source_io"].close()
+            raise ss.SurveySheetError(["admission-selected-tree-changed"])
+        ctx["_layout"] = layout
+    return ctx["_layout"]["source_io"]
+
+
+def _close_reads(ctx):
+    if ctx.get("_layout") is not None:
+        ctx["_layout"]["source_io"].close()
+        ctx["_layout"] = None
+
+
+def _file(ctx, path):
+    return _io(ctx).kind(path) == "file"
+
 def _read_bound_sheet(ctx: dict) -> dict:
     """The sheet this batch is bound to, live or archived.
 
@@ -178,16 +209,16 @@ def _read_bound_sheet(ctx: dict) -> dict:
     to it; anything else is an edit made after the signature (cell 16).
     """
     paths = ctx["paths"]
-    if paths["sheet"].is_file():
-        if paths["live"].is_file():
-            if paths["live"].read_bytes() != paths["sheet"].read_bytes():
+    if _file(ctx, paths["sheet"]):
+        if _file(ctx, paths["live"]):
+            if _io(ctx).read_bytes(paths["live"]) != _io(ctx).read_bytes(paths["sheet"]):
                 raise Contradiction([
                     f"{redact(paths['live'].name, quoted=False)} differs from the archived sheet "
                     f"this batch was signed on — a signed sheet is immutable, "
                     "so the live copy is never edited after the signature"])
-        return ss.read_sheet(paths["sheet"])
-    if paths["live"].is_file():
-        return ss.read_sheet(paths["live"])
+        return ss.read_sheet(paths["sheet"], _source_io=_io(ctx))
+    if _file(ctx, paths["live"]):
+        return ss.read_sheet(paths["live"], _source_io=_io(ctx))
     raise ss.SurveySheetError([
         f"neither {redact(paths['live'], quoted=False)} nor {redact(paths['sheet'], quoted=False)} exists — there is no "
         f"sheet for batch {redact(ctx['batch_id'], quoted=False)}"])
@@ -198,6 +229,7 @@ def build_plan(ctx: dict) -> tuple[dict, list[dict]]:
     refusal runs here, before the first write of any run — including a resume,
     so a tree that drifted under a half-published batch refuses rather than
     completing onto it."""
+    import observation_admission as admission
     sheet = _read_bound_sheet(ctx)
     # The tree, before anything else about the batch is believed. A receipt
     # and its archived sheet are one directory; copying that directory into
@@ -208,11 +240,11 @@ def build_plan(ctx: dict) -> tuple[dict, list[dict]]:
     # the digest binds them to each other, not to a tree.
     ss.assert_tree_identity(sheet.get("scaffold_provenance"), ctx["root"],
                             ctx["tree"],
-                            subject=f"batch {ctx['batch_id']}'s review sheet")
-    if ctx["paths"]["receipt"].is_file():
+                            subject=f"batch {ctx['batch_id']}'s review sheet", _source_io=_io(ctx))
+    if _file(ctx, ctx["paths"]["receipt"]):
         ss.assert_tree_identity(
             _receipt(ctx).get("scaffold_provenance"), ctx["root"],
-            ctx["tree"], subject=f"batch {ctx['batch_id']}'s receipt")
+            ctx["tree"], subject=f"batch {ctx['batch_id']}'s receipt", _source_io=_io(ctx))
     # A pre-v2 sheet carries no `rule` and no `evidence`, so its signature
     # covers an anchor id rather than a claim — refused on EVERY publish path,
     # not only a first signature. A v1 sheet and receipt also lack the
@@ -221,7 +253,7 @@ def build_plan(ctx: dict) -> tuple[dict, list[dict]]:
     # that does. See `survey_sheet.assert_signable`.
     ss.assert_signable(sheet)
     state_path = ctx["tree"].joinpath(*ss.STATE_FILE_REL)
-    rows = StateFile(state_path).rows if state_path.is_file() else {}
+    rows = StateFile(state_path, _source_io=_io(ctx)).rows if _file(ctx, state_path) else {}
     # `read_recorded_observations` raises ValueError for its fail-closed parse
     # AND for its containment refusal. Both are findings in this lane, not
     # environment errors: `main` routes a bare ValueError to exit 2, which
@@ -229,12 +261,15 @@ def build_plan(ctx: dict) -> tuple[dict, list[dict]]:
     # the very same file at exit 1. Two readers of one directory must not
     # disagree about which lane a refusal belongs in.
     try:
-        recorded = read_recorded_observations(ctx["obs"])
+        recorded = read_recorded_observations(ctx["obs"], repo_root=ctx["root"],
+            docs_dir=ctx["tree"].relative_to(ctx["root"]).as_posix(), _source_io=_io(ctx))
+    except admission.AdmissionRefusal as exc:
+        raise ss.SurveySheetError(["admission-context-or-source-refused"]) from exc
     except ValueError as exc:
         raise ss.SurveySheetError([str(exc)]) from exc
     own: dict[str, str] = {}
     bound: dict[str, str] = {}
-    if ctx["paths"]["receipt"].is_file():
+    if _file(ctx, ctx["paths"]["receipt"]):
         receipt = _receipt(ctx)
         # Keyed by ANCHOR, not a flat id set: each exemption in `build_plan`
         # is for the row that allocated the record, never for a peer row.
@@ -243,55 +278,35 @@ def build_plan(ctx: dict) -> tuple[dict, list[dict]]:
         # The row's candidate is the one the SIGNATURE named, never the one an
         # anchor re-resolves to now. See `survey_sheet.build_plan`.
         bound = {r["anchor_id"]: r["candidate_id"] for r in receipt["rows"]}
-    live_slugs, retired_slugs = _slug_maps(ctx)
-    plan = ss.build_plan(sheet, rows, recorded, root=ctx["root"],
+    import observation_admission as admission
+    try:
+        context = admission._complete_context(ctx["_layout"])
+        plan = ss.build_plan(sheet, rows, recorded, root=ctx["root"],
                          obs_dir=ctx["obs"],
-                         disposed_elsewhere=ss.disposed_candidates(ctx["obs"]),
+                         disposed_elsewhere=ss.disposed_candidates(ctx["obs"], _source_io=_io(ctx)),
                          own_record_ids=own, bound_candidates=bound,
-                         live_slugs=live_slugs, retired_slugs=retired_slugs)
-    if not ctx["paths"]["receipt"].is_file():
+                         _admission_context=context)
+    except ss.SurveySheetError:
+        raise
+    except (ValueError, OSError, RuntimeError) as exc:
+        raise ss.SurveySheetError(["admission-context-or-source-refused"]) from exc
+    ctx["_admission_context"] = context
+    if not _file(ctx, ctx["paths"]["receipt"]):
         ss.validate_receipt(planned_receipt(ctx, sheet, plan),
                             "the receipt this sign-off would write")
     return sheet, plan
 
 
 def _receipt(ctx: dict) -> dict:
-    return ss.read_receipt(ctx["paths"]["receipt"])
+    return ss.read_receipt(ctx["paths"]["receipt"], _source_io=_io(ctx))
 
 
 def _slug_maps(ctx: dict) -> tuple[dict, dict]:
-    """`(live_slugs, retired_slugs)` over the corpus this batch publishes
-    into — the two maps `build_plan`'s "already taken" refusal reads
-    (ADR-0099 clause 3).
-
-    The corpus is the same one the summaries projection reads: active ADRs
-    UNION ratified observations, through `sp.collect_records`, and the maps
-    come from `sp.live_and_retired_slugs`, the ONE builder the resolver uses.
-    A sign-off that computed its own slug map could admit a slug the
-    projection then refuses fail-closed for the whole tree; reading the
-    resolver's builder is what makes the two agree.
-
-    `collect_records` never consults the survey receipts — the below-S9
-    refusal lives in `sp.survey_receipts_problem`, which the regenerators
-    call and this lane does not — so an in-flight batch can read the corpus
-    it is about to join. From S4 on its own promoted records are in that
-    corpus; `build_plan` excludes each one for its OWN row, by
-    `own_record_ids`.
-
-    The ADR directory is joined onto `ctx["tree"]`, never resolved from the
-    root: `--docs-dir` may name a tree the layout config does not, and every
-    other path in this lane already comes off `ctx["tree"]`. An absent ADR
-    directory reads as no ADR records, which is the observations-only tree
-    the projection also admits.
-
-    A `GovernsValidationError` here is a corpus already in violation — a
-    duplicate handle, or two live slugs colliding — and it propagates to
-    `main`'s exit-2 lane exactly as the projection's own refusal would."""
-    manifest = sp.read_manifest(ctx["root"])
-    records = sp.collect_records(ctx["tree"] / "adrs",
-                                 governs_from=sp.governs_from(manifest),
-                                 observations=ctx["obs"])
-    return sp.live_and_retired_slugs(records)
+    """Compatibility view of the shared all-lane operation context."""
+    import observation_admission as admission
+    _io(ctx)
+    context = admission._complete_context(ctx["_layout"])
+    return context["reservations"]["slugs"], context["reservations"]["retired_slugs"]
 
 
 def _sheet_ref(ctx: dict) -> str:
@@ -354,7 +369,8 @@ def allocation(ctx: dict, plan: list[dict], receipt: dict | None) -> dict:
                for r in receipt["rows"] if r["record_id"]}
         if got:
             return got
-    number = ss.read_counter(sp.read_manifest(ctx["root"]), "observation",
+    _io(ctx)
+    number = ss.read_counter(ctx["_layout"]["manifest"], "observation",
                              "next_number", 1)
     out = {}
     for i, entry in enumerate(e for e in plan if e["verdict"] == "ratify"):
@@ -640,7 +656,7 @@ def write_log_entry(ctx: dict, receipt: dict) -> str:
     `iterate` candidate; hoisting a signed write path shared with another
     sign-off is a refactor outside ADR-0098's scope."""
     log_path = ctx["tree"] / "log.md"
-    text = log_path.read_text(encoding="utf-8") if log_path.is_file() else ""
+    text = _io(ctx).read_text(log_path) if _file(ctx, log_path) else ""
     subject = _log_subject(ctx["batch_id"])
     ids = list(receipt["records"])
     stamp = _log_date(receipt)
@@ -684,12 +700,13 @@ def write_journal_hook(ctx: dict, receipt: dict) -> str:
     back-dated: the join is by day, so the stamp is cosmetic — the same
     decision `signoff-backfill._write_journal_hook` records."""
     journal_dir = ctx["tree"] / "journal"
-    if journal_dir.is_symlink():
+    metadata = _io(ctx).metadata(journal_dir)
+    if metadata is not None and stat.S_ISLNK(metadata["st_mode"]):
         raise ss.SurveySheetError([
             f"refusing to write the journal hook: {redact(journal_dir, quoted=False)} is a symlink"])
-    root_resolved = ctx["tree"].resolve()
-    if journal_dir.exists():
-        resolved = journal_dir.resolve()
+    root_resolved = ctx["tree"]
+    if metadata is not None:
+        resolved = _io(ctx).resolve(journal_dir)
         if resolved != root_resolved and root_resolved not in resolved.parents:
             raise ss.SurveySheetError([
                 f"refusing to write the journal hook: {redact(journal_dir, quoted=False)} resolves "
@@ -697,7 +714,7 @@ def write_journal_hook(ctx: dict, receipt: dict) -> str:
     subject = f"survey sign-off {ctx['batch_id']}"
     stamp_date = _journal_date(receipt)
     path = journal_dir / f"{stamp_date[:7]}.md"
-    text = (path.read_text(encoding="utf-8") if path.is_file()
+    text = (_io(ctx).read_text(path) if _file(ctx, path)
             else f"# Journal — {stamp_date[:7]}\n")
     ids = list(receipt["records"])
     for hook in sp._journal_entries(text):
@@ -723,12 +740,12 @@ def write_journal_hook(ctx: dict, receipt: dict) -> str:
 
 # ── the cells ──────────────────────────────────────────────────────────────
 
-def _assert_same_device(a: Path, b: Path) -> None:
+def _assert_same_device(a: Path, b: Path, *, _source_io) -> None:
     """`os.replace` is atomic only within one filesystem. A cross-device move
     degrades to copy-then-unlink, which is not atomic and reopens the crash
     window completion-precedes-visibility exists to close — so it is refused
     rather than emulated."""
-    if os.stat(a).st_dev != os.stat(b).st_dev:
+    if _source_io.metadata(_source_io.resolve(a))["st_dev"] != _source_io.metadata(_source_io.resolve(b))["st_dev"]:
         raise ss.SurveySheetError([
             f"refusing to promote: {redact(a, quoted=False)} and {redact(b, quoted=False)} are on different filesystems, "
             "so os.replace would degrade to a non-atomic copy"])
@@ -736,22 +753,26 @@ def _assert_same_device(a: Path, b: Path) -> None:
 
 def _cell_1_bind(ctx: dict, sheet: dict, plan: list[dict]) -> list[str]:
     paths = ctx["paths"]
+    archived = _file(ctx, paths["sheet"])
+    live = _file(ctx, paths["live"])
+    text = _io(ctx).read_text(paths["live"]) if not archived else None
+    _io(ctx).revalidate()
     paths["dir"].mkdir(parents=True, exist_ok=True)
-    if not paths["sheet"].is_file():
+    if not archived:
         ss.atomic_write_text(paths["sheet"],
-                             paths["live"].read_text(encoding="utf-8"),
+                             text,
                              contained_under=ctx["tree"])
     receipt = ss.new_receipt(sheet, _receipt_rows(plan), signed=ctx["date"],
                              sheet_ref=_sheet_ref(ctx))
     ss.write_receipt(paths["receipt"], receipt, contained_under=ctx["tree"])
-    if paths["live"].is_file():
+    if live:
         paths["live"].unlink()
     return [f"bound {redact(ctx['batch_id'], quoted=False)} by digest {redact(receipt['digest'][:12], quoted=False)}"]
 
 
 def _cell_3_allocate(ctx: dict, plan: list[dict]) -> list[str]:
     receipt = _receipt(ctx)
-    manifest = sp.read_manifest(ctx["root"])
+    manifest = ctx["_layout"]["manifest"]
     number = ss.read_counter(manifest, "observation", "next_number", 1)
     ratify = [e for e in plan if e["verdict"] == "ratify"]
     allocated = {}
@@ -762,7 +783,7 @@ def _cell_3_allocate(ctx: dict, plan: list[dict]) -> list[str]:
     # The counter is durable BEFORE any id appears in the receipt.
     # Over-allocation is safe; reuse is not.
     ss.write_counter(ctx["tree"] / "manifest.yml", "observation", "next_number",
-                     number + len(ratify), contained_under=ctx["tree"])
+                     number + len(ratify), contained_under=ctx["tree"], _source_io=_io(ctx))
     for row in receipt["rows"]:
         got = allocated.get(row["anchor_id"])
         if got:
@@ -775,7 +796,7 @@ def _cell_3_allocate(ctx: dict, plan: list[dict]) -> list[str]:
 def _cell_6_stage(ctx: dict, plan: list[dict]) -> list[str]:
     receipt = _receipt(ctx)
     staged = ctx["paths"]["staged"]
-    staged.mkdir(parents=True, exist_ok=True)
+    contents = []
     by_anchor = {r["anchor_id"]: r for r in receipt["rows"]}
     wrote = []
     for entry in plan:
@@ -784,9 +805,7 @@ def _cell_6_stage(ctx: dict, plan: list[dict]) -> list[str]:
         row = by_anchor[entry["anchor_id"]]
         entry = dict(entry, batch_id=ctx["batch_id"])
         target = staged / Path(row["record_path"]).name
-        ss.atomic_write_text(target,
-                             record_body(entry, row["record_id"], ctx["date"]),
-                             contained_under=ctx["tree"])
+        contents.append((target, record_body(entry, row["record_id"], ctx["date"])))
         wrote.append(row["record_id"])
         if row["retires"]:
             # `retires` is TREE-relative (`<obs-dirname>/<file>.md`), so it
@@ -802,23 +821,23 @@ def _cell_6_stage(ctx: dict, plan: list[dict]) -> list[str]:
             # `_assert_contained` only ever guards the WRITE target below —
             # which is contained by construction. `resolve_contained` is the
             # shared remedy, and its own docstring names this case.
-            source = oe.resolve_contained(ctx["tree"], row["retires"])
-            if source is None or not source.is_file():
+            source = oe.resolve_contained(ctx["tree"], row["retires"], _source_io=_io(ctx))
+            if source is None or not _file(ctx, source):
                 raise ss.SurveySheetError([
                     f"refusing to stage the retirement named by "
                     f"{redact(row['retires'])}: it does not resolve to a file "
                     f"inside {redact(ctx['tree'], quoted=False)} — a predecessor is read from the "
                     "tree, never through a link out of it"])
-            ss.atomic_write_text(
-                staged / Path(row["retires"]).name,
-                retire_body(source.read_text(encoding="utf-8"), ctx["date"]),
-                contained_under=ctx["tree"])
+            contents.append((staged / Path(row["retires"]).name,
+                             retire_body(_io(ctx).read_text(source), ctx["date"])))
     index_path = ctx["obs"] / "index.md"
-    existing = (index_path.read_text(encoding="utf-8")
-                if index_path.is_file() else "")
-    ss.atomic_write_text(staged / "index.md",
-                         build_index(ctx, plan, receipt, existing),
-                         contained_under=ctx["tree"])
+    existing = (_io(ctx).read_text(index_path)
+                if _file(ctx, index_path) else "")
+    contents.append((staged / "index.md", build_index(ctx, plan, receipt, existing)))
+    _io(ctx).revalidate()
+    staged.mkdir(parents=True, exist_ok=True)
+    for target, text in contents:
+        ss.atomic_write_text(target, text, contained_under=ctx["tree"])
     return [f"staged {len(wrote)} record body/bodies and the index"]
 
 
@@ -835,11 +854,11 @@ def _cell_7_commit(ctx: dict) -> list[str]:
 def _cell_9_promote(ctx: dict) -> list[str]:
     receipt = _receipt(ctx)
     staged = ctx["paths"]["staged"]
-    _assert_same_device(staged, ctx["obs"])
+    _assert_same_device(staged, ctx["obs"], _source_io=_io(ctx))
     moved = []
     for name in ss.planned_record_names(receipt):
         source = staged / name
-        if not source.is_file():
+        if not _file(ctx, source):
             continue
         os.replace(source, ctx["obs"] / name)
         moved.append(name)
@@ -849,12 +868,19 @@ def _cell_9_promote(ctx: dict) -> list[str]:
 def _cell_11_index(ctx: dict) -> list[str]:
     staged = ctx["paths"]["staged"]
     index = staged / "index.md"
-    if index.is_file():
-        _assert_same_device(staged, ctx["obs"])
+    index_present = _file(ctx, index)
+    staged_present = _io(ctx).kind(staged) == "directory"
+    leftovers = sorted(_io(ctx).glob(staged, "*")) if staged_present else []
+    if index_present:
+        _assert_same_device(staged, ctx["obs"], _source_io=_io(ctx))
+    _io(ctx).revalidate()
+    if index_present:
         os.replace(index, ctx["obs"] / "index.md")
-    for leftover in sorted(staged.iterdir()) if staged.is_dir() else []:
+    for leftover in leftovers:
+        if index_present and leftover == index:
+            continue
         leftover.unlink()
-    if staged.is_dir():
+    if staged_present:
         staged.rmdir()
     return ["promoted the concern index and removed staged/"]
 
@@ -862,7 +888,7 @@ def _cell_11_index(ctx: dict) -> list[str]:
 def _cell_14_dispose(ctx: dict) -> list[str]:
     receipt = _receipt(ctx)
     state_path = ctx["tree"].joinpath(*ss.STATE_FILE_REL)
-    if not state_path.is_file():
+    if not _file(ctx, state_path):
         return ["candidate state file absent — nothing to dispose"]
     # `StateFile` raises ValueError for its fail-closed parse AND for its
     # containment refusal. Both are findings in this lane, not environment
@@ -870,7 +896,7 @@ def _cell_14_dispose(ctx: dict) -> list[str]:
     # rather than fail on, and a refused write is exactly what an operator
     # must be shown. Re-raised as the exit-1 findings payload.
     try:
-        state = StateFile(state_path, contained_under=ctx["tree"])
+        state = StateFile(state_path, contained_under=ctx["tree"], _source_io=_io(ctx))
     except ValueError as exc:
         raise ss.SurveySheetError([str(exc)]) from exc
     wanted = {"ratify": "ratified", "reject": "rejected"}
@@ -906,7 +932,7 @@ def check_surfaces(ctx: dict) -> None:
     "the log op landed" and moves the state past the writer that would have
     noticed. A planted or hand-edited entry would otherwise be adopted
     silently, which is the one thing cell 16 forbids."""
-    if not ctx["paths"]["receipt"].is_file():
+    if not _file(ctx, ctx["paths"]["receipt"]):
         return
     receipt = _receipt(ctx)
     if receipt.get("completed") is None:
@@ -914,7 +940,7 @@ def check_surfaces(ctx: dict) -> None:
     ids = list(receipt["records"])
     log_path = ctx["tree"] / "log.md"
     subject = _log_subject(ctx["batch_id"])
-    text = log_path.read_text(encoding="utf-8") if log_path.is_file() else ""
+    text = _io(ctx).read_text(log_path) if _file(ctx, log_path) else ""
     for entry in sp._log_entries(text):
         if entry["op"] == "observation" and entry["subject"] == subject:
             if (entry["date"] != _log_date(receipt)
@@ -926,8 +952,8 @@ def check_surfaces(ctx: dict) -> None:
     hook_subject = f"survey sign-off {ctx['batch_id']}"
     hook_date = _journal_date(receipt)
     hook_path = ctx["tree"] / "journal" / f"{hook_date[:7]}.md"
-    hook_text = (hook_path.read_text(encoding="utf-8")
-                 if hook_path.is_file() else "")
+    hook_text = (_io(ctx).read_text(hook_path)
+                 if _file(ctx, hook_path) else "")
     for hook in sp._journal_entries(hook_text):
         if hook["category"] == "review" and hook["subject"] == hook_subject:
             if (hook["date"] != hook_date
@@ -956,22 +982,35 @@ CELL_SURFACE = {
 
 
 def advance(ctx: dict) -> tuple[str, list[str]]:
+    _close_reads(ctx)
+    try:
+        return _advance(ctx)
+    finally:
+        _close_reads(ctx)
+
+
+def _advance(ctx: dict) -> tuple[str, list[str]]:
     """Apply the ONE write the current cell names, and return the new state.
 
     The whole state machine is this function. Every caller — the CLI loop and
     the crash test alike — drives it, so there is no second code path that
     could disagree about what a state's write is."""
     paths = ctx["paths"]
-    state = ss.batch_state(paths["receipt"], ctx["obs"])
+    state = ss.batch_state(paths["receipt"], ctx["obs"], _source_io=_io(ctx))
     check_surfaces(ctx)
     sheet, plan = build_plan(ctx)
-    if paths["receipt"].is_file():
+    if _file(ctx, paths["receipt"]):
         receipt = _receipt(ctx)
         if receipt["digest"] != ss.sheet_digest(sheet):
             raise ss.SurveySheetError([
                 f"batch {redact(ctx['batch_id'], quoted=False)}: the sheet no longer matches the "
                 f"digest {redact(receipt['digest'][:12], quoted=False)}… the receipt records — a "
                 "changed sheet refuses and writes nothing"])
+    import observation_admission as admission
+    try:
+        admission._revalidate(ctx["_admission_context"])
+    except (ValueError, OSError, RuntimeError) as exc:
+        raise ss.SurveySheetError(["admission-input-changed"]) from exc
     if state == "S0":
         return "S1", _cell_1_bind(ctx, sheet, plan)
     if state == "S1":
@@ -994,25 +1033,32 @@ def advance(ctx: dict) -> tuple[str, list[str]]:
 
 
 def run(ctx: dict, *, dry_run: bool) -> tuple[int, dict]:
+    try:
+        return _run(ctx, dry_run=dry_run)
+    finally:
+        _close_reads(ctx)
+
+
+def _run(ctx: dict, *, dry_run: bool) -> tuple[int, dict]:
     check_surfaces(ctx)
     sheet, plan = build_plan(ctx)
-    receipt = _receipt(ctx) if ctx["paths"]["receipt"].is_file() else None
+    receipt = _receipt(ctx) if _file(ctx, ctx["paths"]["receipt"]) else None
     lines = rendering(ctx, plan, receipt)
     if dry_run:
-        state = ss.batch_state(ctx["paths"]["receipt"], ctx["obs"])
+        state = ss.batch_state(ctx["paths"]["receipt"], ctx["obs"], _source_io=_io(ctx))
         return 0, {"batch_id": ctx["batch_id"], "state": state,
                    "rendering": lines, "writes": [], "records": [],
                    "dry_run": True}
     writes: list[str] = []
     seen: list[str] = []
     for _ in range(len(ss.STATES) + 1):
-        state = ss.batch_state(ctx["paths"]["receipt"], ctx["obs"])
+        state = ss.batch_state(ctx["paths"]["receipt"], ctx["obs"], _source_io=_io(ctx))
         if state == "S9":
             break
         seen.append(state)
         _next, wrote = advance(ctx)
         writes.extend(wrote)
-        after = ss.batch_state(ctx["paths"]["receipt"], ctx["obs"])
+        after = ss.batch_state(ctx["paths"]["receipt"], ctx["obs"], _source_io=_io(ctx))
         if after == state:
             # The cell ran its one write and the batch did not move. Naming
             # the CELL is the whole point: a wedged batch has no scripted

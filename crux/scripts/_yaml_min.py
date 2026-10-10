@@ -466,6 +466,66 @@ def _refuse_catalog_duplicate_keys(text: str, yaml: Any) -> None:
         _walk_for_duplicate_keys(node, yaml)
 
 
+class CatalogYamlExpansionError(CatalogYamlError):
+    """A document whose anchors and aliases expand past the node or depth bound."""
+
+
+# The alias-expanded node count and nesting depth `_refuse_duplicate_keys_bounded`
+# admits. The largest committed migration input expands to about 500 nodes.
+YAML_EXPANDED_NODE_LIMIT = 200_000
+YAML_DEPTH_LIMIT = 128
+
+
+def _refuse_duplicate_keys_bounded(text: str, yaml: Any, *,
+                                   max_nodes: int = YAML_EXPANDED_NODE_LIMIT) -> None:
+    """`_refuse_catalog_duplicate_keys`, visiting each distinct composed node once.
+
+    An alias names a node the composer already built, so the unmemoized walk revisits
+    a shared subtree once per alias, and nested aliases multiply that work. This walk
+    checks each distinct node once and sums alias-expanded sizes from its memo. It
+    refuses a document that expands past `max_nodes`, nests past `YAML_DEPTH_LIMIT`,
+    or refers to itself. Every consumer of the loaded object then walks a bounded
+    graph. A document without anchors or aliases gets the same verdict as before.
+    """
+    try:
+        documents = list(yaml.compose_all(text, Loader=yaml.SafeLoader))
+    except yaml.YAMLError as exc:
+        raise CatalogYamlError(f"invalid YAML: {str(exc).splitlines()[0]!r}") from exc
+    if len(documents) > 1:
+        raise CatalogYamlError("catalog document contains more than one YAML document")
+    sizes: dict[int, int] = {}
+    active: set[int] = set()
+
+    def visit(node: Any, depth: int) -> int:
+        identity = id(node)
+        if identity in sizes:
+            return sizes[identity]
+        if identity in active or depth >= YAML_DEPTH_LIMIT:
+            raise CatalogYamlExpansionError("YAML nesting is recursive or too deep")
+        active.add(identity)
+        size = 1
+        if isinstance(node, yaml.MappingNode):
+            seen: set[str] = set()
+            for key_node, value_node in node.value:
+                key = getattr(key_node, "value", None)
+                if isinstance(key, str):
+                    if key in seen:
+                        raise CatalogYamlError(f"duplicate mapping key {key!r}")
+                    seen.add(key)
+                size += visit(key_node, depth + 1) + visit(value_node, depth + 1)
+        elif isinstance(node, yaml.SequenceNode):
+            for item in node.value:
+                size += visit(item, depth + 1)
+        active.discard(identity)
+        if size > max_nodes:
+            raise CatalogYamlExpansionError(f"YAML aliases expand past {max_nodes} nodes")
+        sizes[identity] = size
+        return size
+
+    for node in documents:
+        visit(node, 0)
+
+
 def _walk_for_duplicate_keys(node: Any, yaml: Any) -> None:
     if isinstance(node, yaml.MappingNode):
         seen: set[str] = set()

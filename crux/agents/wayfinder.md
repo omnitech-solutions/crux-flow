@@ -47,7 +47,10 @@ You also summarize, search, and locate specific facts in a corpus on request.
 - **When the purpose concerns a current-belief question — what the project
   currently holds to be true, and whether it is live or only on paper —
   `docs/adrs/doctrine/` is the source to wayfind first**, then
-  `docs/adrs/summaries/`; the ADR body is the record and wins if they disagree.
+  `docs/adrs/summaries/`. For a live architectural clause, the ADR body wins a
+  disagreement, within its lifecycle status and any validated migration
+  disposition; a demoted clause is historical record and holds no live
+  authority.
 - Read the source with `Read`/`Grep`/`Glob` (local) or `WebFetch`/`WebSearch`
   (external). You have **no execution** — "command output" means output the caller
   captured and handed you, never something you ran (you hold no `Bash`).

@@ -71,6 +71,8 @@ uv run "${CRUX_PLUGIN_ROOT}/scripts/scaffold-survey-sheet.py" --repo-root <repo-
 
 Exit 0 scaffolded or nothing-to-scaffold · 1 findings (JSON on stdout) · 2 environment (stderr). Read the findings; a refusal here is a real state, not a retry prompt.
 
+The scaffold reads the corpus through guarded admission, so it also refuses when proof or a source it needs is missing or invalid (for example, a declared migration source that is unavailable). Stop on that refusal and report it. Never bypass it by hand-writing the sheet, the counter or any other surface, and never fill a human cell to get past it. Only the owning commands (`scaffold-survey-sheet.py` here, `signoff-survey.py` for sign-off) write these surfaces.
+
 ### 2. Scaffold
 
 ```bash

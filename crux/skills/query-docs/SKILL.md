@@ -37,20 +37,20 @@ Pairs with: every write skill in the suite (which adds material the queries draw
 The user is asking a question. The expected shape of citation depends on the question form:
 
 - **"How is the project shaped today?" / "what entities exist?" / "what's the interface surface?" / "which modules depend on which?" / "what decisions are accepted?"** → resolve against `docs/arch/` FIRST, before any ADR body. Cite the spine page that answers it: `docs/arch/data-model.md` for entities, `docs/arch/api-surface.md` for the interface surface, `docs/arch/module-graph.md` for module dependencies, `docs/arch/decision-index.md` for the accepted-decision list. `docs/arch/overview.md` is the synthesized narrative across all four.
-- **"What do we currently hold to be true about X?" / "is X live or only on paper?"** → this is a current-belief question, distinct from the shape question above. Resolve `docs/adrs/doctrine/` FIRST, then `docs/adrs/summaries/`, then the ADR body. Doctrine holds no authority — when doctrine and an ADR body disagree, the ADR body is the record and wins; cite it as the deciding source.
+- **"What do we currently hold to be true about X?" / "is X live or only on paper?"** → this is a current-belief question, distinct from the shape question above. Resolve `docs/adrs/doctrine/` FIRST, then `docs/adrs/summaries/`, then the ADR body. Doctrine holds no authority. Resolve any disagreement against the canonical record and validated clause disposition; an Accepted mixed body may retain architectural clauses beside historical implementation reasoning.
 - **"What does X do?"** → narrative answer; cite `docs/code/<lang-namespace>/<unit>.md` pages.
-- **"Why did we choose Y?"** → cite ADRs (`docs/adrs/ADR-NNNN-<slug>.md`); when the ADR's `related_briefs:` points to one, cite the brief too (`docs/briefs/BRIEF-<slug>.md`).
+- **"Why did we choose Y?"** → distinguish architectural constraints from a particular implementation's reviewed intent; cite the owning Implementation Decision for that reasoning and cite ADRs (`docs/adrs/ADR-NNNN-<slug>.md`); when the ADR's `related_briefs:` points to one, cite the brief too (`docs/briefs/BRIEF-<slug>.md`).
 - **"What's our plan for Z?"** → cite active promptbooks (`docs/promptbooks/active/<id>-<slug>.yaml`, or a legacy `.md` book) and, when relevant, the latest run snapshot.
 - **"What do we know about W?"** → cite research synthesis pages (`docs/research/<category>/<slug>.md`) and source pages (`docs/research/sources/<slug>.md`).
 - **"What's new since [date]?" / "what's stale?" / "what was decided this month?"** → read `docs/log.md` and `docs/journal/YYYY-MM.md` and `docs/research/updates.md` directly. The indexes aren't the right entry point for these.
 - **"Compare X and Y."** → two parallel scans, then read both sets, then extract dimensions/agreements/disagreements.
 - **"Find a source that says X."** → use `docs/research/index.md` to locate plausible sources by tag/summary, then read bodies to confirm.
 
-**The arch/ADR split, because one question shape resolves against each.** A question about the project's own shape — what exists — resolves against `docs/arch/`. A question about rationale — why it is that way — resolves against an ADR body. Read the ADR when the question asks why, or when an arch page names that decision as the reason for a shape. An answer about shape cites arch pages; an answer about rationale cites the ADR. `docs/arch/` is derived and regenerated from the project's real sources, so it says what is true now; the decision history says what was decided when, which is a different question at greater length.
+**The arch/ADR split, because one question shape resolves against each.** A question about the project's own shape — what exists — resolves against `docs/arch/`. A question about architectural rationale resolves against an ADR body; implementation rationale resolves against the reviewed Implementation Decision revision. Read the ADR when the question asks why, or when an arch page names that decision as the reason for a shape. An answer about shape cites arch pages; an answer about rationale cites the owning ADR or reviewed Implementation Decision revision. `docs/arch/` is derived and regenerated from the project's real sources, so it says what is true now; the decision history says what was decided when, which is a different question at greater length.
 
 When `docs/arch/` is absent (the concern is not enabled in `docs/manifest.yml`), say so and fall back to the sources a shape question can be answered from — `docs/code/` pages, then the ADR set. Do not present the decision history as a current-state answer without naming that substitution.
 
-**The doctrine/ADR split, because a current-belief question resolves through a different chain than a shape question.** A question about what the project currently holds to be true — and whether that belief is live or only on paper — routes `docs/adrs/doctrine/` → `docs/adrs/summaries/` → the ADR body, in that order. Doctrine is a per-domain, plain-language read view compiled from summaries and reconciled against ratified invariants; it holds zero authority. The ADR body is the record and wins on any disagreement.
+**The doctrine/ADR split, because a current-belief question resolves through a different chain than a shape question.** A question about what the project currently holds to be true — and whether that belief is live or only on paper — routes `docs/adrs/doctrine/` → `docs/adrs/summaries/` → the ADR body, in that order. Doctrine is a per-domain, plain-language read view compiled from summaries and reconciled against ratified invariants; it holds zero authority. The canonical record and validated clause disposition settle a disagreement. A retained body proves what was recorded; historical implementation clauses do not override surviving architectural constraints.
 
 Do **not** use this skill for:
 - Filing new external material — use `ingest-research`.
@@ -61,6 +61,32 @@ Do **not** use this skill for:
 - Editing existing pages outside of an explicit "file this answer back" step (just edit directly).
 
 ## The pipeline
+
+Before searching or answering, resolve the containing project's configuration, then run `uv run "${CRUX_PLUGIN_ROOT}/scripts/authority-view.py" state --repo-root <repo-root>`. Exit 0 reports `original` (no clause migration was ever published, so every ADR clause governs as its record says; this is the normal state) or `published` (a migration publication was proved from full Git history, so the clauses it moved are historical evidence, not current constraints). Exit 1 prints `{"authority": "none", "limit": "<code>"}`: current authority is unknown. Never fall back to an older ADR body or resolver. The common code is `history-unavailable`, a shallow clone of a tree that published a migration; fetch full history with `git fetch --unshallow`. Exit 2 is an environment error. Never treat an applied flag or existing generated bytes as publication proof. A refusal refuses the answer. Before recursive discovery, prune retained demonstration holdings: list the holdings once with `uv run "${CRUX_PLUGIN_ROOT}/scripts/authority-view.py" retained-roots --repo-root <repo-root>` and skip each listed root during recursive walks; test one path with `uv run "${CRUX_PLUGIN_ROOT}/scripts/authority-view.py" retained --repo-root <repo-root> <path>` (exit 0, `retained` true or false). Never read held configurations or count held records as parent knowledge. Explicit historical evidence retrieval may read selected retained artifacts; query a reconstructed repository only with its own isolated root and configuration.
+
+When you delegate a question to the librarian, run `authority-view.py state` and `retained-roots` first and put their output, with exit codes, in the delegation. For an implementation question, add the `implementation-decisions.py query` output as well. A librarian in a read-only sandbox cannot run them, because `uv run` must write its cache. Without that output it refuses the answer. When a delegation hands you this output, use it as printed and do not run the script again.
+
+For an implementation question, locate the exact revision named by the owning run's `implementation_bindings`. Use the existing read-only query:
+
+```bash
+uv run "${CRUX_PLUGIN_ROOT}/scripts/implementation-decisions.py" query \
+  --repo-root <repo-root> --decision <decision-revision-path> --revision <source-revision>
+```
+
+Keep its `reviewed_intent`, `historical_delivery`, `current_eligibility` and `current_state` separate. Report the requested and observed source revisions, scope, state and any limit. `authority: none` remains true even after council approval. `current_eligibility` checks path-scoped governing rules for undeclared overlap and lists rules without a path scope as unchecked. When a live Accepted rule's path scope overlaps the revision's scope and the revision does not declare that rule, `eligible` is false, the limit is `undeclared-governing-constraint`, and `undeclared_refs` names the handles. A scope entry that is a symlink makes the limit `path-refused`. A scope entry outside the repository, or naming the repository root, refuses the whole query as `path-refused`. `unscoped_unchecked_refs` names each undeclared live Accepted rule whose scope names no path; its overlap was not checked, so report it as unchecked. That key never changes `eligible` and is absent when no such rule exists. An approved proposal or past delivery establishes no current implementation; preserve `UNOBSERVED` when the query cannot observe it. Results may establish delivery within their recorded scope; they authorize no architectural constraint. Historical resolver destinations retrieve evidence, while surviving live handles identify current constraints. Body-only historical selections have no invented handle. Retain architectural clauses beside historical clauses in a mixed record.
+
+`implementation-decisions.py` has four subcommands. `validate <record>` checks a decision revision. `result --decision <path> --evidence <path>` appends `result-NNN.yaml`. `annotate --decision <path> --evidence <path> --output <path>` writes `annotation-NNN.yaml`. `query --decision <path> [--revision <rev>]` answers the retrieval question above, with `--revision` defaulting to `HEAD`. Each takes `--repo-root`. A refusal prints `{"refused": "<code>"}` and exits 1; evidence that cannot be read or validated refuses as `evidence-invalid`. Otherwise the command prints one JSON report and exits 0.
+
+`query` reports two kinds of state. `current_state.state` is one of `UNOBSERVED`, `delivered`, `reverted` or `diverged`. Each `historical_delivery[].observed` is one of `UNOBSERVED`, `unimplemented`, `unrelated-lineage`, `delivered`, `reverted` or `diverged`:
+
+- `UNOBSERVED`: nothing was observed. The decision revision has no approval evidence, the result was refused (its `limit` names why), or the full history is unavailable.
+- `unimplemented`: the result records that nothing was delivered.
+- `unrelated-lineage`: the result's delivery commit is not an ancestor of the queried revision, so the queried source cannot show it.
+- `delivered`: every source path at the queried revision matches the delivered bytes.
+- `reverted`: every source path matches the preimage bytes.
+- `diverged`: the paths match neither state, or a mix of them. A revision that a later cycle legitimately replaced reads `diverged`. That is not drift.
+
+`current_state` comes from the last result, in filename order, that passes validation, whose delivery commit is an ancestor of the queried revision and whose delivery state is not `unimplemented`. When no result qualifies, `current_state.state` stays `UNOBSERVED`.
 
 ### 1. Locate
 
@@ -77,7 +103,7 @@ Then dive into the per-concern index for each candidate:
 - `docs/journal/index.md` — for "what was figured out recently?" / "what's the timeline of X?" questions. Derived by `generate-journal-index.py`; read it as-is.
 - `docs/log.md` (no index — it IS the index) — for "when did skill X run?" / operational-history questions.
 
-When per-concern indexes are insufficient (vague topic, large tree), fall back to a Bash grep over `docs/` for the topic keywords.
+When per-concern indexes are insufficient, search topic keywords only in the pruned containing tree. The shared holding predicate applies before that search.
 
 ### 2. Read
 
@@ -85,7 +111,7 @@ Read every page identified in step 1 **in full**. Don't synthesize from titles o
 
 For each page read:
 - For arch spine pages: these are derived and regenerated wholesale from the project's real sources. They reflect the shape of the tree at the last derive, they carry no `last_reviewed`, and a hand-edit to them is blown away. `docs/arch/decision-index.md` cites ADRs as footnotes and never inline, so follow the footnote to reach the decision itself.
-- For ADRs: respect status. A `Deprecated` or `Superseded` ADR may have been the right decision once but isn't current; mention the status when citing.
+- For ADRs: respect status and validated clause disposition; historical reasoning remains evidence even when its enclosing ADR stays Accepted. A `Deprecated` or `Superseded` ADR may have been the right decision once but isn't current; mention the status when citing.
 - For research synthesis pages: if it has `> [contradiction]`, `> [source updated]`, or `> [unresolved]` markers, the answer may need to mention pending tensions. If `last_reviewed` is more than `research.refresh_interval_days` old, note staleness.
 - For code-doc pages: these are regenerated from source. They reflect what the code says today. They have NO `last_reviewed`.
 - For promptbook pages: state lives in the run snapshot, not the book. To answer "where are we on Z?", read the book *and* the current run snapshot.
@@ -197,7 +223,7 @@ Ask before producing another form:
 ## Verification checklist
 
 - [ ] A current-state question was answered from `docs/arch/` first, and an ADR body was read only for rationale or because an arch page named that decision as the reason for a shape.
-- [ ] A current-belief question was answered by routing `docs/adrs/doctrine/` → `docs/adrs/summaries/` → the ADR body, and any disagreement between doctrine and an ADR body was resolved in the ADR body's favor.
+- [ ] A current-belief question was answered by routing `docs/adrs/doctrine/` → `docs/adrs/summaries/` → the ADR body, and any disagreement was resolved against the canonical record and validated clause disposition, preserving historical reasoning separately from live constraints.
 - [ ] Every substantive claim has a citation to a real `docs/` path.
 - [ ] No fabricated paths — every `[[...]]` link or `docs/...` reference resolves to a file that exists.
 - [ ] Every cited page was read in full, not skimmed from index summaries.

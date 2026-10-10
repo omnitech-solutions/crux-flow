@@ -21,6 +21,143 @@ sys.path.insert(0, str(SCRIPTS))
 import xcode_fixture_harness as h  # noqa: E402
 
 
+class DescriptorAttributionTests(unittest.TestCase):
+    def _run(self, body):
+        with tempfile.TemporaryDirectory() as d:
+            parent = Path(d).resolve()
+            scratch = parent / "case"
+            (scratch / "nested").mkdir(parents=True)
+            (scratch / "nested" / "inside.txt").write_text("inside")
+            (parent / "outside.txt").write_text("outside")
+            return h._run_hooked(scratch, (
+                f"scratch = {str(scratch)!r}\nparent = {str(parent)!r}\n"
+                "directory_flags = os.O_RDONLY | os.O_DIRECTORY\n"
+                + body + "\nprint(json.dumps({'outside_opens': outside_opens, "
+                "'outside_listings': outside_listings}))\n"), 30), parent
+
+    def test_anchored_nested_reads_and_duplicate_listings_are_attributed(self):
+        result, _ = self._run("""
+fd = os.open(os.path.sep, directory_flags)
+for component in scratch.split(os.path.sep)[1:]:
+    child = os.open(component, directory_flags, dir_fd=fd)
+    os.close(fd)
+    fd = child
+nested = os.open('nested', directory_flags, dir_fd=fd)
+copy = os.dup(nested)
+content = os.open('inside.txt', os.O_RDONLY, dir_fd=copy)
+assert os.read(content, 20) == b'inside'
+assert os.listdir(copy) == ['inside.txt']
+with os.scandir(copy) as entries:
+    assert [entry.name for entry in entries] == ['inside.txt']
+for descriptor in (content, copy, nested, fd):
+    os.close(descriptor)
+""")
+        self.assertEqual(result, {"outside_opens": [], "outside_listings": []})
+
+    def test_ancestor_handle_does_not_admit_content_or_listings(self):
+        result, parent = self._run("""
+fd = os.open(parent, directory_flags)
+content = os.open('outside.txt', os.O_RDONLY, dir_fd=fd)
+assert os.read(content, 20) == b'outside'
+os.listdir(fd)
+with os.scandir(fd) as entries:
+    list(entries)
+os.close(content)
+os.close(fd)
+""")
+        self.assertEqual(result["outside_opens"], [str(parent / "outside.txt")])
+        self.assertEqual(result["outside_listings"], [str(parent), str(parent)])
+        with self.assertRaisesRegex(h.FixtureCaseError, "opened paths outside"):
+            h._check_report("descriptor control", "derive", {"exit_code": 0, **result}, 0)
+
+    def test_dup2_replaces_prior_descriptor_provenance(self):
+        result, parent = self._run("""
+inside = os.open(scratch, directory_flags)
+outside = os.open(parent, directory_flags)
+os.dup2(outside, inside)
+os.listdir(inside)
+os.close(inside)
+os.close(outside)
+""")
+        self.assertEqual(result["outside_opens"], [])
+        self.assertEqual(result["outside_listings"], [str(parent)])
+
+    def test_moved_directory_symlink_back_does_not_reuse_allowed_spelling(self):
+        result, _ = self._run("""
+fd = os.open(scratch + '/nested', directory_flags)
+os.rename(scratch + '/nested', parent + '/moved')
+os.symlink(parent + '/moved', scratch + '/nested', target_is_directory=True)
+assert os.listdir(fd) == ['inside.txt']
+with os.scandir(fd) as entries:
+    assert [entry.name for entry in entries] == ['inside.txt']
+content = os.open('inside.txt', os.O_RDONLY, dir_fd=fd)
+assert os.read(content, 20) == b'inside'
+os.close(content)
+os.close(fd)
+""")
+        self.assertEqual(len(result["outside_opens"]), 1)
+        self.assertEqual(len(result["outside_listings"]), 2)
+        for path in result["outside_opens"] + result["outside_listings"]:
+            self.assertTrue(path.startswith('<unattributed-fd:'), path)
+        with self.assertRaisesRegex(h.FixtureCaseError, "listed directories outside"):
+            h._check_report("rebound control", "derive", {
+                "exit_code": 0, "outside_listings": result["outside_listings"]}, 0)
+
+    def test_unknown_and_stale_descriptors_are_reported(self):
+        result, _ = self._run("""
+fd = os.open(scratch, directory_flags)
+os.closerange(fd, fd + 1)
+for descriptor in (fd, 0):
+    try:
+        os.listdir(descriptor)
+    except OSError:
+        pass
+with os.fdopen(0, 'rb', closefd=False):
+    pass
+""")
+        self.assertEqual(len(result["outside_opens"]), 1)
+        self.assertTrue(result["outside_opens"][0].startswith('<unattributed-fd:'))
+        self.assertEqual(len(result["outside_listings"]), 2)
+        for path in result["outside_listings"]:
+            self.assertTrue(path.startswith('<unattributed-fd:'), path)
+
+    def test_ancestor_handle_with_write_flags_is_reported(self):
+        result, parent = self._run("""
+try:
+    os.open(parent, os.O_WRONLY | os.O_DIRECTORY)
+except OSError:
+    pass
+""")
+        self.assertEqual(result["outside_opens"], [str(parent)])
+
+    def test_permission_change_and_closed_descriptor_reuse_keep_attribution(self):
+        result, _ = self._run("""
+fd = os.open(scratch + '/created.txt', os.O_WRONLY | os.O_CREAT, 0o600)
+os.fchmod(fd, 0o644)
+with os.fdopen(fd, 'w') as stream:
+    stream.write('created')
+directory = os.open(scratch, directory_flags)
+os.listdir(directory)
+os.close(directory)
+""")
+        self.assertEqual(result, {"outside_opens": [], "outside_listings": []})
+
+    def test_known_pipe_content_is_not_a_filesystem_read(self):
+        result, _ = self._run("""
+read_fd, write_fd = os.pipe()
+os.write(write_fd, b'pipe')
+os.close(write_fd)
+try:
+    os.listdir(read_fd)
+except OSError:
+    pass
+with os.fdopen(read_fd, 'rb') as stream:
+    assert stream.read() == b'pipe'
+""")
+        self.assertEqual(result, {"outside_opens": [],
+                                  "outside_listings": ['<anonymous-pipe>']})
+
+
 class ParseResidualLineTests(unittest.TestCase):
     def test_parses_a_well_formed_bullet(self):
         line = "- `path-escape` `App.xcworkspace/contents.xcworkspacedata` lines 3-3 — workspace file reference"
@@ -312,6 +449,21 @@ class ChildReportChecksTests(unittest.TestCase):
 
     def test_clean_reports_control_passes(self):
         self._run_with_reports({}, {})
+
+    def _run_with_cwd_import_path(self, entry):
+        import os
+        from unittest import mock
+        path = os.pathsep.join([entry, os.environ.get("PYTHONPATH", "")])
+        with mock.patch.dict(os.environ, {"PYTHONPATH": path}):
+            self._run_with_reports({}, {})
+        # Import-path cleanup never admits access to the checkout's parent tree.
+        self.assertFalse(h._is_allowed(str(h.SCRIPTS.parent.parent), h.allowed_prefixes()))
+
+    def test_absolute_cwd_import_path_keeps_clean_derive_clean(self):
+        self._run_with_cwd_import_path(str(Path.cwd()))
+
+    def test_relative_cwd_import_path_keeps_clean_derive_clean(self):
+        self._run_with_cwd_import_path(".")
 
 
 class DependencyAllowlistTests(unittest.TestCase):

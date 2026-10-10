@@ -136,15 +136,24 @@ def _anchor_collisions(eligible: list[tuple[str, dict]]) -> dict[str, list[str]]
 
 def scaffold(root: Path, docs_dir: str | None, *, today: str,
              dry_run: bool) -> tuple[int, dict]:
+    import observation_admission as admission
+    layout = admission._load_layout(root, docs_dir=docs_dir)
+    try:
+        return _scaffold(layout, today=today, dry_run=dry_run)
+    finally:
+        layout["source_io"].close()
+
+
+def _scaffold(layout, *, today, dry_run):
+    import observation_admission as admission
+    root, tree, source_io = layout["root"], layout["tree"], layout["source_io"]
     # `--docs-dir` is an operator-supplied component joined onto a validated
     # root, and a guard that validates a prefix and then concatenates an
     # unvalidated suffix has validated nothing. It takes the SAME verdict the
     # configured value takes, through the one shared implementation — not a
     # local re-check, and not the write guards below, which cannot see it: every
     # write here is `contained_under=tree` and the traversed path IS `tree`.
-    tree = (sp.resolve_tree(root) if docs_dir is None
-            else validate_docs_dir_override(root, docs_dir))
-    manifest = sp.read_manifest(root)
+    manifest = layout["manifest"]
     concerns = manifest.get("concerns_enabled") or []
     if "observations" not in concerns:
         raise EnvironmentError(
@@ -152,18 +161,18 @@ def scaffold(root: Path, docs_dir: str | None, *, today: str,
             "batch ratification is the observations concern's gate")
     # Beside the concern gate because it is the same kind of statement: a tree
     # this lane cannot ratify into. See `survey_sheet.assert_unprefixed_tree`.
-    ss.assert_unprefixed_tree(root)
+    ss.assert_unprefixed_tree(root, _source_io=source_io)
     # [SECURITY:S5] The concern directory is RESOLVED and proven contained
     # before anything resolves against it. Every reader below joins names
     # onto `obs`, and `resolve_contained(obs, name)` resolves `obs` too — so
     # a symlinked concern directory compares an outside directory against
     # itself and admits everything under it. One implementation, shared with
     # the projection that reads the same directory.
-    obs = sp.observations_root(tree)
-    if not obs.is_dir():
+    obs = layout["observations"]
+    if source_io.kind(obs) != "directory":
         raise EnvironmentError(f"the observations directory {redact(obs, quoted=False)} is absent")
 
-    live = sorted(p.name for p in obs.glob("survey-*.yml")
+    live = sorted(p.name for p in source_io.glob(obs, "survey-*.yml")
                   if ss.SHEET_RE.match(p.name))
     if live:
         return 1, {"findings": [
@@ -172,20 +181,23 @@ def scaffold(root: Path, docs_dir: str | None, *, today: str,
             "ratify one anchor"]}
 
     state_path = tree.joinpath(*ss.STATE_FILE_REL)
-    rows = StateFile(state_path).rows if state_path.is_file() else {}
+    rows = StateFile(state_path, _source_io=source_io).rows if source_io.kind(state_path) == "file" else {}
     # A finding, never an environment error — the same lane
     # `survey_sheet.record_paths` puts the identical refusal in.
     try:
-        recorded = read_recorded_observations(obs)
+        recorded = read_recorded_observations(obs, repo_root=root,
+            docs_dir=tree.relative_to(root).as_posix(), _source_io=source_io)
+    except admission.AdmissionRefusal as exc:
+        raise ss.SurveySheetError(["admission-context-or-source-refused"]) from exc
     except ValueError as exc:
         raise ss.SurveySheetError([str(exc)]) from exc
-    disposed = ss.disposed_candidates(obs)
+    disposed = ss.disposed_candidates(obs, _source_io=source_io)
     eligible = _eligible(rows, recorded, disposed)
 
     # An unfinished batch holds every anchor its receipt names, because cell 1
     # deletes the live sheet and the refusal above is the only other interlock.
     # See `survey_sheet.unfinished_batch_anchors`.
-    reserved = ss.unfinished_batch_anchors(obs)
+    reserved = ss.unfinished_batch_anchors(obs, _source_io=source_io)
     held = sorted({reserved[anchor_of(cid)] for cid, _c in eligible
                    if anchor_of(cid) in reserved})
     eligible = [(cid, cand) for cid, cand in eligible
@@ -210,9 +222,23 @@ def scaffold(root: Path, docs_dir: str | None, *, today: str,
             "scaffold again."
             for anchor, cids in sorted(collisions.items())]}
 
+    import observation_admission as admission
+    try:
+        context = admission._complete_context(layout)
+        problems = []
+        for _cid, cand in eligible:
+            problems += admission._source_problems(context, cand.get("evidence"), draft=True)
+            problems += admission._slug_problems(context["reservations"], ss.proposed_slug(cand), removed=context["removed"])
+        if problems:
+            raise ss.SurveySheetError(problems)
+    except ss.SurveySheetError:
+        raise
+    except (ValueError, OSError, RuntimeError) as exc:
+        raise ss.SurveySheetError(["admission-context-or-source-refused"]) from exc
+
     number = ss.read_counter(manifest, "observation", "next_survey_number", 1)
     batch_id = f"SVY-{number:04d}"
-    paths = ss.receipt_paths(obs, batch_id)
+    paths = ss.receipt_paths(obs, batch_id, _source_io=source_io)
     sheet = {
         "config_version": ss.CONFIG_VERSION,
         "batch_id": batch_id,
@@ -224,7 +250,7 @@ def scaffold(root: Path, docs_dir: str | None, *, today: str,
             # The tree this batch belongs to. Inside the digest, so the
             # receipt carries it and a batch cannot publish into another
             # tree. See `survey_sheet.tree_identity`.
-            **ss.tree_identity(root, tree),
+            **ss.tree_identity(root, tree, _source_io=source_io),
         },
         "rows": [
             {
@@ -266,8 +292,12 @@ def scaffold(root: Path, docs_dir: str | None, *, today: str,
 
     # The counter moves FIRST. Over-allocation is safe (a burnt number is a
     # number nobody signs); reuse is not (two batches under one id).
+    try:
+        admission._revalidate(context)
+    except (ValueError, OSError, RuntimeError) as exc:
+        raise ss.SurveySheetError(["admission-input-changed"]) from exc
     ss.write_counter(tree / "manifest.yml", "observation",
-                     "next_survey_number", number + 1, contained_under=tree)
+                     "next_survey_number", number + 1, contained_under=tree, _source_io=source_io)
     ss.write_sheet(paths["live"], sheet, contained_under=tree)
     payload["written"] = [str(paths["live"].relative_to(root)),
                           str((tree / "manifest.yml").relative_to(root))]

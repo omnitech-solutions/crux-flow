@@ -1,6 +1,6 @@
 {
   "name": "crux",
-  "version": "3.25.1",
+  "version": "3.27.4",
   "description": "Maintains a docs/ tree across seven concerns (code docs, research wiki, ADRs, briefs, work journal, promptbooks, invariants) for Codex and Claude Code.",
   "author": {
     "name": "Idyll",

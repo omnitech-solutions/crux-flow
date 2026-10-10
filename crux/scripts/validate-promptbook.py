@@ -460,6 +460,187 @@ def _patch_coverage_pass(doc: dict, prompts: list, e) -> None:
               f"#/blast_radius/{idx}")
 
 
+# The explicit declaration that no architectural constraint governs a slot's scope. The pattern
+# repeats the reason bound the two schemas state: one line of 1 to 500 characters with a
+# non-whitespace character.
+_DECLARATION_FIELD = "no_governing_constraint"
+_DECLARATION_REASON_PATTERN = r"^(?=[^\x00-\x1f\x7f]*\S)[^\x00-\x1f\x7f]{1,500}(?![\s\S])"
+
+
+class FormatTwoError(ValueError):
+    """A bounded structural refusal safe for execution-boundary diagnostics."""
+    def __init__(self, code):
+        self.code = code
+        super().__init__(code)
+
+
+def validate_format_two(book: dict) -> None:
+    """Canonical format-two cycle structure, independent of run-start history."""
+    def require(condition, code):
+        if not condition:
+            raise FormatTwoError(code)
+
+    require(isinstance(book, dict), "book-shape-refused")
+    require(book.get("format_version") == "2", "explicit-format-required")
+    require("cycle_grandfathered" not in book and "grandfather_reason" not in book,
+            "grandfathering-refused")
+    kind = book.get("cycle_kind")
+    require(kind in ("adr", "implementation", "verify", "patch"), "cycle-kind-refused")
+    prompts = book.get("prompts")
+    require(isinstance(prompts, list) and prompts, "prompts-refused")
+    require(all(isinstance(p, dict) and type(p.get("n")) is int and p.get("n") == i + 1
+                for i, p in enumerate(prompts)),
+            "prompt-order-refused")
+    slots = book.get("implementation_slots")
+    require(isinstance(slots, list), "slots-refused")
+    for slot in slots:
+        base = {"slot", "slug", "scope", "constraint_refs"}
+        require(isinstance(slot, dict) and base <= set(slot) and
+                set(slot) - base <= {"migration_batch", _DECLARATION_FIELD},
+                "slot-shape-refused")
+        declared = _DECLARATION_FIELD in slot
+        if declared:
+            require("migration_batch" not in slot, "migration-slot-declaration-refused")
+            marker = slot[_DECLARATION_FIELD]
+            require(isinstance(marker, dict) and set(marker) == {"reason"} and
+                    isinstance(marker["reason"], str) and
+                    re.match(_DECLARATION_REASON_PATTERN, marker["reason"]) is not None and
+                    slot["constraint_refs"] == [], "slot-declaration-refused")
+        require(isinstance(slot["slug"], str) and re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", slot["slug"]),
+                "slot-slug-refused")
+        require(isinstance(slot["scope"], list) and slot["scope"] and
+                isinstance(slot["constraint_refs"], list) and (declared or slot["constraint_refs"]),
+                "slot-scope-refused")
+        require(isinstance(slot["slot"], str) and re.fullmatch(r"(?:implementation|verify)-[1-9][0-9]*|patch", slot["slot"]),
+                "slot-kind-refused")
+        require(all(isinstance(path, str) and path and not path.startswith("/") and
+                    all(part not in ("", ".", "..") for part in path.split("/")) and
+                    not any(ord(char) < 32 or ord(char) == 127 or char == "\\" for char in path)
+                    for path in slot["scope"]),
+                "slot-scope-refused")
+        require(all(isinstance(handle, str) and re.fullmatch(
+                    r"(?:(?!(?:PB|ADR|RUN|BRIEF)-)[A-Z][A-Z0-9]{1,9}-)?ADR-[0-9]{4}/[a-z0-9]+(?:-[a-z0-9]+)*", handle)
+                    for handle in slot["constraint_refs"]), "slot-constraint-refused")
+        if "migration_batch" in slot:
+            batch = slot["migration_batch"]
+            require(isinstance(batch, dict) and set(batch) == {"role", "path"} and
+                    batch["role"] == "migration-batch", "migration-slot-shape-refused")
+            path = batch["path"]
+            require(slot["slot"].startswith("implementation-") and isinstance(path, str) and
+                    not path.startswith("/") and all(part not in ("", ".", "..") for part in path.split("/")) and
+                    not any(ord(char) < 32 or ord(char) == 127 or char == "\\" for char in path) and
+                    any(path == entry or path.startswith(entry + "/") for entry in slot["scope"]),
+                    "migration-slot-path-refused")
+    require(len({s["slot"] for s in slots}) == len(slots), "duplicate-slot")
+    if kind == "patch":
+        require("modules" not in book, "patch-modules-refused")
+        require(len(prompts) == 5 and [p.get("phase") for p in prompts] == list(_PATCH_PHASES),
+                "patch-order-refused")
+        require(all(s["slot"] == "patch" for s in slots), "slot-kind-refused")
+        require(all("module_tag" not in p for p in prompts), "patch-module-refused")
+        require(isinstance(book.get("blast_radius"), list) and book["blast_radius"] and
+                all(invalid_blast_radius_entry(entry) is None for entry in book["blast_radius"]),
+                "patch-blast-radius-refused")
+    else:
+        require("blast_radius" not in book and all("phase" not in p for p in prompts),
+                "module-phase-refused")
+        groups = []
+        untagged = []
+        for p in prompts:
+            tag = p.get("module_tag")
+            if not tag:
+                untagged.append(p["n"])
+                continue
+            require(isinstance(tag, str) and re.fullmatch(r"(?:adr|implementation|verify|dev|review)-[1-9][0-9]*", tag),
+                    "module-prefix-refused")
+            if not groups or groups[-1][0] != tag:
+                require(tag not in [g[0] for g in groups], "module-order-refused")
+                groups.append((tag, []))
+            groups[-1][1].append(p["n"])
+        counts = {k: 0 for k in ("adr", "implementation", "verify", "dev", "review")}
+        stages = []
+        for tag, numbers in groups:
+            prefix = tag.rsplit("-", 1)[0]
+            require(len(numbers) == (3 if prefix == "review" else 4), "module-count-refused")
+            require(numbers == list(range(numbers[0], numbers[0] + len(numbers))), "module-order-refused")
+            counts[prefix] += 1
+            require(int(tag.rsplit("-", 1)[1]) == counts[prefix], "module-instance-refused")
+            stages.append(2 if prefix == "review" else 1 if prefix == "dev" else 0)
+        require(stages == sorted(stages), "module-order-refused")
+        a, i, v, d, r = (counts[k] for k in counts)
+        require(d >= 1 and r >= 1 and len(prompts) >= 13 and len(untagged) == 2,
+                "cycle-count-refused")
+        require(untagged == [len(prompts) - 1, len(prompts)], "final-prompts-refused")
+        require((kind == "adr" and a >= 1 and v == 0) or
+                (kind == "implementation" and i >= 1 and a == v == 0) or
+                (kind == "verify" and v >= 1 and a == i == 0), "cycle-combination-refused")
+        require(len(prompts) == 4 * (a + i + v + d) + 3 * r + 2, "cycle-count-refused")
+        require(all(s["slot"] in [g[0] for g in groups] and s["slot"].split("-")[0] in
+                    ("implementation", "verify") for s in slots), "slot-kind-refused")
+    if kind != "patch":
+        declared = book.get("modules")
+        keys = ("adrs", "implementations", "verify", "dev_loops", "review_cycles")
+        require(isinstance(declared, dict) and set(declared) == set(keys), "module-declaration-refused")
+        require(all(type(declared[key]) is int and declared[key] >= 0 for key in keys),
+                "module-declaration-refused")
+        require([declared[key] for key in keys] == [a, i, v, d, r], "module-declaration-refused")
+        required_slots = {tag for tag, _ in groups if tag.startswith("implementation-")}
+        require(required_slots <= {s["slot"] for s in slots}, "dedicated-slot-missing")
+    require(type(book.get("total_prompts")) is int, "total-count-refused")
+    require(book.get("total_prompts") == len(prompts), "total-count-refused")
+
+
+
+def validate_format_two_run(run: dict, book: dict) -> None:
+    """A run covers the entire frozen book, including its independent review."""
+    validate_format_two(book)
+    if not isinstance(run, dict) or run.get("format_version") != "2":
+        raise FormatTwoError("format-binding-refused")
+    if run.get("book_id") != book["id"] or run.get("book_content_hash") != compute_book_hash(book):
+        raise FormatTwoError("book-binding-refused")
+    entries = run.get("prompts")
+    if not isinstance(entries, list) or not all(isinstance(p, dict) for p in entries) or \
+            [(p.get("n"), p.get("title")) for p in entries] != [(p["n"], p["title"]) for p in book["prompts"]]:
+        raise FormatTwoError("run-book-shape-refused")
+    batch_slots = {item["slot"]: item for item in book["implementation_slots"] if "migration_batch" in item}
+    if batch_slots:
+        if not isinstance(run.get("migration_bindings"), list):
+            raise FormatTwoError("migration-bindings-required")
+    elif "migration_bindings" in run:
+        raise FormatTwoError("migration-bindings-not-declared")
+    slots = {item["slot"]: item for item in book["implementation_slots"]}
+    seen = set()
+    for container, subject_key in (("implementation_bindings", "revision"), ("migration_bindings", "batch")):
+        bindings = run.get(container, [])
+        if not isinstance(bindings, list):
+            raise FormatTwoError("binding-container-refused")
+        for binding in bindings:
+            required = {"slot", "book_id", "run_id", "book_content_hash", subject_key, "gate_prompt",
+                        "deciding_record", "retained_subject", "context"}
+            if not isinstance(binding, dict) or set(binding) != required or \
+                    not isinstance(binding.get("slot"), str) or binding["slot"] not in slots:
+                raise FormatTwoError("binding-declaration-refused")
+            slot = slots[binding["slot"]]
+            if ("migration_batch" in slot) != (subject_key == "batch"):
+                raise FormatTwoError("cross-role-binding-refused")
+            if any(binding[key] != run.get(key) for key in ("book_id", "run_id", "book_content_hash")):
+                raise FormatTwoError("binding-identity-refused")
+            members = [p["n"] for p in book["prompts"] if
+                       (p.get("phase") == "verify" if slot["slot"] == "patch" else p.get("module_tag") == slot["slot"])]
+            if type(binding["gate_prompt"]) is not int or binding["gate_prompt"] != members[-1]:
+                raise FormatTwoError("binding-close-refused")
+            identity = (container, slot["slot"], binding["gate_prompt"])
+            if identity in seen:
+                raise FormatTwoError("binding-close-identity-ambiguous")
+            seen.add(identity)
+            subject = binding[subject_key]
+            if not isinstance(subject, dict) or set(subject) != {"path", "sha256"} or \
+                    not isinstance(subject["path"], str) or not isinstance(subject["sha256"], str) or \
+                    not re.fullmatch(r"[0-9a-f]{64}", subject["sha256"]):
+                raise FormatTwoError("binding-subject-refused")
+            if subject_key == "batch" and subject["path"] != slot["migration_batch"]["path"]:
+                raise FormatTwoError("migration-binding-subject-refused")
+
 def cycle_coverage_pass(doc: dict, errors: list[dict], file_label: str) -> None:
     """Cycle-coverage invariants for cycle-kind promptbooks — dev-cycle (`adr`),
     iterate (`verify`), and patch-cycle (`patch`). Machine-enforces what dev-cycle
@@ -470,6 +651,12 @@ def cycle_coverage_pass(doc: dict, errors: list[dict], file_label: str) -> None:
     + per-instance contiguity, adr/verify mutual exclusion, the >=13 floor, exactly-2
     untagged (prep + summary), and ``cycle_kind`` <-> ``modules`` <-> tag cross-agreement.
 
+    For a ``format_version`` "2" book the pass delegates to ``validate_format_two``:
+    kinds `adr`, `implementation`, `verify` and `patch`; the architectural count is
+    ``4(A+I)+4D+3R+2`` and the implementation count ``4I+4D+3R+2``; and
+    ``cycle_grandfathered`` / ``grandfather_reason`` are refused. The ``4N+4M+3K+2``
+    formula above is the format-one rule.
+
     For `patch` (ADR-0077 clause 1): the constant count of 5, the fixed phase sequence,
     no module tags, and a non-empty repo-relative ``blast_radius``. A separate branch,
     not a relaxation of the other two.
@@ -477,6 +664,13 @@ def cycle_coverage_pass(doc: dict, errors: list[dict], file_label: str) -> None:
     A book with ``cycle_grandfathered: true`` is skipped (it stays schema-validated).
     Pure-data: no eval, no module_tag-driven file access, bounded by len(prompts) — safe
     on untrusted promptbook YAML."""
+    if doc.get("format_version") == "2":
+        try:
+            validate_format_two(doc)
+        except (FormatTwoError, TypeError, KeyError, AttributeError) as exc:
+            _err(errors, file_label, "#", "#/cycle-coverage", str(exc) if isinstance(exc, FormatTwoError)
+                 else "format-two-shape-refused")
+        return
     if doc.get("cycle_grandfathered") is True:
         return
     tags = doc.get("tags") or []
@@ -608,6 +802,10 @@ def frozen_plan_subset(book: dict) -> dict:
         subset["modules"] = book["modules"]
     if "blast_radius" in book and book["blast_radius"] is not None:
         subset["blast_radius"] = book["blast_radius"]
+    if book.get("format_version") == "2":
+        for key in ("cycle_kind", "implementation_slots"):
+            if key in book:
+                subset[key] = book[key]
     prompts_out: list[dict] = []
     for p in book.get("prompts", []) or []:
         if not isinstance(p, dict):
@@ -675,6 +873,48 @@ def duplicate_number_errors(path: Path, file_label: str) -> list[dict]:
             for msg in record_numbers.find_duplicate_numbers(docs, only=key)]
 
 
+def declared_empty_overlap_errors(path: Path, doc: dict, file_label: str) -> list[dict]:
+    """Authoring-time check: a declared-empty slot whose scope an undeclared live Accepted rule's
+    path scope overlaps, as validator errors.
+
+    The slot validator, `validate_format_two`, is structural and reads no repository. This reads the
+    committed Accepted rules of the repository the book sits in. A repository that cannot be read
+    (no git root, an uncommitted rule source) yields no finding here: council preflight, the
+    approval close and current eligibility each repeat the check against the committed tree."""
+    slots = doc.get("implementation_slots") if doc.get("format_version") == "2" else None
+    declared = [s for s in slots if isinstance(s, dict) and _DECLARATION_FIELD in s] \
+        if isinstance(slots, list) else []
+    if not declared:
+        return []
+    try:
+        import subprocess
+        top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=path.resolve().parent,
+                             capture_output=True, text=True, check=True).stdout.strip()
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import implementation_approval as approval
+        repo = Path(top)
+        view = approval.live_constraints(repo, [])
+        out = []
+        for index, slot in enumerate(slots):
+            if not isinstance(slot, dict) or _DECLARATION_FIELD not in slot:
+                continue
+            found = approval.undeclared_governing_constraints(repo, slot["scope"], [], view)
+            if found["overlapping"]:
+                out.append({"file": file_label, "instance_path": f"#/implementation_slots/{index}",
+                            "schema_path": "#", "error": "declared-empty slot "
+                            f"{slot.get('slot')!r} overlaps the path scope of undeclared live rule(s) "
+                            + ", ".join(found["overlapping"])})
+        return out
+    except (subprocess.CalledProcessError, OSError, ValueError):
+        # Unreadable sources only: no git root, or an uncommitted rule source (`Refused` is a
+        # ValueError). A programming error propagates rather than reading as a clean check.
+        return []
+    except Exception as exc:  # noqa: BLE001
+        if type(exc).__name__ in ("RecordError", "PathRefused", "BionicConfigError", "YAMLError"):
+            return []
+        raise
+
+
 def validate_file(path: Path, kind_override: str | None) -> tuple[int, list[dict]]:
     """Validate one file. Returns (exit_code, errors)."""
     file_label = str(path)
@@ -718,6 +958,8 @@ def validate_file(path: Path, kind_override: str | None) -> tuple[int, list[dict
     if kind == "promptbook":
         cycle_coverage_pass(doc, errors, file_label)
     errors.extend(duplicate_number_errors(path, file_label))
+    if kind == "promptbook":
+        errors.extend(declared_empty_overlap_errors(path, doc, file_label))
 
     return (1 if errors else 0), errors
 

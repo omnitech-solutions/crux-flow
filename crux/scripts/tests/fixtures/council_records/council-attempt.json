@@ -1,0 +1,35 @@
+{
+  "attempt_id": "0123456789abcdef0123456789abcdef",
+  "binding": {
+    "module_tag": "adr-1",
+    "prompt": 2
+  },
+  "book": {
+    "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "PB-0999"
+  },
+  "council_kind": "adr",
+  "format_version": "1",
+  "ordinal": 1,
+  "question": {
+    "path": "docs/promptbooks/runs/PB-0999-fixture/council/question.md",
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "record_type": "council-attempt",
+  "registry": {
+    "path": "crux/scripts/crux/_config/llm_router_config.json",
+    "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "version": "4.1.0"
+  },
+  "round": 1,
+  "run_id": "RUN-001",
+  "seal": "sha256:7cd9313a2cbeb277e3c435863f7b151a69ce693e5f4ffe986963b157db90970e",
+  "subjects": [
+    {
+      "path": "docs/adrs/ADR-0001-fixture.md",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  ],
+  "writer": "run-council",
+  "written_at": "2026-10-01T11:59:00.000001Z"
+}

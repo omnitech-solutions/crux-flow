@@ -197,6 +197,58 @@ To upgrade, refresh the marketplace and re-install:
 Upgrading does not touch the existing tree. Recover schemas 2–4 on a copy
 with verified crux v3.23.2 before using a confirmed current-version copy. For an existing
 schema-5 tree, `audit-docs --migrate` remains available for instruction files.
+
+An upgrade applies the gate check to every cycle run in flight at its next gate
+prompt. A module whose council ran before council records existed closes only on a
+council-runner round convened at module close. No book's bytes change. A template change fixes no existing
+book. The gate check binds hashes, not content. See `run-promptbook`'s
+`references/gates.md`.
+
+After the upgrade, refresh the installed roles so they carry the new council and
+review text. Claude Code reads the roles from the plugin, so restart the session.
+In Codex, run `install-codex-agents` again. In OpenCode, run
+`install-opencode-agents` again for a project install, or regenerate the symlinked
+tree and restart.
+
+Before a run's next gate prompt, store the gateway key
+(`crux-env set OPENROUTER_API_KEY ...`) and commit every council subject. The
+council runner commits its attempt record and its council record itself; do not
+commit either by hand. The gate check reads only committed records. A hook that
+rewrites a council file (a JSON formatter with another indent or key order, for
+example) must exclude `<docs_dir>/promptbooks/runs/`, for example
+`exclude: ^<docs_dir>/promptbooks/runs/` in the pre-commit framework. Otherwise
+each council commit whose file the hook rewrites fails closed
+(`hook-or-commit-failed`, or `mismatch` when the hook re-stages its rewrite) and
+stops for the owner. A hook slower than the commit's 120-second bound makes the
+commit time out and leaves the attempt open. When the commit times out, or a
+refused commit names outside work it moved, look first for the work the hook
+set aside (`git stash list`; the pre-commit framework keeps a backup patch under
+its cache directory) and restore it. Only then remove a stale `index.lock` in the
+git directory, and run recovery. Councils in a promptbook run need `fcntl`, which
+native Windows lacks. There the council runner exits 2 before it claims a round,
+and recovery and the run-work witness writer exit 2 as well, so no council gate
+can pass. Run promptbook councils on macOS, Linux or WSL. The council runner
+refuses a `--prompt` that is not the run's current prompt, so the retry count
+always names the prompt the run is at. After each council record the council
+runner also commits the run's diagnostics log and run-work witness. When the
+council runner exits 2 and stderr names `timeout`, or names outside work the
+commit moved, the owner's remedy above comes first: restore the set-aside work,
+then remove a stale `index.lock`. After those two steps, and after any other
+exit 2 or an open attempt, run the process check and probe the lock with
+`run-council.py --recover <run> --prompt <n> --probe`. Once no live
+council runner holds it, run `run-council.py --recover <run> --prompt <n>`, never
+a new round. A stop for a council that could not run clears: its record takes no
+round place, so once the owner fixes the cause you reconvene at the same round
+number. A stop on a round no owner exception authorizes clears when the owner
+commits an owner-exception record and that round converges. Every other council
+stop is permanent for the module once its record is committed, so abandon the run
+and author a successor book.
+
+Every `--outcome` of `advance-run.py`, at a gate prompt or not, needs a book whose
+content hash matches the run's `book_content_hash`. A route, or a re-advance of a
+blocked prompt that holds a result or artifacts, appends a dated entry to the run snapshot's `notes`
+field. A `notes` value written as plain, folded or non-empty quoted text refuses that advance
+with nothing written. Rewrite `notes` as a literal block (`|`) and run it again.
 ```
 
 After a cache-only block, first tell the user to identify the active Crux `SKILL.md` path or host load trace. Do not recommend an upgrade based on the cached candidate. Offer the marketplace commands only as optional install guidance, without claiming which version is active:

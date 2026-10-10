@@ -139,15 +139,13 @@ In all cases:
 
 ### 6. Update `docs/adrs/index.md`
 
-For the target ADR's row:
-- Update `status` column to the new status.
-- Update `date` column to `${TODAY}`.
-- For `supersede`: update `superseded_by` column to `${replacement}`.
+Regenerate the index from ADR frontmatter, which step 5 has already written. Never edit its rows by hand.
 
-For the replacement ADR's row (supersede only):
-- Update `supersedes` column: append `${target}` to the existing comma-separated list (or replace `—` if empty).
+```
+uv run "${CRUX_PLUGIN_ROOT}/scripts/generate-adr-index.py" --repo-root <repo-root>
+```
 
-Update the `_Last updated:_` line to `${TODAY}`.
+The generator rewrites the target ADR's row (status, date, `superseded_by`) and, for `supersede`, the replacement's `supersedes` column.
 
 ### 7. Append to `docs/log.md`
 
@@ -184,18 +182,42 @@ Restored ${target}.superseded_by ↔ ${replacement}.supersedes consistency.
 
 ### 8. Update `docs/index.md`
 
-- The ADR section count stays the same (the ADR exists; only its status changed) — but verify the count is still accurate.
-- Update the `_Last updated:_` line.
+- Update the `_Last updated:_` line. Step 9 regenerates the ADR section.
 
-### 9. Regenerate the summaries projection (when the ADR carries a `governs` block)
+### 9. Commit, then regenerate the derived outputs
 
-If the transitioned ADR carries a `governs` block, the transition changed what the summaries projection reads: an `accept` edits the frontmatter the projection hashes, and a `supersede`/`deprecate` moves the ADR into `adrs/archive/`, dropping its governs entries out of the active set. Regenerate the projection so the working tree stays fresh:
+While a tester's window is open, commit nothing and run no regenerator. The window runs from the tester's dispatch until the tester returns; outside a run there is none.
+
+Commit this skill's own writes first: the ADR file or files, including the move into `adrs/archive/` for a supersede or deprecate, `adrs/index.md`, `log.md` and `docs/index.md`. Stage only these paths (`git add -- <paths>`) and commit only them (`git commit -- <paths>`), so no change already staged is included. If a regenerator still exits 2 with `migration-input-not-committed`, another uncommitted input is in the tree: stop and name it; never commit a file this skill did not write. The commit comes first because, in a tree whose projections declare migration inputs, a regenerator refuses an uncommitted ADR input with exit 2 (`migration-input-not-committed`).
+
+Then run the regenerators in this order, before the hand-off.
+
+```
+uv run "${CRUX_PLUGIN_ROOT}/scripts/generate-lineage.py" --repo-root <repo-root>
+uv run "${CRUX_PLUGIN_ROOT}/scripts/generate-index-rollup.py" --repo-root <repo-root>
+```
+
+Then regenerate the summaries projection, on every transition. The projection hashes every active ADR's frontmatter, whether or not it carries a `governs` block: an `accept` edits that frontmatter, and a `supersede`/`deprecate` moves the ADR into `adrs/archive/`, dropping its frontmatter and any governs entries out of the active set. Regenerate the projection so the working tree stays fresh:
 
 ```
 uv run "${CRUX_PLUGIN_ROOT}/scripts/summarize-adrs.py" --repo-root <repo-root>
 ```
 
-This rewrites `<docs_dir>/adrs/summaries/` from every active (top-level) ADR's governs blocks, keeping the `summarize-adrs.py --dry-run` drift gate (and CI) green. Skip only when the ADR has no `governs` block.
+This rewrites `<docs_dir>/adrs/summaries/` from every active (top-level) ADR's governs blocks, keeping the `summarize-adrs.py --dry-run` drift gate (and CI) green.
+
+Then regenerate the doctrine projection, which reads the summaries records:
+
+```
+uv run "${CRUX_PLUGIN_ROOT}/scripts/compile-doctrine.py" --repo-root <repo-root>
+```
+
+Last, when `arch` is in `concerns_enabled` and the transition changed the Accepted set (an `accept`, or a `supersede` or `deprecate` of an Accepted ADR), regenerate the arch spine. An `accept` leaves the spine drifted until this runs. It runs last because it reads `adrs/index.md` and the other outputs and refuses a stale input:
+
+```
+uv run "${CRUX_PLUGIN_ROOT}/scripts/derive-arch.py" --repo-root <repo-root>
+```
+
+Confirm `--dry-run` of each regenerator exits 0, then commit the regenerated projections so none stays uncommitted.
 
 ### 10. Hand off to the user
 
@@ -215,9 +237,13 @@ This rewrites `<docs_dir>/adrs/summaries/` from every active (top-level) ADR's g
 - [ ] For supersede: target ADR's `superseded_by:` equals `${replacement}` (a single id, not a list).
 - [ ] For supersede: replacement ADR's body bytes are unchanged.
 - [ ] `docs/adrs/index.md` row(s) for the affected ADR(s) reflect the new status, date, and supersede fields.
-- [ ] `docs/adrs/index.md` `_Last updated:_` equals `${TODAY}`.
+- [ ] `generate-adr-index.py --dry-run` exits 0.
 - [ ] `docs/log.md` has the appropriate `adr` entry (and `lint` entry for Proposed→Deprecated or `--repair`).
-- [ ] `docs/index.md` ADR section count matches the actual file count and `_Last updated:_` is `${TODAY}`.
+- [ ] `docs/index.md` `_Last updated:_` is `${TODAY}`.
+- [ ] The ADR writes, the index, the log entry and the docs-index update are committed before any regenerator runs.
+- [ ] `generate-lineage.py --dry-run`, `generate-index-rollup.py --dry-run`, `summarize-adrs.py --dry-run` and `compile-doctrine.py --dry-run` exit 0.
+- [ ] When `arch` is in `concerns_enabled` and the transition changed the Accepted set, `derive-arch.py --dry-run` exits 0.
+- [ ] The regenerated projections are committed.
 
 ## Red flags — STOP and reconsider
 
@@ -253,7 +279,7 @@ This rewrites `<docs_dir>/adrs/summaries/` from every active (top-level) ADR's g
 - **Confusing `--repair` with normal supersede**: `--repair` is invoked by `audit-docs` to fix detected asymmetries; it doesn't go through the state-machine validation. Don't expose it to user-typed invocations.
 - **Forgetting the Proposed→Deprecated extra `lint` log**: the dual entry (`adr` + `lint`) is the chronological signal that an abandoned proposal occurred. Both required.
 - **Reading the ADR file with a YAML library that re-emits keys in a different order**: parse-then-mutate-then-byte-merge, or use a structured editor that preserves layout. Don't round-trip through a lossy YAML emitter.
-- **Updating the `docs/index.md` ADR count on a transition**: the file count didn't change. Don't bump.
+- **Updating the `docs/index.md` ADR count on a transition**: the file count didn't change, and `generate-index-rollup.py` owns that region. Don't bump.
 - **Trying to journal every transition automatically**: only the user-meaningful ones (accept, supersede). Deprecate-of-Proposed is too minor; let the user invoke `log-work` if they want.
 
 ## ADR archival cold tier (SP-4)

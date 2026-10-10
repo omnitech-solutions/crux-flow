@@ -1125,6 +1125,74 @@ def _prose_cell(s) -> str:
 _PARSE_FAILED = (SyntaxError, ValueError, RecursionError, MemoryError)
 
 
+@functools.lru_cache(maxsize=1)
+def _retained_source_readers():
+    """Load trusted stdlib readers without importing the package or held code."""
+    scripts = Path(__file__).resolve().parents[2]
+    readers = []
+    for name in ("bionic_config", "retained_evidence"):
+        spec = importlib.util.spec_from_file_location("_arch_source_" + name, scripts / (name + ".py"))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        readers.append(module)
+    return tuple(readers)
+
+
+def _retained_source_filter(root: Path, *, discovery: bool = True):
+    """Resolve only the containing project; do not cache its mutable layout."""
+    config, retained = _retained_source_readers()
+    docs = config.load_config(root).docs_root
+    if discovery:
+        retained.retained_evidence_roots(docs)
+    return lambda path: retained.is_retained_evidence_path(docs, Path(path).absolute())
+
+
+def _retained_source_resolver(root: Path):
+    """Admit ordinary source paths without entering retained repository content."""
+    config, retained = _retained_source_readers()
+    repo = Path(root).absolute()
+    docs = config.load_config(repo).docs_root
+    retained.retained_evidence_roots(docs)
+    return lambda path: retained.resolve_source_path(repo, docs, Path(path).absolute())
+
+
+def _retained_source_walk(root: Path, base: Path):
+    """Prune holdings before descent; callers retain their own source filters."""
+    held = _retained_source_filter(root)
+    if not _contained(root, base) or held(base):
+        return
+    for directory, children, files in os.walk(base, followlinks=False):
+        remaining = []
+        for name in children:
+            path = Path(directory) / name
+            if path.is_symlink() and not _contained(root, path):
+                continue
+            if not held(path):
+                remaining.append(name)
+        children[:] = remaining
+        remaining_files = []
+        for name in files:
+            path = Path(directory) / name
+            # Existing file escape/read diagnostics belong to the shared reader.
+            if not _contained(root, path):
+                remaining_files.append(name)
+                continue
+            if path.is_symlink() and not path.is_file():
+                # Missing targets still reach the shared read diagnostics.
+                # Preserve the skip for loops and other non-file links.
+                try:
+                    path.stat()
+                except FileNotFoundError:
+                    pass
+                except OSError:
+                    continue
+                else:
+                    continue
+            if not held(path):
+                remaining_files.append(name)
+        yield directory, children, remaining_files
+
+
 def _iter_py_files(root: Path):
     """Yield every `.py` file under `root`, skipping VCS/venv/build dirs and any
     dot-directory. Deterministic ordering is the caller's concern.
@@ -1134,7 +1202,7 @@ def _iter_py_files(root: Path):
     behaviour, so it is spelled rather than inherited. A symlinked FILE is still
     yielded — containment is `_safe_read_bytes`'s job at the read, which is why
     every caller of this generator goes through it."""
-    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+    for dirpath, dirnames, filenames in _retained_source_walk(root, root):
         dirnames[:] = [
             d for d in dirnames if d not in _SKIP_DIRS and not d.startswith(".")
         ]
@@ -1231,6 +1299,8 @@ def _safe_read_bytes(
     if not _contained(root, path):
         if refusal is not None:
             refusal.append("escape")
+        return None
+    if _retained_source_filter(root, discovery=False)(path):
         return None
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
     try:
@@ -1770,7 +1840,9 @@ def _extract_module_graph(root: Path, pkg: Path, pkg_name: str) -> tuple[str, di
     # Pass 1: enumerate modules (so relative `from . import X` can resolve X against
     # the known set), recording each file's module name, package path, and text.
     files: list[tuple[str, str, str]] = []
-    for py in sorted(pkg.rglob("*.py")):
+    for py in sorted(Path(directory) / name
+                     for directory, _children, files in _retained_source_walk(root, pkg)
+                     for name in files if name.endswith(".py")):
         if "__pycache__" in py.parts:
             continue
         # `rglob` does not recurse into a symlinked directory (measured on 3.13),
@@ -1852,6 +1924,43 @@ def _extract_module_graph(root: Path, pkg: Path, pkg_name: str) -> tuple[str, di
     return _canon(out), sources
 
 
+@functools.lru_cache(maxsize=1)
+def _decision_history_reader():
+    """Load the mandatory trusted reader; optional projection checks are separate."""
+    spec = importlib.util.spec_from_file_location(
+        "_crux_arch_summary_reader", _VENDORED_SCRIPTS / "summarize-adrs.py")
+    if spec is None or spec.loader is None:
+        raise OSError("architectural authority reader is unavailable")
+    prior = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        driver = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(driver)
+        return driver
+    finally:
+        sys.dont_write_bytecode = prior
+
+
+def _decision_history(root: Path, docs_dir: str) -> tuple[list[dict], dict, dict]:
+    """Read proved clause history before either architectural input path."""
+    driver = _decision_history_reader()
+    import implementation_migration as migration
+    view = migration.authority_view(root)
+    if view["state"] == "published" and driver.sp.resolve_tree(root).resolve() != (root / docs_dir).resolve():
+        raise OSError("architectural history belongs to a different configured tree")
+    clauses, _ = driver._historical_summary_clauses(root, view)
+    sources = {ref["path"]: ref["sha256"] for ref in view["dependency_fingerprints"]}
+    sources.update({ref["path"]: ref["sha256"] for ref in view["publications"]})
+    return clauses, sources, view
+
+
+def _architectural_frontmatter(text: str) -> dict:
+    front = _frontmatter(text)
+    if "record_type" in front:
+        raise ValueError("typed implementation evidence cannot supply architectural decisions")
+    return front
+
+
 def extract_decision_index(root: Path, docs_dir: str, mode: str = "complete") -> tuple[str, dict]:
     """Decision index = Accepted, non-archived ADRs, footnote-only. `complete`
     (ADR-0060 default) lists all; `curated` (ADR-0062) keeps load_bearing +
@@ -1864,7 +1973,12 @@ def extract_decision_index(root: Path, docs_dir: str, mode: str = "complete") ->
     the ADR tree and its index are stack-independent.
     """
     from .recover import curated_keep  # noqa: E402
-    sources: dict = {}
+    import implementation_migration as migration
+    if migration._decision_index_applicability(root, docs_dir) == "ABSENT":
+        return _canon(["# Decision index", "", NO_EXTRACTOR.rstrip("\n")]), {}
+    # This gate stays outside _adr_index_projection's optional-input catches.
+    # A failed publication proof is never permission to restore old authority.
+    clauses, sources, authority = _decision_history(root, docs_dir)
     # Every ADR read below goes through `_safe_read_bytes`, and it has to: this is
     # the UNIVERSAL probe, bound for every pack, so an unbounded read here is an
     # unbounded read in every repository crux touches. `_rel` cannot stand in for
@@ -1891,6 +2005,7 @@ def extract_decision_index(root: Path, docs_dir: str, mode: str = "complete") ->
             raw = _safe_read_bytes(root, ap, oversize)
             if raw is None:
                 continue
+            _architectural_frontmatter(_universal(raw.decode("utf-8", errors="replace")))
             sources[_rel(root, ap)] = _sha256_hex(raw)
         for ap in sorted((adrs_dir / "archive").glob("ADR-*.md")):
             raw = _safe_read_bytes(root, ap, oversize)
@@ -1919,7 +2034,7 @@ def extract_decision_index(root: Path, docs_dir: str, mode: str = "complete") ->
             raw = _safe_read_bytes(root, ap, oversize)
             if raw is None:
                 continue
-            fm = _frontmatter(_universal(raw.decode("utf-8", errors="replace")))
+            fm = _architectural_frontmatter(_universal(raw.decode("utf-8", errors="replace")))
             status = str(fm.get("status", "")).strip()
             if status != "Accepted":
                 continue
@@ -1977,6 +2092,22 @@ def extract_decision_index(root: Path, docs_dir: str, mode: str = "complete") ->
         out.append(f"| {i} | {title} | {date} | [^d{i}] |")
         foots.append(f"[^d{i}]: ADR-{num}")
     out += [""] + foots + [""]
+    if clauses:
+        out += ["## Historical implementation clauses", "",
+                "_These source clauses retain evidence and establish no current architectural requirement._", "",
+                "| evidence | clause digest | disposition |", "|---|---|---|"]
+        historical_foots = []
+        for i, clause in enumerate(clauses, start=1):
+            ref = clause["source_ref"]
+            out.append(f"| [^h{i}] | {_cell(ref['clause_sha256'])} | historical implementation |")
+            historical_foots.append(f"[^h{i}]: {_cell(ref['path'])}; architectural replacements: "
+                                    f"{_cell(', '.join(clause['replacements'])) or 'none'}")
+        out += [""] + historical_foots + [""]
+    if authority["state"] == "published":
+        import implementation_migration as migration
+        migration._unchanged_inputs(root, authority["dependency_fingerprints"] +
+                                   [{"path": p["path"], "sha256": p["sha256"]}
+                                    for p in authority["publications"]])
     if not rows:
         out += ["_No Accepted decisions yet._", ""]
     return _canon(out), sources
@@ -2293,6 +2424,7 @@ def _scan_dirs(root: Path, max_depth: int = DETECTION_MAX_DEPTH):
     this one.
     """
     root = Path(root)
+    held = _retained_source_filter(root)
     frontier = [(root, "")]
     yield root, ""
     for _ in range(max_depth):
@@ -2300,7 +2432,7 @@ def _scan_dirs(root: Path, max_depth: int = DETECTION_MAX_DEPTH):
         for parent, prefix in frontier:
             try:
                 children = sorted(
-                    p for p in parent.iterdir() if p.is_dir() and not p.is_symlink()
+                    p for p in parent.iterdir() if not p.is_symlink() and not held(p) and p.is_dir()
                 )
             except OSError:
                 continue

@@ -1,0 +1,153 @@
+{
+  "record_type": "council-record",
+  "format_version": "1",
+  "writer": "run-council",
+  "written_at": "2026-10-01T12:00:00.000001Z",
+  "book": {
+    "id": "PB-0999",
+    "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "run_id": "RUN-001",
+  "binding": {
+    "prompt": 2,
+    "module_tag": "adr-1"
+  },
+  "council_kind": "adr",
+  "round": 1,
+  "question": {
+    "path": "docs/promptbooks/runs/PB-0999-fixture/council/question.md",
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "system_prompt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "vote_instruction_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "subjects": [
+    {
+      "path": "docs/adrs/ADR-0001-fixture.md",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "retained_copy": null
+    }
+  ],
+  "registry": {
+    "path": "crux/scripts/crux/_config/llm_router_config.json",
+    "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "version": "4.1.0"
+  },
+  "outcome": "ran",
+  "refusal_reason": null,
+  "quorum_met": true,
+  "degraded": false,
+  "errored_seats": [],
+  "seats": [
+    {
+      "role": "openai_top",
+      "registry_key": "gpt-6-astra",
+      "requested_model": "openai/gpt-6-astra",
+      "provider_namespace": "openai",
+      "serving_providers": [
+        "openai"
+      ],
+      "served_model": "openai/gpt-6-astra",
+      "served_provider": "OpenAI",
+      "generation_id": "gen-0000000000-fixtureopenai_top",
+      "errored": false,
+      "fault_label": null,
+      "finish_reason": "stop",
+      "retried": false,
+      "attempts": [
+        {
+          "attempt": 1,
+          "replied": true,
+          "served_model": "openai/gpt-6-astra",
+          "served_provider": "OpenAI",
+          "generation_id": "gen-0000000000-fixtureopenai_top",
+          "finish_reason": "stop",
+          "fault_label": null,
+          "served_model_match": true,
+          "served_provider_match": true
+        }
+      ],
+      "decision": "APPROVE",
+      "confidence": 0.9,
+      "reasoning": "Completeness: fine. Correctness: fine. Consistency: fine. Clarity: fine. Security: fine.",
+      "findings": []
+    },
+    {
+      "role": "anthropic_top",
+      "registry_key": "claude-opus-5.5-xhigh",
+      "requested_model": "anthropic/claude-opus-5.5",
+      "provider_namespace": "anthropic",
+      "serving_providers": [
+        "anthropic"
+      ],
+      "served_model": "anthropic/claude-opus-5.5",
+      "served_provider": "Anthropic",
+      "generation_id": "gen-0000000000-fixtureanthropic_top",
+      "errored": false,
+      "fault_label": null,
+      "finish_reason": "stop",
+      "retried": false,
+      "attempts": [
+        {
+          "attempt": 1,
+          "replied": true,
+          "served_model": "anthropic/claude-opus-5.5",
+          "served_provider": "Anthropic",
+          "generation_id": "gen-0000000000-fixtureanthropic_top",
+          "finish_reason": "stop",
+          "fault_label": null,
+          "served_model_match": true,
+          "served_provider_match": true
+        }
+      ],
+      "decision": "APPROVE_WITH_NITS",
+      "confidence": 0.9,
+      "reasoning": "Completeness: fine. Correctness: fine. Consistency: fine. Clarity: fine. Security: fine.",
+      "findings": [
+        {
+          "id": "anthropic_top:F1",
+          "dimension": "Clarity",
+          "safety_adjacent": false,
+          "kind": "nit",
+          "text": "A sentence could be shorter."
+        }
+      ]
+    },
+    {
+      "role": "google_top",
+      "registry_key": "gemini-3.1-pro-preview",
+      "requested_model": "google/gemini-3.1-pro-preview",
+      "provider_namespace": "google",
+      "serving_providers": [
+        "google-ai-studio"
+      ],
+      "served_model": "google/gemini-3.1-pro-preview",
+      "served_provider": "Google AI Studio",
+      "generation_id": "gen-0000000000-fixturegoogle_top",
+      "errored": false,
+      "fault_label": null,
+      "finish_reason": "stop",
+      "retried": false,
+      "attempts": [
+        {
+          "attempt": 1,
+          "replied": true,
+          "served_model": "google/gemini-3.1-pro-preview",
+          "served_provider": "Google AI Studio",
+          "generation_id": "gen-0000000000-fixturegoogle_top",
+          "finish_reason": "stop",
+          "fault_label": null,
+          "served_model_match": true,
+          "served_provider_match": true
+        }
+      ],
+      "decision": "APPROVE",
+      "confidence": 0.9,
+      "reasoning": "Completeness: fine. Correctness: fine. Consistency: fine. Clarity: fine. Security: fine.",
+      "findings": []
+    }
+  ],
+  "aggregate": {
+    "consensus": "UNANIMOUS_APPROVE",
+    "action": "AUTO_EXECUTE"
+  }
+}

@@ -391,6 +391,7 @@ class ReportedNeverRecordedTests(_Repo):
         (self.root / "bionic").mkdir(exist_ok=True)
         (self.root / "bionic" / "manifest.yml").write_text(
             'schema_version: "5"\n', encoding="utf-8")
+        self.commit("the initialized documentation layout")
         report: list = []
         CORE.derive(self.root, "bionic", report=report)
         for rec in report:
@@ -478,7 +479,7 @@ class DeclaredSourcesInManifestTests(unittest.TestCase):
                 'schema_version: "5"\n', encoding="utf-8")
             tree = CORE._build(root, "bionic")
             doc = json.loads(tree[CORE.MANIFEST_REL])
-        pack = CORE.detect_stack(root, None)
+            pack = CORE.detect_stack(root, None)
         self.assertEqual(
             doc["declared_sources"],
             {c: list(ic.globs) for c, ic in sorted(CORE.input_classes(pack).items())},

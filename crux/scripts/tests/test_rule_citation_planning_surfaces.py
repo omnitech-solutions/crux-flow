@@ -309,6 +309,27 @@ class BriefTemplateTests(unittest.TestCase):
         self.assertEqual(buckets["malformed"], [])
 
 
+class BriefHistoricalAdviceParityTests(unittest.TestCase):
+    """The lint's advice for a demoted rule in a brief and the brief template state the same sentence."""
+
+    CORE = "describe the former rule in prose without a citation token"
+
+    @staticmethod
+    def _states(text: str) -> bool:
+        return BriefHistoricalAdviceParityTests.CORE in " ".join(text.split()).lower()
+
+    def test_lint_advice_and_brief_template_state_the_same_phrase(self):
+        import implementation_migration as migration
+        advice = migration._reference_reader().BRIEF_HISTORICAL_ADVICE
+        self.assertTrue(advice.endswith(self.CORE), advice)
+        self.assertTrue(self._states(_read(BRIEF_TEMPLATE)), "the brief template states the lint's advice")
+
+    def test_detector_reports_absence_on_a_copy_without_the_phrase(self):
+        stripped = _read(BRIEF_TEMPLATE).replace("Describe the former rule in prose without a citation token", "")
+        self.assertNotEqual(stripped, _read(BRIEF_TEMPLATE))
+        self.assertFalse(self._states(stripped))
+
+
 class CitationGrammarTests(unittest.TestCase):
     """Every citation on the planning surfaces resolves; every placeholder is a non-token."""
 
