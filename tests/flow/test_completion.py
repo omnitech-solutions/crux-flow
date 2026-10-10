@@ -356,3 +356,29 @@ def test_shipped_mode_data_has_a_strict_schema(tmp_path, change):
     target.write_text(json.dumps(data))
     with pytest.raises(FlowError):
         policy.load_definition(tmp_path)
+
+
+@pytest.mark.parametrize('host', ['claude', 'codex', 'opencode', 'omp'])
+def test_flow_mode_librarian_holds_no_shell_and_upstream_mode_keeps_upstream_role(tmp_path, host):
+    # Upstream 3.27.3 gave the librarian Bash. A generated Flow librarian stays a reader on every host; upstream mode renders upstream's role.
+    def librarian(mode):
+        effective = policy.resolve(PLUGIN, tmp_path, tmp_path / 'home', host, invocation={'mode': mode})
+        return hosts.roles(PLUGIN, effective)['files']['crux-flow-librarian.' + ('toml' if host == 'codex' else 'md')].decode()
+
+    for mode in ('aggressive', 'balanced', 'thorough'):
+        text = librarian(mode)
+        if host == 'claude':
+            assert 'Bash' not in yaml.safe_load(text.split('---', 2)[1])['tools']
+        elif host == 'opencode':
+            assert not [r for r in yaml.safe_load(text.split('---', 2)[1])['permissions'] if r['action'] == 'shell' and r.get('effect') == 'allow']
+        elif host == 'omp':
+            assert 'bash' not in yaml.safe_load(text.split('---', 2)[1])['tools']
+        else:
+            assert 'read-only' in text and 'workspace-write' not in text
+    upstream = librarian('upstream')
+    if host == 'claude':
+        assert 'Bash' in yaml.safe_load(upstream.split('---', 2)[1])['tools']
+    elif host == 'opencode':
+        assert [r for r in yaml.safe_load(upstream.split('---', 2)[1])['permissions'] if r['action'] == 'shell' and r.get('effect') == 'allow']
+    elif host == 'omp':
+        assert 'bash' in yaml.safe_load(upstream.split('---', 2)[1])['tools']

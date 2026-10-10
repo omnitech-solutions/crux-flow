@@ -28,6 +28,17 @@ def _parts(raw: bytes) -> tuple[dict,str,str]:
     return mapping(decode(pieces[1])),pieces[2],pieces[1]
 
 
+# Read-only retrieval roles hold no shell in the Flow modes. Upstream 3.27.3 granted the librarian Bash; a generated Flow
+# librarian stays a reader (Read, Grep, Glob, Skill) on every host, and upstream mode renders the role as upstream ships it.
+NO_SHELL=frozenset({'librarian'})
+
+
+def _drop_shell(head: dict,fm: str) -> tuple[dict,str]:
+    def keep(listed: str) -> str: return ', '.join(tool for tool in re.split(r',\s*(?![^()]*\))',listed) if tool.strip() and tool.strip()!='Bash')
+    if isinstance(head.get('tools'),str): head={**head,'tools':keep(head['tools'])}
+    return head,re.sub(r'^(tools:[ \t]*)(.+)$',lambda match: match[1]+keep(match[2]),fm,count=1,flags=re.M)
+
+
 def _markdown(head: dict,body: str) -> bytes:
     return ('---\n'+yaml.safe_dump(head,sort_keys=False,allow_unicode=True)+'---\n'+body.lstrip()).encode()
 
@@ -62,11 +73,13 @@ def roles(plugin: Path, policy: dict, *, engine: Path | None=None, preload: dict
         if raw is None: raise FlowError('role source disappeared')
         head,body,fm=_parts(raw); name=head['name']
         if not upstream and name=='commander': continue
+        if not upstream and name in NO_SHELL: head,fm=_drop_shell(head,fm)
         assignment=policy['roles'][name]
         routed=extra is not None and name in extra['roles']
         source=codex_agents.parse_source(path)
         if not upstream:
             source=replace(source,body=_instructions(plugin,name,policy),skills=('flow',))
+            if name in NO_SHELL: source=replace(source,tools=frozenset(tool for tool in source.tools if tool!='Bash'))
             body=source.body
         unsupported[name]=[key for key in ('memory','isolation','maxTurns','effort','skills') if key in head]
         if host=='codex':
