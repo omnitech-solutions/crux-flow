@@ -1,0 +1,23 @@
+{
+  "name": "@omnitech/agent-worker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "node ../../scripts/bundle-node-app.mjs src/main.ts dist/main.js",
+    "dev": "tsx watch --clear-screen=false --include \"../../products/*/dist/backend/**/*.js\" --include \"../../packages/*/dist/**/*.js\" src/main.ts",
+    "start": "node dist/main.js",
+    "lint": "biome lint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config ../../vitest.package.config.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "esbuild": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

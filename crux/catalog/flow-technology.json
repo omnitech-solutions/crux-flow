@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "families": {
+    "language": "The language and runtime a package is written for.",
+    "ui": "Browser user interface and the web framework that renders it.",
+    "api": "HTTP routing and validation at a boundary.",
+    "persistence": "Schemas, migrations, queries and the database server.",
+    "ai-runtime": "Model provider SDKs, agent runtimes and the protocols they speak.",
+    "testing": "Unit, integration and browser test runners.",
+    "native": "Native desktop application code.",
+    "operations": "Logging and local service orchestration."
+  },
+  "technologies": {
+    "typescript": {
+      "name": "TypeScript",
+      "family": "language",
+      "detect": {"packages": ["typescript"]},
+      "terms": ["TypeScript", "tsconfig"],
+      "docs": "https://www.typescriptlang.org/docs/"
+    },
+    "node": {
+      "name": "Node.js",
+      "family": "language",
+      "detect": {"files": ["package.json"], "pattern": "\"node\"\\s*:\\s*\"([^\"]+)\""},
+      "terms": ["Node.js"],
+      "docs": "https://nodejs.org/docs/latest/api/"
+    },
+    "react": {
+      "name": "React",
+      "family": "ui",
+      "detect": {"packages": ["react"]},
+      "terms": ["React", "JSX", "component"],
+      "docs": "https://react.dev/reference/react",
+      "sources": [
+        {"repository": "vercel-labs/agent-skills", "path": "skills/composition-patterns", "publisher": "Vercel",
+         "licence": "MIT (stated in the skill; the repository has no root licence file)", "first_party": true,
+         "lifecycle": "active", "compatibility": "unknown"},
+        {"repository": "vercel-labs/agent-skills", "path": "skills/react-best-practices", "publisher": "Vercel",
+         "licence": "MIT (stated in the skill; the repository has no root licence file)", "first_party": true,
+         "lifecycle": "active", "compatibility": "unknown"}
+      ]
+    },
+    "nextjs": {
+      "name": "Next.js",
+      "family": "ui",
+      "detect": {"packages": ["next"]},
+      "terms": ["Next.js", "App Router"],
+      "docs": "https://nextjs.org/docs/app",
+      "sources": [
+        {"repository": "vercel/next.js", "path": "skills", "ref": "canary", "publisher": "Vercel", "licence": "MIT",
+         "first_party": true, "lifecycle": "active", "compatibility": "unknown"},
+        {"repository": "vercel-labs/next-skills", "path": "", "publisher": "Vercel",
+         "licence": "none stated", "first_party": true, "lifecycle": "moved",
+         "replaced_by": "the documentation bundled in the installed next package (next/dist/docs)", "compatibility": "unknown"}
+      ]
+    },
+    "hono": {
+      "name": "Hono",
+      "family": "api",
+      "detect": {"packages": ["hono"]},
+      "terms": ["Hono"],
+      "docs": "https://hono.dev/docs",
+      "sources": [
+        {"repository": "honojs/skills", "path": "skills/hono", "publisher": "Hono", "licence": "MIT",
+         "first_party": true, "lifecycle": "active", "compatibility": "unknown"}
+      ]
+    },
+    "zod": {
+      "name": "Zod",
+      "family": "api",
+      "detect": {"packages": ["zod"]},
+      "terms": ["Zod", "schema validation"],
+      "docs": "https://zod.dev"
+    },
+    "drizzle": {
+      "name": "Drizzle",
+      "family": "persistence",
+      "detect": {"packages": ["drizzle-orm", "drizzle-kit"]},
+      "terms": ["Drizzle", "migration"],
+      "docs": "https://orm.drizzle.team/docs/overview"
+    },
+    "postgresql": {
+      "name": "PostgreSQL",
+      "family": "persistence",
+      "detect": {"files": ["compose.yaml", "compose.yml", "docker-compose.yml", "docker-compose.yaml"],
+                 "pattern": "image:\\s*[\"']?postgres:([A-Za-z0-9._-]+)"},
+      "terms": ["PostgreSQL", "Postgres", "row-level security"],
+      "docs": "https://www.postgresql.org/docs/",
+      "sources": [
+        {"repository": "supabase/agent-skills", "path": "skills/supabase-postgres-best-practices", "publisher": "Supabase",
+         "licence": "MIT", "first_party": false, "lifecycle": "active", "compatibility": "unknown"}
+      ]
+    },
+    "node-postgres": {
+      "name": "node-postgres",
+      "family": "persistence",
+      "detect": {"packages": ["pg"]},
+      "terms": ["node-postgres", "pg driver"],
+      "docs": "https://node-postgres.com/"
+    },
+    "vitest": {
+      "name": "Vitest",
+      "family": "testing",
+      "detect": {"packages": ["vitest"]},
+      "terms": ["Vitest"],
+      "docs": "https://vitest.dev/guide/"
+    },
+    "playwright": {
+      "name": "Playwright",
+      "family": "testing",
+      "detect": {"packages": ["@playwright/test", "playwright"]},
+      "terms": ["Playwright", "browser test"],
+      "docs": "https://playwright.dev/docs/intro",
+      "sources": [
+        {"repository": "microsoft/playwright-cli", "path": "skills/playwright-cli", "publisher": "Microsoft",
+         "licence": "Apache-2.0", "first_party": true, "lifecycle": "active", "compatibility": "unknown"}
+      ]
+    },
+    "swift": {
+      "name": "Swift and AppKit",
+      "family": "native",
+      "detect": {"files": ["Package.swift"], "pattern": "swift-tools-version:\\s*([0-9.]+)"},
+      "terms": ["Swift", "AppKit", "WKWebView"],
+      "docs": "https://developer.apple.com/documentation/appkit",
+      "sources": [
+        {"repository": "AvdLee/Swift-Concurrency-Agent-Skill", "path": "skills/swift-concurrency", "publisher": "Antoine van der Lee",
+         "licence": "MIT", "first_party": false, "lifecycle": "active", "compatibility": "unknown"}
+      ]
+    },
+    "anthropic-sdk": {
+      "name": "Anthropic SDK",
+      "family": "ai-runtime",
+      "detect": {"packages": ["@anthropic-ai/sdk"]},
+      "terms": ["Anthropic SDK", "Messages API"],
+      "docs": "https://platform.claude.com/docs/en/api/client-sdks",
+      "sources": [
+        {"repository": "anthropics/skills", "path": "skills/claude-api", "publisher": "Anthropic",
+         "licence": "LICENSE.txt inside the skill (the repository has no root licence file)", "first_party": true,
+         "lifecycle": "active", "compatibility": "unknown"}
+      ]
+    },
+    "claude-agent-sdk": {
+      "name": "Claude Agent SDK",
+      "family": "ai-runtime",
+      "detect": {"packages": ["@anthropic-ai/claude-agent-sdk"]},
+      "terms": ["Claude Agent SDK", "agent runtime"],
+      "docs": "https://platform.claude.com/docs/en/agent-sdk/overview"
+    },
+    "openai-sdk": {
+      "name": "OpenAI SDK",
+      "family": "ai-runtime",
+      "detect": {"packages": ["openai"]},
+      "terms": ["OpenAI SDK", "OpenAI-compatible"],
+      "docs": "https://platform.openai.com/docs/libraries"
+    },
+    "codex-app-server": {
+      "name": "Codex app server",
+      "family": "ai-runtime",
+      "detect": {"files": ["**/codex-app-server/*"]},
+      "terms": ["Codex app server", "app-server"],
+      "docs": "https://developers.openai.com/codex/app-server"
+    },
+    "mcp": {
+      "name": "Model Context Protocol",
+      "family": "ai-runtime",
+      "detect": {"packages": ["@modelcontextprotocol/sdk"]},
+      "terms": ["MCP", "Model Context Protocol"],
+      "docs": "https://modelcontextprotocol.io/docs",
+      "sources": [
+        {"repository": "anthropics/skills", "path": "skills/mcp-builder", "publisher": "Anthropic",
+         "licence": "LICENSE.txt inside the skill (the repository has no root licence file)", "first_party": true,
+         "lifecycle": "active", "compatibility": "unknown"}
+      ]
+    },
+    "pino": {
+      "name": "pino",
+      "family": "operations",
+      "detect": {"packages": ["pino"]},
+      "terms": ["pino", "logging"],
+      "docs": "https://getpino.io/"
+    },
+    "docker-compose": {
+      "name": "Docker Compose",
+      "family": "operations",
+      "detect": {"files": ["compose.yaml", "compose.yml", "docker-compose.yml", "docker-compose.yaml"]},
+      "terms": ["Docker Compose", "compose file"],
+      "docs": "https://docs.docker.com/compose/"
+    }
+  }
+}

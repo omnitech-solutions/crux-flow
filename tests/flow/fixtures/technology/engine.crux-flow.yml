@@ -1,0 +1,82 @@
+config_version: "1"
+mode: aggressive
+technology:
+  router: technology-references
+  owner: flow                       # Flow generates the router and owns it
+  preload: [developer, reviewer]    # delegated roles that start with the router
+  never: [nextjs, react]            # the engine is an embedded SDK: no web framework, no UI
+  layers:
+    - id: engine-core
+      paths: ["packages/ai-engine/src/*.ts", "packages/ai-engine/src/contracts/**"]
+      technologies: [typescript, node, zod]
+      read:
+        project:
+          - bionic/research/references/contract.md
+          - bionic/research/references/versioning.md
+          - bionic/adrs/ADR-0032-one-entry-point-a-host-names-a-provider-or-runtime.md
+          - bionic/adrs/ADR-0006-every-operation-fails-with-one-typed-failure-and-a.md
+      rules: [AGENTS.md]
+      commands:
+        - {id: verify, cwd: ".", argv: [pnpm, run, verify], risk: read-only}
+      never:
+        - "an import path other than the one entry point"
+        - "an environment read inside the engine"
+    - id: model-providers
+      paths: ["packages/ai-engine/src/providers/*.ts"]
+      technologies: [anthropic-sdk, openai-sdk]
+      read:
+        project:
+          - bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md
+          - bionic/adrs/ADR-0004-one-model-contract-and-streaming-port-ending-in-on.md
+          - bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md
+      rules: [AGENTS.md]
+      commands:
+        - {id: no-frameworks, cwd: ".", argv: [pnpm, run, "verify:no-frameworks"], risk: read-only}
+        - id: live
+          cwd: "."
+          argv: [pnpm, run, "test:live"]
+          risk: external
+          requires: ["provider credentials supplied by the host", "the owner's approval for paid calls"]
+      never:
+        - "an AI framework dependency (AGENTS.md rule 2)"
+        - "a provider SDK import outside providers/"
+        - "a plain thrown error reaching a caller"
+    - id: agent-runtimes
+      paths: ["packages/ai-engine/src/providers/agents/**"]
+      technologies: [claude-agent-sdk, codex-app-server, mcp]
+      read:
+        project:
+          - bionic/adrs/ADR-0018-agent-runtimes-are-a-distinct-kind-of-provider.md
+          - bionic/adrs/ADR-0038-an-agent-runtime-is-given-tools-the-engine-serves.md
+      rules: [AGENTS.md]
+      commands:
+        - {id: test, cwd: ".", argv: [pnpm, run, test], risk: read-only}
+      never:
+        - "an agent process started by importing the entry point"
+    - id: storage
+      paths: ["packages/ai-engine/src/store/**", "scripts/db-setup.ts", "docker-compose.yml"]
+      technologies: [drizzle, node-postgres, postgresql, docker-compose]
+      read:
+        project:
+          - bionic/adrs/ADR-0016-storage-is-a-drizzle-schema-and-two-repository-vie.md
+      rules: [AGENTS.md]
+      commands:
+        - {id: db-up, cwd: ".", argv: [pnpm, run, "db:up"], risk: writes, requires: ["Docker is running"]}
+        - {id: db-setup, cwd: ".", argv: [pnpm, run, "db:setup"], risk: writes, requires: ["db-up has completed"]}
+        - {id: db-reset, cwd: ".", argv: [pnpm, run, "db:reset"], risk: destructive, requires: ["the owner's approval"]}
+    - id: logging
+      paths: ["packages/ai-engine/src/logging/**"]
+      technologies: [pino]
+      read:
+        project:
+          - packages/ai-engine/src/logging/README.md
+          - bionic/adrs/ADR-0024-the-engine-logs-by-configuration-and-a-line-never.md
+          - bionic/adrs/ADR-0036-the-engine-owns-its-logger-it-logs-by-default-with.md
+      rules: [AGENTS.md]
+    - id: tests
+      paths: ["packages/ai-engine/src/**/*.test.ts", "vitest.config.ts"]
+      technologies: [vitest]
+      rules: [AGENTS.md]
+      commands:
+        - {id: test, cwd: ".", argv: [pnpm, run, test], risk: read-only}
+        - {id: coverage, cwd: ".", argv: [pnpm, run, "test:coverage"], risk: read-only}

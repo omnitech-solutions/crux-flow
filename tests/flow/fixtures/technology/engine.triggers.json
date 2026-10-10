@@ -1,0 +1,24 @@
+{
+  "skill": "technology-references",
+  "should_fire": [
+    {"layer": "model-providers", "prompt": "Sketch a provider adapter for a new OpenAI-compatible endpoint. Do not edit files."},
+    {"layer": "model-providers", "prompt": "The Anthropic SDK call in the provider drops the stop reason on a streamed reply; find out why."},
+    {"layer": "agent-runtimes", "prompt": "Add a tool the Claude Agent SDK runtime can call and expose it over MCP."},
+    {"layer": "agent-runtimes", "prompt": "The Codex app server runtime never emits its terminal part when a turn is cancelled. Fix it."},
+    {"layer": "storage", "prompt": "Add a nullable finished_at column to the runs table in the Drizzle schema."},
+    {"layer": "storage", "prompt": "Why does db:setup fail against Postgres 17 on a clean volume?"},
+    {"layer": "engine-core", "prompt": "Tighten the Zod schema for the profile configuration so an unknown key is a typed failure."},
+    {"layer": "logging", "prompt": "Make the pino backend redact the request body before the line is written."},
+    {"layer": "tests", "prompt": "Write a Vitest case that proves a provider timeout ends in one typed failure."}
+  ],
+  "should_not_fire": [
+    {"prompt": "Fix the typo in README.md. Do not edit files; say what you would change.", "why": "prose only; no layer's paths are touched"},
+    {"prompt": "Summarise what changed in the last three commits.", "why": "read-only history question"},
+    {"prompt": "Reword the Unreleased section of the changelog so each line starts with a verb.", "why": "prose only"},
+    {"prompt": "What is the difference between a mutex and a semaphore?", "why": "general knowledge, not this repository"},
+    {"prompt": "List the open decisions in the documentation tree.", "why": "a documentation query, answered by query-docs"},
+    {"prompt": "Rename the default branch from master to main and tell me the git commands.", "why": "repository housekeeping"},
+    {"prompt": "Draft a two-line commit message for a formatting-only change.", "why": "no code path is read or written"},
+    {"prompt": "Which licence does this repository ship under?", "why": "a fact lookup"}
+  ]
+}

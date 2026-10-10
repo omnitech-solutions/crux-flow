@@ -1,0 +1,184 @@
+{
+ "case": "test_b_engine_with_the_smallest_model",
+ "consumer": "engine",
+ "model": "haiku",
+ "prompt": "Sketch a provider adapter for a new OpenAI-compatible endpoint. Do not edit files.",
+ "runs": 5,
+ "passes": 4,
+ "router_loaded": 4,
+ "cost_usd": 0.4784,
+ "observations": [
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "bionic/research/references/contract.md",
+    "packages/ai-engine/src/providers/anthropic.ts",
+    "packages/ai-engine/src/providers/ai-sdk.ts",
+    "packages/ai-engine/src/contracts/model.ts",
+    "packages/ai-engine/src/failure.ts",
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "bionic/adrs/ADR-0004-one-model-contract-and-streaming-port-ending-in-on.md",
+    "packages/ai-engine/src/engine.ts",
+    "packages/ai-engine/src/import-rule.test.ts",
+    "packages/ai-engine/src/index.ts",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "bionic/research/references/contract.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "Based on my exploration of the codebase, here's a sketch of what an OpenAI-compatible provider adapter would look like:\n\n## Provider Adapter Sketch for OpenAI-Compatible Endpoint\n\n**Location:** `packages/ai-engine/src/providers/openai-compatible.ts`\n\n### Structure Overview\n\n```typescript\n// [GUARD] Only provider SDK imports here; no framework dependencies\nimport { OpenAI } from \"openai\";\nimport type { Message } from \"openai/resources/chat/completions\";\n\n// [STRATEGY] The adapter is a factory that creates a provider with:\n// 1. Model contract operations (complete, stream, etc.)\n// 2. Typed fail",
+   "cost_usd": 0.09140080000000002,
+   "turns": 20,
+   "router_loaded": true,
+   "families": {
+    "ai-runtime": true,
+    "storage": false,
+    "logging": false
+   },
+   "pass": true
+  },
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "bionic/research/references/contract.md",
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "packages/ai-engine/src/providers/anthropic.ts",
+    "packages/ai-engine/src/providers/ai-sdk.ts",
+    "packages/ai-engine/src/contracts/model.ts",
+    "packages/ai-engine/src/index.ts",
+    "packages/ai-engine/src/failure.ts",
+    "packages/ai-engine/src/engine.ts",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "bionic/research/references/plan.md",
+    "bionic/objectives.md",
+    "bionic/adrs/ADR-0004-one-model-contract-and-streaming-port-ending-in-on.md",
+    "bionic/adrs/ADR-0004-one-model-contract-and-streaming-port-ending-in-on.md",
+    "bionic/adrs/ADR-0032-one-entry-point-a-host-names-a-provider-or-runtime.md",
+    "bionic/adrs/ADR-0032-one-entry-point-a-host-names-a-provider-or-runtime.md",
+    "bionic/research/references/contract.md",
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "bionic/research/references/contract.md",
+    "bionic/research/references/contract.md",
+    "package.json",
+    "packages/ai-engine/package.json",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "Based on the project's architecture and specifications, here's a sketch for an OpenAI-compatible provider adapter:\n\n## OpenAI-Compatible Provider Adapter Design\n\n### Core Principle (from ADR-0028)\nAny AI SDK provider can sit behind the engine's own port. The OpenAI-compatible endpoint should be wrapped at the boundary, translating between the OpenAI API and the engine's model contract.\n\n### Provider Registration\n```ts\nimport { modelProvider } from \"@omnitech/ai-engine\";\n\nconst providers = {\n  openaiCompat: modelProvider({\n    kind: \"openai-compatible\",\n    apiKey: process.env.OPENAI_API_KEY,\n ",
+   "cost_usd": 0.12412400000000003,
+   "turns": 35,
+   "router_loaded": true,
+   "families": {
+    "ai-runtime": true,
+    "storage": false,
+    "logging": false
+   },
+   "pass": true
+  },
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "bionic/research/references/contract.md",
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "packages/ai-engine/src/providers/anthropic.ts",
+    "packages/ai-engine/src",
+    "packages/ai-engine/src/contracts/model.ts",
+    "packages/ai-engine/src/failure.ts",
+    "packages/ai-engine/src/providers/ai-sdk.ts",
+    "packages/ai-engine/src/engine.ts",
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own-port.md",
+    "bionic/adrs/ADR-0004-one-model-contract-and-streaming-port-ending-in-on.md",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "bionic/adrs/ADR-0006-every-operation-fails-with-one-typed-failure-and-a.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "Based on the architecture decisions and contract specification, here's a sketch of an OpenAI-compatible provider adapter:\n\n## Provider Adapter Sketch: OpenAI-Compatible Endpoint\n\n### Structure\n\nThe adapter lives at `packages/ai-engine/src/providers/openai-compatible.ts` and is a thin translation layer that:\n\n1. **Takes host configuration** (never reads environment itself):\n   - API key/authentication\n   - Base URL for the endpoint\n   - Model mappings (logical name \u2192 endpoint model ID)\n   - Optional: timeout, retry policy, custom headers\n\n2. **Implements the engine's model contract** with three",
+   "cost_usd": 0.0742109,
+   "turns": 23,
+   "router_loaded": true,
+   "families": {
+    "ai-runtime": true,
+    "storage": false,
+    "logging": false
+   },
+   "pass": true
+  },
+  {
+   "skills": [],
+   "reads": [
+    "/private/var/folders/3q/yd3w9m4544g4mkmdc3bcld2m0000gn/T/pytest-of-desoleary/pytest-363/test_b_engine_with_the_smalles0/run-3/engine",
+    "packages/ai-engine/src/providers/anthropic.ts",
+    "packages/ai-engine/src/contracts/model.ts",
+    "packages/ai-engine/src/engine.ts",
+    "bionic/research/references/contract.md",
+    "bionic/research/references/contract.md",
+    "packages/ai-engine/src/index.ts",
+    "packages/ai-engine/src/failure.ts",
+    "README.md",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "bionic/adrs/ADR-0032-one-entry-point-a-host-names-a-provider-or-runtime.md",
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "Based on the architecture in AGENTS.md and the contract specification, here's a sketch for an OpenAI-compatible provider adapter:\n\n## Sketch: OpenAI-Compatible Provider Adapter\n\n### 1. **Factory Export** (in `index.ts`)\n```ts\nexport function modelProvider(config: OpenAIProviderConfig): ModelProvider {\n  return new OpenAIAdapter(config);\n}\n```\n\n### 2. **Provider Configuration**\n```ts\ninterface OpenAIProviderConfig {\n  apiKey: string;\n  baseUrl?: string;  // for compatible endpoints: Azure, Ollama, vLLM, etc.\n  organization?: string;  // optional for OpenAI\n  timeout?: number;  // milliseconds\n}",
+   "cost_usd": 0.0835181,
+   "turns": 18,
+   "router_loaded": false,
+   "families": {
+    "ai-runtime": true,
+    "storage": false,
+    "logging": false
+   },
+   "pass": false
+  },
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "packages/ai-engine/src/contracts",
+    "packages/ai-engine/src/contracts/model.ts",
+    "packages/ai-engine/src/providers/anthropic.ts",
+    "bionic/research/references/contract.md",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "packages/ai-engine/src/engine.ts",
+    "packages/ai-engine/src/providers/ai-sdk.ts",
+    "bionic/objectives.md",
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "package.json",
+    "packages/ai-engine/package.json"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "Based on the project's architecture and the technology stack, here's a sketch of a provider adapter for an OpenAI-compatible endpoint:\n\n## Provider Adapter Sketch: OpenAI-Compatible\n\n### Architecture Overview\n\nThe provider adapter follows the **thin-layer-over-SDK** philosophy (ADR-0002). It:\n- Takes credentials/config from the host at construction time\n- Wraps the OpenAI SDK without adding framework dependencies\n- Returns typed `Failure` results, never throws\n- Implements the engine's model contract interface\n\n### Structure\n\n```typescript\n// packages/ai-engine/src/providers/openai-compatible.",
+   "cost_usd": 0.1051128,
+   "turns": 22,
+   "router_loaded": true,
+   "families": {
+    "ai-runtime": true,
+    "storage": false,
+    "logging": false
+   },
+   "pass": true
+  }
+ ]
+}

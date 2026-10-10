@@ -1,0 +1,99 @@
+{
+ "case": "test_e_a_readme_typo_loads_no_reference_family[studio]",
+ "consumer": "studio",
+ "model": "sonnet",
+ "prompt": "Fix the typo in README.md. Do not edit files; say what you would change.",
+ "runs": 5,
+ "passes": 5,
+ "router_loaded": 0,
+ "cost_usd": 0.2036,
+ "observations": [
+  {
+   "skills": [],
+   "reads": [
+    "README.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "The typo is on line 3 of `README.md`: \"Teh\" should be \"The\".\n\nProposed change:\n\n```diff\n-A fixture copy for Crux Flow's technology tests. Teh real repository is elsewhere.\n+A fixture copy for Crux Flow's technology tests. The real repository is elsewhere.\n```\n\nI haven't edited anything, as you asked.",
+   "cost_usd": 0.041110999999999995,
+   "turns": 3,
+   "router_loaded": false,
+   "families": {
+    "persistence": false,
+    "ui": false
+   },
+   "pass": true
+  },
+  {
+   "skills": [],
+   "reads": [
+    "README.md",
+    "bionic/objectives.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "In `README.md` line 3, I would change \"Teh\" to \"The\":\n\n```\n- A fixture copy for Crux Flow's technology tests. Teh real repository is elsewhere.\n+ A fixture copy for Crux Flow's technology tests. The real repository is elsewhere.\n```\n\nThat is the only typo in the file. I made no edits, as you asked.\n\n`bionic/objectives.md`, which `AGENTS.md` says to read before work, doesn't exist in this checkout. A one-word typo fix doesn't depend on it.",
+   "cost_usd": 0.041930999999999996,
+   "turns": 3,
+   "router_loaded": false,
+   "families": {
+    "persistence": false,
+    "ui": false
+   },
+   "pass": true
+  },
+  {
+   "skills": [],
+   "reads": [
+    "README.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "The typo is on line 3 of `README.md`: \"Teh\" should be \"The\".\n\n**Change:**\n\n```\n- A fixture copy for Crux Flow's technology tests. Teh real repository is elsewhere.\n+ A fixture copy for Crux Flow's technology tests. The real repository is elsewhere.\n```\n\nI haven't edited anything, as you asked.",
+   "cost_usd": 0.0378752,
+   "turns": 2,
+   "router_loaded": false,
+   "families": {
+    "persistence": false,
+    "ui": false
+   },
+   "pass": true
+  },
+  {
+   "skills": [],
+   "reads": [
+    "README.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "The typo is on line 3 of `README.md`: \"Teh\" should be \"The\".\n\nI would change:\n\n```\nA fixture copy for Crux Flow's technology tests. Teh real repository is elsewhere.\n```\n\nto:\n\n```\nA fixture copy for Crux Flow's technology tests. The real repository is elsewhere.\n```\n\nI haven't edited anything, as you asked.",
+   "cost_usd": 0.0408476,
+   "turns": 3,
+   "router_loaded": false,
+   "families": {
+    "persistence": false,
+    "ui": false
+   },
+   "pass": true
+  },
+  {
+   "skills": [],
+   "reads": [
+    "README.md",
+    "bionic/objectives.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "In `README.md`, line 3 has a typo: \"Teh\" should be \"The\".\n\n- **Current:** `A fixture copy for Crux Flow's technology tests. Teh real repository is elsewhere.`\n- **Proposed:** `A fixture copy for Crux Flow's technology tests. The real repository is elsewhere.`\n\nI didn't edit anything, as requested. `bionic/objectives.md`, which `AGENTS.md` says to read before work, doesn't exist in this fixture, so I proceeded without it.",
+   "cost_usd": 0.041883,
+   "turns": 3,
+   "router_loaded": false,
+   "families": {
+    "persistence": false,
+    "ui": false
+   },
+   "pass": true
+  }
+ ]
+}

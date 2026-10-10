@@ -39,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
     output.mkdir(parents=True, exist_ok=False)
     tests = ['crux/scripts/tests'] if args.full else ['crux/scripts/tests/' + name for name in CORE_TESTS]
     commands = [
-        ('flow', [sys.executable, '-m', 'pytest', 'tests/flow', '-q', '--tb=short', '--durations=15'], 300),
+        ('flow', [sys.executable, '-m', 'pytest', 'tests/flow', '-q', '--tb=short', '--durations=15'], 600),
         ('upstream-full' if args.full else 'upstream-core',
          [sys.executable, '-m', 'pytest', *tests, '-q', '--tb=short', '--durations=15'], 1800),
         ('catalog', [sys.executable, 'crux/scripts/validate-catalog.py', '--dry-run'], 60),

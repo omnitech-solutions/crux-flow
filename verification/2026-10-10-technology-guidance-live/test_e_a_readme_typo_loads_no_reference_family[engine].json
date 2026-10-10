@@ -1,0 +1,102 @@
+{
+ "case": "test_e_a_readme_typo_loads_no_reference_family[engine]",
+ "consumer": "engine",
+ "model": "sonnet",
+ "prompt": "Fix the typo in README.md. Do not edit files; say what you would change.",
+ "runs": 5,
+ "passes": 5,
+ "router_loaded": 0,
+ "cost_usd": 0.225,
+ "observations": [
+  {
+   "skills": [],
+   "reads": [
+    "README.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "The typo is on line 3 of `README.md`: \"Teh\" should be \"The\".\n\nChange:\n\n```\nA fixture copy for Crux Flow's technology tests. Teh real repository is elsewhere.\n```\nto\n```\nA fixture copy for Crux Flow's technology tests. The real repository is elsewhere.\n```\n\nI haven't edited anything. Per `AGENTS.md`, a real change would also need a line under Unreleased in `CHANGELOG.md`.",
+   "cost_usd": 0.0449878,
+   "turns": 2,
+   "router_loaded": false,
+   "families": {
+    "ai-runtime": false,
+    "storage": false,
+    "logging": false
+   },
+   "pass": true
+  },
+  {
+   "skills": [],
+   "reads": [
+    "README.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "The typo is on line 3 of `README.md`: \"Teh\" should be \"The\".\n\nCurrent:\n```\nA fixture copy for Crux Flow's technology tests. Teh real repository is elsewhere.\n```\n\nProposed:\n```\nA fixture copy for Crux Flow's technology tests. The real repository is elsewhere.\n```\n\nI haven't edited anything, as you asked. I also skipped the `technology-references` skill, since this is a prose-only change and the skill is not meant for those.\n\nPer `AGENTS.md`, a real change would also need a line under Unreleased in `CHANGELOG.md`.",
+   "cost_usd": 0.045272599999999996,
+   "turns": 2,
+   "router_loaded": false,
+   "families": {
+    "ai-runtime": false,
+    "storage": false,
+    "logging": false
+   },
+   "pass": true
+  },
+  {
+   "skills": [],
+   "reads": [
+    "README.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "The typo is on line 3 of `README.md`: \"Teh\" should be \"The\".\n\nChange:\n\n```\n- A fixture copy for Crux Flow's technology tests. Teh real repository is elsewhere.\n+ A fixture copy for Crux Flow's technology tests. The real repository is elsewhere.\n```\n\nI haven't edited any files, as you asked.",
+   "cost_usd": 0.044203400000000004,
+   "turns": 2,
+   "router_loaded": false,
+   "families": {
+    "ai-runtime": false,
+    "storage": false,
+    "logging": false
+   },
+   "pass": true
+  },
+  {
+   "skills": [],
+   "reads": [
+    "README.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "The typo is on line 3 of `README.md`: \"Teh\" should be \"The\".\n\nHere is the change I would make:\n\n```diff\n-A fixture copy for Crux Flow's technology tests. Teh real repository is elsewhere.\n+A fixture copy for Crux Flow's technology tests. The real repository is elsewhere.\n```\n\nI haven't edited anything, as you asked. Per `AGENTS.md`, a real change would also need a line under Unreleased in `CHANGELOG.md`, though that may not apply to this fixture README.",
+   "cost_usd": 0.0452792,
+   "turns": 2,
+   "router_loaded": false,
+   "families": {
+    "ai-runtime": false,
+    "storage": false,
+    "logging": false
+   },
+   "pass": true
+  },
+  {
+   "skills": [],
+   "reads": [
+    "README.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "I would change one word in `README.md`, line 3:\n\n- **Before:** `A fixture copy for Crux Flow's technology tests. Teh real repository is elsewhere.`\n- **After:** `A fixture copy for Crux Flow's technology tests. The real repository is elsewhere.`\n\nThe typo is \"Teh\", which should be \"The\". I haven't edited anything, as you asked.\n\nIf this were applied, `AGENTS.md` also asks for a line under Unreleased in `CHANGELOG.md`, and for `pnpm verify` before calling the change done.",
+   "cost_usd": 0.0452822,
+   "turns": 2,
+   "router_loaded": false,
+   "families": {
+    "ai-runtime": false,
+    "storage": false,
+    "logging": false
+   },
+   "pass": true
+  }
+ ]
+}

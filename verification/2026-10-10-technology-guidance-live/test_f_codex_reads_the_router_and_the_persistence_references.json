@@ -1,0 +1,45 @@
+{
+ "case": "test_f_codex_reads_the_router_and_the_persistence_references",
+ "runs": 3,
+ "passes": 3,
+ "observations": [
+  {
+   "router_loaded": true,
+   "persistence": true,
+   "ui": false,
+   "commands": [
+    "/bin/zsh -lc \"pwd; rg --files -g 'AGENTS.md' -g 'objectives.md' -g '*schema*' -g 'package.json' -g '*drizzle*' -g 'SKILL.md' -g '*technology-references*'\"",
+    "/bin/zsh -lc \"rg -n 'Studio|migration|technology-references' /Users/desoleary/.codex/memories/MEMORY.md\"",
+    "/bin/zsh -lc \"ls -la bionic .agents/skills/technology-references; cat bionic/objectives.md bionic/AGENTS.md .agents/skills/technology-references/SKILL.md; cat package.json packages/database/package.json; rg -n 'answers|archived|generate|migration' products/interview packages/database bionic/research/references/technology-references.md\"",
+    "/bin/zsh -lc 'rg --files --hidden products/interview packages/database bionic/research/raw; cat bionic/research/references/technology-references.md bionic/research/sources/drizzle-orm-schema-declaration.md bionic/research/sources/drizzle-orm-migrations.md bionic/research/sources/drizzle-kit-generate.md bionic/research/sources/drizzle-kit-migrate.md bionic/invariants/tenant-drizzle-handle-only-via-with-tenant.md bionic/invariants/schema-files-and-migrations-agree.md bionic/invariants/tenant-owned-tables-force-rls.md'",
+    "/bin/zsh -lc \"nl -ba products/interview/src/backend/index.ts; nl -ba packages/database/src/index.ts; nl -ba packages/database/package.json; nl -ba package.json; rg --files --hidden -g '*schema*' -g '*drizzle*' -g '*migration*' -g '*lock*'; nl -ba bionic/research/sources/drizzle-orm-migrations.md | tail -8; nl -ba /Users/desoleary/.codex/memories/MEMORY.md | sed -n '41,44p'\""
+   ]
+  },
+  {
+   "router_loaded": true,
+   "persistence": true,
+   "ui": false,
+   "commands": [
+    "/bin/zsh -lc \"pwd; rg -n 'migration|Drizzle|interview answers' /Users/desoleary/.codex/memories/MEMORY.md\"",
+    "/bin/zsh -lc 'cat bionic/objectives.md bionic/AGENTS.md .agents/skills/technology-references/SKILL.md'",
+    "/bin/zsh -lc \"rg --files -g '\"'!node_modules'\"' -g '\"'!'\"\\\\.git'\"",
+    "/bin/zsh -lc 'cat bionic/research/references/technology-references.md; git status --short'",
+    "/bin/zsh -lc 'nl -ba packages/database/src/index.ts; nl -ba products/interview/src/backend/index.ts; nl -ba packages/database/package.json; nl -ba package.json; nl -ba packages/database/drizzle/20261001000000_init/migration.sql; cat bionic/research/sources/drizzle-orm-schema-declaration.md bionic/research/sources/drizzle-orm-migrations.md bionic/research/sources/drizzle-kit-generate.md bionic/research/sources/drizzle-kit-migrate.md bionic/invariants/schema-files-and-migrations-agree.md bionic/invariants/tenant-owned-tables-force-rls.md bionic/invariants/tenant-drizzle-handle-only-via-with-tenant.md .agents/skills/bionic-regeneration/SKILL.md'",
+    "/bin/zsh -lc \"nl -ba /Users/desoleary/.codex/memories/MEMORY.md | sed -n '40,44p'; rg -n 'answers|timestamp|archived|schema' products packages --glob '*.ts'; test -f packages/database/drizzle.config.ts; test -f packages/database/scripts/write-migration-names.mjs\""
+   ]
+  },
+  {
+   "router_loaded": true,
+   "persistence": true,
+   "ui": false,
+   "commands": [
+    "/bin/zsh -lc 'pwd; rg -n \"migration|db:migrate|schema\" /Users/desoleary/.codex/memories/MEMORY.md'",
+    "/bin/zsh -lc 'cat bionic/objectives.md; cat .agents/skills/technology-references/SKILL.md; cat bionic/AGENTS.md'",
+    "/bin/zsh -lc \"rg --files -g '\"'!node_modules'\"' -g '\"'!pnpm-lock.yaml'\"'\"",
+    "/bin/zsh -lc \"sed -n '39,44p' /Users/desoleary/.codex/memories/MEMORY.md; cat bionic/research/references/technology-references.md\"",
+    "/bin/zsh -lc 'nl -ba packages/database/src/index.ts; nl -ba products/interview/src/backend/index.ts; nl -ba packages/database/package.json; nl -ba package.json; cat bionic/research/sources/drizzle-orm-schema-declaration.md bionic/research/sources/drizzle-orm-migrations.md bionic/research/sources/drizzle-kit-generate.md; cat bionic/invariants/tenant-drizzle-handle-only-via-with-tenant.md bionic/invariants/schema-files-and-migrations-agree.md bionic/invariants/tenant-owned-tables-force-rls.md; nl -ba packages/database/drizzle/20261001000000_init/migration.sql'",
+    "/bin/zsh -lc 'rg -n \"answers|timestamp|schema\" products/interview packages/database; nl -ba .agents/skills/technology-references/SKILL.md; git status --short'"
+   ]
+  }
+ ]
+}

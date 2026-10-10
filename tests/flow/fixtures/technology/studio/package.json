@@ -1,0 +1,26 @@
+{
+  "name": "omnitech-interview-answers-generator",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.3",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "turbo run test",
+    "test:browser": "pnpm --filter @omnitech/e2e-live-session run test:browser",
+    "verify": "pnpm verify:core && pnpm test:browser",
+    "db:migrate": "DATABASE_OWNER_URL=${DATABASE_OWNER_URL:-postgresql://omnitech_owner:omnitech_owner@127.0.0.1:54320/omnitech} pnpm --filter @omnitech/database db:migrate",
+    "docs:arch": "node scripts/docs-arch.mjs",
+    "docs:arch:check": "node scripts/docs-arch.mjs --dry-run"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.5",
+    "@vitest/coverage-v8": "^4.1.10",
+    "knip": "^6.40.0",
+    "lefthook": "^2.1.10",
+    "turbo": "^2.9.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.2"
+  }
+}

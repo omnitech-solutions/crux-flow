@@ -61,6 +61,8 @@ second workflow database, daemon, gateway or parallel legacy Flow implementation
 
 The canonical implementation lives in `crux/scripts/crux/flow/`. Authored policy,
 model overrides and concise role instructions live in `crux/catalog/flow-*.json`.
+The technology catalog is one more of those files; a project's `technology` section in
+`.crux-flow.yml` turns it into a small router skill that `check-drift` verifies.
 Catalogs and runtime-compatibility blocks are checked by the existing Crux generators.
 
 ## Documentation

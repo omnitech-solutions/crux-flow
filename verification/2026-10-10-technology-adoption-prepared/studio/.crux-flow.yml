@@ -1,0 +1,92 @@
+config_version: "1"
+technology:
+  router: technology-references
+  owner: project                    # the Studio wrote its router by hand; Flow checks it and never writes it
+  map: bionic/research/references/technology-references.md
+  exclude:
+    typescript: "language baseline; Biome and tsc in pnpm verify govern it and no reference is filed"
+    node: "runtime baseline pinned by engines; no reference is filed"
+    node-postgres: "reached only through Drizzle and withTenant(); the Drizzle row governs it"
+    vitest: "test runner; the repository's own test conventions govern it and no reference is filed"
+    playwright: "browser tests live in one package with its own runner script; no reference is filed"
+    docker-compose: "starts the development services; no application code depends on it"
+  layers:
+    - id: react-ui
+      paths: ["products/*/src/frontend/**"]
+      technologies: [react]
+      read:
+        captures:
+          - bionic/research/sources/vercel-composition-patterns.md
+          - bionic/research/sources/vercel-react-best-practices.md
+      rules:
+        - bionic/adrs/ADR-0004-build-products-as-verticals-inside-a-modular-monol.md
+        - bionic/adrs/ADR-0002-simplicity-first-the-least-complex-design-that-mee.md
+        - bionic/invariants/product-frontend-never-imports-apps-web.md
+    - id: native-swift
+      paths: ["apps/studio-shell/**", "apps/capture-companion/macos/**"]
+      technologies: [swift]
+      read:
+        captures: [bionic/research/sources/swift-concurrency-agent-skill.md]
+      rules: [bionic/adrs/ADR-0019-host-the-overlay-in-a-native-shell-through-one-host-adapter.md]
+    - id: nextjs
+      paths: ["apps/web/**"]
+      technologies: [nextjs]
+      rules:
+        - bionic/adrs/ADR-0004-build-products-as-verticals-inside-a-modular-monol.md
+        - bionic/invariants/product-domain-never-imports-nextjs.md
+        - bionic/invariants/nextjs-never-launches-agent-processes.md
+    - id: hono
+      paths: ["products/*/src/backend/**", "packages/platform-api/**"]
+      technologies: [hono]
+      rules: [bionic/invariants/product-routes-resolve-membership-first.md]
+    - id: zod
+      paths: ["packages/*-contracts/**"]
+      technologies: [zod]
+      rules: [bionic/adrs/ADR-0003-keep-package-boundaries-narrow-with-one-public-ent.md]
+    - id: drizzle
+      paths: ["packages/database/**"]
+      technologies: [drizzle]
+      read:
+        captures:
+          - bionic/research/sources/drizzle-orm-schema-declaration.md
+          - bionic/research/sources/drizzle-orm-migrations.md
+          - bionic/research/sources/drizzle-kit-generate.md
+          - bionic/research/sources/drizzle-kit-migrate.md
+          - bionic/research/sources/drizzle-orm-row-level-security.md
+          - bionic/research/sources/drizzle-orm-transactions.md
+      rules:
+        - bionic/adrs/ADR-0005-isolate-tenants-in-one-postgresql-cluster-with-own.md
+        - bionic/adrs/ADR-0023-use-the-query-builder-by-default-and-check-the-dat.md
+        - bionic/invariants/tenant-drizzle-handle-only-via-with-tenant.md
+        - bionic/invariants/schema-files-and-migrations-agree.md
+        - bionic/invariants/tenant-owned-tables-force-rls.md
+      commands:
+        - {id: generate, cwd: packages/database, argv: [pnpm, run, "db:generate"], risk: writes}
+        - {id: migrate, cwd: ".", argv: [pnpm, run, "db:migrate"], risk: writes, requires: ["the development PostgreSQL is running"]}
+        - {id: arch, cwd: ".", argv: [pnpm, run, "docs:arch"], risk: writes}
+        - {id: arch-check, cwd: ".", argv: [pnpm, run, "docs:arch:check"], risk: read-only}
+      never: ["drizzle-kit push"]
+    - id: postgresql
+      paths: ["packages/database/drizzle/**", "compose.yaml"]
+      technologies: [postgresql]
+      rules:
+        - bionic/adrs/ADR-0005-isolate-tenants-in-one-postgresql-cluster-with-own.md
+        - bionic/invariants/tenant-owned-tables-force-rls.md
+    - id: ai
+      paths: ["apps/agent-worker/**"]
+      technologies: [claude-agent-sdk]
+      read:
+        project:
+          - bionic/research/references/ai-execution-boundaries.md
+          - .agents/skills/ai-provider-maintainer/SKILL.md
+      rules:
+        - bionic/adrs/ADR-0007-route-ai-work-through-aiexecutiongateway-profiles.md
+        - bionic/invariants/products-never-branch-on-provider-names.md
+        - bionic/invariants/nextjs-never-launches-agent-processes.md
+    - id: review
+      paths: ["apps/**", "packages/**", "products/**"]
+      rules:
+        - bionic/adrs/ADR-0003-keep-package-boundaries-narrow-with-one-public-ent.md
+        - bionic/invariants/package-boundaries-hold.md
+      commands:
+        - {id: verify, cwd: ".", argv: [pnpm, run, verify], risk: read-only}

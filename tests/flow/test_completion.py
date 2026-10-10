@@ -305,7 +305,7 @@ def test_fork_catalog_sources_are_explicitly_validated_without_regeneration(tmp_
     spec.loader.exec_module(validator)
     targets = getattr(validator, 'AUTHORED_CATALOG_JSON', None)
     assert targets is not None, 'authored JSON must be enrolled separately from generated catalogs'
-    assert set(targets) == {'flow-policy.json', 'flow-bindings.json', 'flow-roles.json'}
+    assert set(targets) == {'flow-policy.json', 'flow-bindings.json', 'flow-roles.json', 'flow-technology.json'}
     plugin = tmp_path / 'crux'; catalog = plugin / 'catalog'; catalog.mkdir(parents=True)
     target = catalog / 'flow-policy.json'
     target.write_text('{"schema_version": 77}')

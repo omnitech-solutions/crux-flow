@@ -1706,6 +1706,9 @@ def _flow_catalog_target(path: Path, ctx: dict) -> list[dict]:
             raise FlowError('required authored Flow catalog is missing')
         if path.name == 'flow-policy.json':
             flow_policy.load_definition(plugin)
+        elif path.name == 'flow-technology.json':
+            from crux.flow import technology
+            technology.load_catalog(plugin)
         else:
             value = mapping(decode(raw))
             catalog = models_catalog.load(plugin / 'catalog/models.yml', plugin / 'agents')
@@ -1730,6 +1733,7 @@ AUTHORED_CATALOG_JSON: dict[str, Callable[[Path, dict], list[dict]]] = {
     'flow-policy.json': _flow_catalog_target,
     'flow-bindings.json': _flow_catalog_target,
     'flow-roles.json': _flow_catalog_target,
+    'flow-technology.json': _flow_catalog_target,
 }
 
 

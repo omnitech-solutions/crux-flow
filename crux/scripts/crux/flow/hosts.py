@@ -47,18 +47,23 @@ def _instructions(plugin: Path, role: str, policy: dict) -> str:
             'Report findings and evidence to that parent; do not claim the entire run is complete after your unit.\n')
 
 
-def roles(plugin: Path, policy: dict, *, engine: Path | None=None) -> dict:
+def roles(plugin: Path, policy: dict, *, engine: Path | None=None, preload: dict | None=None) -> dict:
+    """Render the role files. `preload` is the project's technology router (technology.preload): the roles it names
+    start with that skill beside `flow`. None, or upstream mode, renders exactly what was rendered before it existed."""
     host=policy['host']; upstream=policy['mode']=='upstream'
     if host not in HOSTS:
         raise FlowError('unsupported host projection')
     files={}; unsupported={}
     catalog=models_catalog.load(plugin/"catalog/models.yml",plugin/"agents")
+    extra=mapping(preload,required={'skill','roles','path'}) if preload and not upstream else None
+    if extra and set(extra['roles'])-(set(catalog.agents)-{'commander'}): raise FlowError('technology preload names an unknown role')
     for path in sorted((plugin/'agents').glob('*.md')):
         raw=read_file(plugin,path.relative_to(plugin).as_posix())
         if raw is None: raise FlowError('role source disappeared')
         head,body,fm=_parts(raw); name=head['name']
         if not upstream and name=='commander': continue
         assignment=policy['roles'][name]
+        routed=extra is not None and name in extra['roles']
         source=codex_agents.parse_source(path)
         if not upstream:
             source=replace(source,body=_instructions(plugin,name,policy),skills=('flow',))
@@ -70,6 +75,8 @@ def roles(plugin: Path, policy: dict, *, engine: Path | None=None) -> dict:
             projected_skills = (installed_engine / 'skills' if upstream else installed_engine.parent / 'skills') if installed_engine else None
             validated_skills = plugin / 'skills' if upstream or projected_skills is not None else None
             rendered=codex_agents.render_agent(source,runtime,skill_root=validated_skills,name_prefix='crux_' if upstream else 'crux_flow_',projected_skill_root=projected_skills)
+            if routed:   # enables the project's router for this role; Codex lists it, it does not inject the body
+                rendered+=f'\n[[skills.config]]\npath = {codex_agents._toml_basic_string(extra["path"])}\nenabled = true\n'
             files[f'crux-flow-{name}.toml']=rendered.encode()
         elif host=='claude':
             projected={key:head[key] for key in ('description','tools','disallowedTools','maxTurns','memory','isolation') if key in head}
@@ -78,7 +85,7 @@ def roles(plugin: Path, policy: dict, *, engine: Path | None=None) -> dict:
             projected['name']='crux-flow-'+name; projected['model']=assignment['model']
             if assignment['effort'] is not None: projected['effort']=assignment['effort']
             elif 'effort' in head: projected['effort']=head['effort']
-            projected['skills']=head.get('skills',[]) if upstream else ['flow']
+            projected['skills']=head.get('skills',[]) if upstream else ['flow',extra['skill']] if routed else ['flow']
             unsupported[name]=[]
             files[f'crux-flow-{name}.md']=_markdown(projected,body)
         elif host=='opencode':
@@ -101,6 +108,8 @@ def roles(plugin: Path, policy: dict, *, engine: Path | None=None) -> dict:
                        'tools':sorted(set(tools)),'spawns':sorted(spawns)}
             unsupported[name]=sorted(set(unsupported[name]+missing))
             files[f'crux-flow-{name}.md']=_markdown(projected,body)
+    if extra and host in ('opencode','omp'):   # no role field injects a skill at start on these hosts: say so, do not imply it
+        for name in extra['roles']: unsupported[name]=sorted({*unsupported[name],'technology-router-preload'})
     return {'files':files,'unsupported':unsupported,'runtime_loaded':'unobserved',
             'enforcement':{'native_delegation':'cooperative','permissions':'host-specific projection; runtime verification required'}}
 

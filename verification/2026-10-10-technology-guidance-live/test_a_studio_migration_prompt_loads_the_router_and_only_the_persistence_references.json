@@ -1,0 +1,117 @@
+{
+ "case": "test_a_studio_migration_prompt_loads_the_router_and_only_the_persistence_references",
+ "consumer": "studio",
+ "model": "sonnet",
+ "prompt": "Add a nullable archived_at column to the interview answers table and say exactly how to produce the migration. Do not edit files.",
+ "runs": 5,
+ "passes": 0,
+ "router_loaded": 1,
+ "cost_usd": 0.4313,
+ "observations": [
+  {
+   "skills": [],
+   "reads": [
+    "bionic/objectives.md",
+    "package.json",
+    "packages/database/package.json",
+    "packages/database/drizzle/20261001000000_init/migration.sql",
+    "packages/database/src/index.ts"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "I haven't changed anything. The repo here is a skeleton, so I can give you the procedure but not the exact schema edit.\n\n**What's missing**\n- `bionic/objectives.md` doesn't exist. AGENTS.md says to read it before work, so I'm flagging that I proceeded without it.\n- There's no interview-answers table or schema file. A search for `interview_answers` / `interviewAnswers` finds nothing.\n- `packages/database/` contains only `package.json`, `src/index.ts` (a one-line stub) and `drizzle/20261001000000_init/migration.sql` (a one-line stub).\n- There's no `drizzle.config.*` and no `scripts/write-migrati",
+   "cost_usd": 0.07079719999999999,
+   "turns": 9,
+   "router_loaded": false,
+   "families": {
+    "persistence": false,
+    "ui": false
+   },
+   "pass": false
+  },
+  {
+   "skills": [],
+   "reads": [
+    "bionic/research/references/technology-references.md",
+    "packages/database/package.json",
+    "packages/database/drizzle/20261001000000_init/migration.sql"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "I couldn't find an interview-answers table in this checkout, so I can't name the schema file or the table definition. I haven't edited anything.\n\n## What's in the repo\n\n- `packages/database/drizzle/20261001000000_init/migration.sql` contains only `-- fixture migration`.\n- There is no `drizzle.config.*`, no `schema*.ts`, no `pgTable` call and no `scripts/write-migration-names.mjs`.\n- `packages/database/src/index.ts` is the only source file in that package.\n- The only mentions of interview answers are in `AGENTS.md` and a `package.json`.\n\nSo this checkout is a stripped fixture. The steps below c",
+   "cost_usd": 0.10433239999999999,
+   "turns": 13,
+   "router_loaded": false,
+   "families": {
+    "persistence": false,
+    "ui": false
+   },
+   "pass": false
+  },
+  {
+   "skills": [],
+   "reads": [
+    "package.json",
+    "packages/database/package.json",
+    "packages/database/src/index.ts",
+    "packages/database/drizzle/20261001000000_init/migration.sql"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "I didn't edit anything. This checkout is a skeleton, so the exact schema file path is something I couldn't confirm.\n\n## What I found\n\n- Migrations are one Drizzle stream in `packages/database/drizzle` (AGENTS.md rule 5). The only existing one is `20261001000000_init/migration.sql`, a placeholder.\n- `packages/database/package.json` defines the generator: `db:generate` runs `drizzle-kit generate && node scripts/write-migration-names.mjs`.\n- The root `package.json` has `db:migrate`, which applies migrations through `@omnitech/database`.\n- This checkout has no interview answers table definition, n",
+   "cost_usd": 0.0828286,
+   "turns": 11,
+   "router_loaded": false,
+   "families": {
+    "persistence": false,
+    "ui": false
+   },
+   "pass": false
+  },
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "bionic/objectives.md",
+    "packages/database/package.json",
+    "packages/database/drizzle/20261001000000_init/migration.sql",
+    "packages/database/src/index.ts",
+    "package.json"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "I haven't edited anything. This checkout is a skeleton, so I can't name the exact schema file or table, but the procedure itself is clear.\n\n## What I found\n\n- **No interview answers schema exists here.** `packages/database/src/index.ts` and `packages/database/drizzle/20261001000000_init/migration.sql` are one-line fixture stubs. There is no `drizzle.config.*`, no schema file, and no `scripts/write-migration-names.mjs`.\n- **`bionic/objectives.md` is missing.** `AGENTS.md` says to read it before work, but the file doesn't exist. I'm treating this as a bounded schema change.\n- **Where the column ",
+   "cost_usd": 0.0821378,
+   "turns": 12,
+   "router_loaded": true,
+   "families": {
+    "persistence": false,
+    "ui": false
+   },
+   "pass": false
+  },
+  {
+   "skills": [],
+   "reads": [
+    "bionic/objectives.md",
+    "packages/database/package.json",
+    "packages/database/drizzle/20261001000000_init/migration.sql",
+    "bionic/invariants/schema-files-and-migrations-agree.md",
+    "packages/database/src/index.ts",
+    "bionic/research/sources/drizzle-kit-generate.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "The migration is generated from a Drizzle schema change, not written by hand. This checkout is only a skeleton, so I couldn't point to the exact table file.\n\n## What's missing from this checkout\n\n- **Answers schema:** `interview_answers` / `interviewAnswers` appears nowhere outside `bionic/`. The only package sources are `packages/database/src/index.ts` (a one-line fixture) and `packages/database/drizzle/20261001000000_init/migration.sql` (also `-- fixture migration`). I can't name the schema file to edit.\n- **Project docs:** `bionic/objectives.md` and `bionic/AGENTS.md`, which `AGENTS.md` say",
+   "cost_usd": 0.09117239999999999,
+   "turns": 11,
+   "router_loaded": false,
+   "families": {
+    "persistence": true,
+    "ui": false
+   },
+   "pass": false
+  }
+ ]
+}

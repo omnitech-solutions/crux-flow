@@ -581,6 +581,30 @@
     ]
   },
   {
+    "id": "maintain-technology-skills",
+    "name": "maintain-technology-skills",
+    "description": "Inspects, proposes, checks, refreshes and adopts a project's technology guidance: the technology section of .crux-flow.yml, the router skill it generates or checks, and the pinned research sources behind it. Use when a maintainer asks to set up or update technology references, add a technology or layer, see which references apply, find out why the technology drift gate is DRIFT or BROKEN, or check whether a pinned source has moved upstream.",
+    "tags": [
+      "technology",
+      "references",
+      "maintenance",
+      "drift"
+    ],
+    "bundles": [
+      "crux-flow"
+    ],
+    "risk_level": "medium",
+    "routing_note": "Maintainer-invoked. Edits only the project's technology section and, through the existing research skills, its source pages. The router itself is written by `crux-flow technology sync`, never by hand when Flow owns it.",
+    "triggers": [
+      "set up technology references",
+      "update the technology skills",
+      "add a technology layer",
+      "why is the technology gate broken",
+      "refresh the technology sources",
+      "which references apply here"
+    ]
+  },
+  {
     "id": "models-refresh",
     "name": "models-refresh",
     "description": "Discover model facts, propose bounded native/API role changes, then apply a reviewed, digest-bound proposal with rollback.",

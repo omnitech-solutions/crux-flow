@@ -1,0 +1,34 @@
+{
+ "claude/aggressive": {
+  "files": 9,
+  "sha256": "211d347df248bb26c10b5ff8d263527a1aa146d91b9b432979ed6736d83d023d"
+ },
+ "claude/upstream": {
+  "files": 10,
+  "sha256": "cf2100c0fb19bc8428066511506e9114bf1d6fc73f72b0b731bc9f4e86ca996a"
+ },
+ "codex/aggressive": {
+  "files": 9,
+  "sha256": "f51056f7a377c7b11c59c1c8feed160fc52afef97b4d8123f60ba3ddc86e5b20"
+ },
+ "codex/upstream": {
+  "files": 10,
+  "sha256": "54373fc7952bc4c4e974ea4ac9f1a94f9214e0038e7a647348e8140554c01dc1"
+ },
+ "opencode/aggressive": {
+  "files": 9,
+  "sha256": "95f1b1772dd1ee80c0891e13cb32c17d799c3574138d6129a16f30556c1f56c7"
+ },
+ "opencode/upstream": {
+  "files": 10,
+  "sha256": "54982f42d276ce0e9c6cd511ab1d41eb04bee28c80eb5a46e737b5cc1cbd3daf"
+ },
+ "omp/aggressive": {
+  "files": 9,
+  "sha256": "104a8b0215bfb64568721868e3769d04a5dcdc7ee8037e7346d19d4c9b29a572"
+ },
+ "omp/upstream": {
+  "files": 10,
+  "sha256": "4fc9e3ac401089c23cbf5e7c2b346f34fd105943a41fce2bd6537c0ca63c7e2e"
+ }
+}

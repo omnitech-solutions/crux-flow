@@ -1,0 +1,24 @@
+{
+  "skill": "maintain-technology-skills",
+  "should_fire": [
+    {"prompt": "Set up technology references for this repository."},
+    {"prompt": "We added Playwright last week. Update the technology skills so it is routed."},
+    {"prompt": "Why is the technology row in check-drift BROKEN?"},
+    {"prompt": "The technology gate says DRIFT after the Drizzle upgrade. What do I run?"},
+    {"prompt": "Has the pinned Vercel React reference moved upstream since we captured it?"},
+    {"prompt": "Add a layer for the new billing package to the technology section."},
+    {"prompt": "Which technologies does Flow detect here, and which are not routed yet?"},
+    {"prompt": "Refresh the sources behind the technology router and tell me what changed."},
+    {"prompt": "Should this repository's router be owned by Flow or by the project?"}
+  ],
+  "should_not_fire": [
+    {"prompt": "Add a nullable archived_at column and generate the migration.", "why": "ordinary code work: the project's router applies, not its maintenance"},
+    {"prompt": "Review this Hono route for tenant checks.", "why": "ordinary review: the router applies"},
+    {"prompt": "Update the available models for the reviewer role.", "why": "belongs to models-refresh"},
+    {"prompt": "Check drift across the whole documentation tree.", "why": "belongs to check-drift, which runs this gate as one row"},
+    {"prompt": "File this article in the research wiki.", "why": "belongs to ingest-research"},
+    {"prompt": "Write a new project skill that formats our release notes.", "why": "belongs to forge-skill"},
+    {"prompt": "Fix the typo in README.md.", "why": "prose only"},
+    {"prompt": "Implement the retry policy described in the accepted decision.", "why": "a code change: enters the flow skill"}
+  ]
+}

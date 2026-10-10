@@ -1,0 +1,27 @@
+{
+  "name": "@omnitech/database",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -b",
+    "lint": "biome lint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config ../../vitest.package.config.ts",
+    "db:migrate": "tsx src/migrate-command.ts",
+    "db:generate": "drizzle-kit generate && node scripts/write-migration-names.mjs",
+    "db:names": "node scripts/write-migration-names.mjs"
+  },
+  "dependencies": {
+    "drizzle-orm": "catalog:",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "^8.15.5",
+    "drizzle-kit": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "zod": "catalog:"
+  }
+}

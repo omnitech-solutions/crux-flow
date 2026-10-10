@@ -1,0 +1,113 @@
+{
+ "case": "test_a_studio_with_the_routing_line_flow_proposes",
+ "consumer": "studio",
+ "model": "sonnet",
+ "prompt": "Add a nullable archived_at column to the interview answers table and say exactly how to produce the migration. Do not edit files.",
+ "runs": 5,
+ "passes": 0,
+ "router_loaded": 5,
+ "cost_usd": 0.4955,
+ "observations": [
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "bionic/research/references/technology-references.md",
+    "packages/database/package.json"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "I searched for the interview answers table and found no schema for it, so I'm writing up the procedure now.\n\n## What I found\n\n- `packages/database` has only one migration, `drizzle/20261001000000_init/migration.sql`. It contains no \"answer\" table.\n- No `pgTable` or `interview_answer*` definition exists under `packages/`, `products/` or `apps/`.\n- So I can't name the exact schema file or the real table identifier. Everything below uses placeholders where that matters. If the table is defined somewhere I didn't search, point me at it.\n\n## Exact steps to produce the migration\n\nPer the `technology",
+   "cost_usd": 0.1120956,
+   "turns": 15,
+   "router_loaded": true,
+   "families": {
+    "persistence": false,
+    "ui": false
+   },
+   "pass": false
+  },
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "bionic/research/references/technology-references.md",
+    "packages/database/package.json"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "I didn't edit anything. This checkout has no Drizzle table definition for interview answers, so I can't name the exact file or export.\n\nMy searches for `pgTable`, `pgSchema`, and `interview_answers`/`interviewAnswers` in `*.ts` and `*.sql` returned nothing. Only `packages/database/package.json` and the references map were readable.\n\n## How to produce the migration\n\nThe repo's rules (AGENTS.md rule 5, the technology-references skill, and the Drizzle row in `bionic/research/references/technology-references.md`) fix the workflow. Never use `drizzle-kit push`.\n\n1. **Edit the schema file**, in the ",
+   "cost_usd": 0.0880026,
+   "turns": 10,
+   "router_loaded": true,
+   "families": {
+    "persistence": false,
+    "ui": false
+   },
+   "pass": false
+  },
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "bionic/research/references/technology-references.md",
+    "packages/database/package.json",
+    "bionic/invariants/schema-files-and-migrations-agree.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "I made no edits. This checkout has no Drizzle schema source files (no `pgTable` declarations, no `drizzle.config`, no `packages/database/drizzle` folder), so I could not locate the interview answers table and can't name its schema file or exact column location.\n\n## What to change\n\nIn the schema file of the package that owns the interview answers table (domain packages own their schemas, ADR-0003), add one nullable column to the table's column map:\n\n```ts\narchivedAt: timestamp(\"archived_at\", { withTimezone: true }),\n```\n\n- Leave it nullable, with no `.notNull()` and no default.\n- Match the neig",
+   "cost_usd": 0.102348,
+   "turns": 12,
+   "router_loaded": true,
+   "families": {
+    "persistence": false,
+    "ui": false
+   },
+   "pass": false
+  },
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "bionic/research/references/technology-references.md",
+    "packages/database/package.json"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "The migration is generated with `db:generate`, never `push`, but I can't give you the column edit yet: this checkout has no interview answers table to add it to.\n\n## What I found\n\n- `interview_answers` and `interviewAnswers` appear nowhere in the repo, including `bionic/`.\n- `packages/database/drizzle/20261001000000_init/migration.sql` contains no `CREATE TABLE`.\n- `packages/database` has only `src/index.ts`, with no schema files and no `drizzle.config.*`.\n- Per AGENTS.md, domain packages own their schemas, so the table would live in a domain package or product that isn't present here.\n\nIf the",
+   "cost_usd": 0.0963552,
+   "turns": 12,
+   "router_loaded": true,
+   "families": {
+    "persistence": false,
+    "ui": false
+   },
+   "pass": false
+  },
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "bionic/research/references/technology-references.md",
+    "packages/database/package.json"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "I couldn't find an interview answers table in this checkout, so I can't name the schema file to edit. Here is the procedure the repo documents and what I verified.\n\n## What I found\n\n- Searching `packages/` and `products/` for `answer` (case-insensitive) returns nothing in `.ts`, `.sql` or `.json` files.\n- `packages/database/drizzle/20261001000000_init/migration.sql` contains no `CREATE TABLE`, and there is no `drizzle.config.*` file.\n- The only migration present is the init one, and there is no `src/schema` for the interview answers table.\n\nThe table's schema file isn't in this tree. Per ADR-0",
+   "cost_usd": 0.0966834,
+   "turns": 11,
+   "router_loaded": true,
+   "families": {
+    "persistence": false,
+    "ui": false
+   },
+   "pass": false
+  }
+ ]
+}

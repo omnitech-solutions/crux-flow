@@ -1,0 +1,24 @@
+{
+  "skill": "technology-references",
+  "should_fire": [
+    {"layer": "drizzle", "prompt": "Add a nullable archived_at column to the interview answers table and say exactly how to produce the migration. Do not edit files."},
+    {"layer": "drizzle", "prompt": "Review this Drizzle query: does it reach the tenant's rows only through the tenant handle?"},
+    {"layer": "hono", "prompt": "Review this Hono route for tenant checks before any domain work runs."},
+    {"layer": "react-ui", "prompt": "This React component takes six boolean props. Propose a better shape."},
+    {"layer": "nextjs", "prompt": "Move this data fetch out of the Next.js layout and into the route that needs it."},
+    {"layer": "native-swift", "prompt": "The Swift shell warns about a non-Sendable capture in the WKWebView delegate. Fix it."},
+    {"layer": "zod", "prompt": "Add a Zod schema for the playground update contract and export its inferred type."},
+    {"layer": "postgresql", "prompt": "Write the PostgreSQL policy that forces row-level security on the new table."},
+    {"layer": "ai", "prompt": "Change how the worker starts the agent runtime so a cancelled job stops the Claude Agent SDK session."}
+  ],
+  "should_not_fire": [
+    {"prompt": "Fix the typo in README.md. Do not edit files; say what you would change.", "why": "prose only; no layer's paths are touched"},
+    {"prompt": "Answer this interview question: explain binary search and its complexity.", "why": "belongs to the interview question router"},
+    {"prompt": "Start a timed mock interview on system design.", "why": "belongs to the mock-interview skill"},
+    {"prompt": "Summarise yesterday's journal entry.", "why": "a documentation query"},
+    {"prompt": "Is the documentation tree up to date with the code?", "why": "belongs to the regeneration skill"},
+    {"prompt": "Draft a two-line commit message for a formatting-only change.", "why": "no code path is read or written"},
+    {"prompt": "What is the difference between optimistic and pessimistic locking?", "why": "general knowledge, not this repository"},
+    {"prompt": "Which decisions are still proposed?", "why": "a documentation query, answered by query-docs"}
+  ]
+}

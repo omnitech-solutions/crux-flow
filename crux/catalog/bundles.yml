@@ -79,13 +79,14 @@ crux-docs:
     - "whiteboarding"
 crux-flow:
   name: "Crux Flow fork policy and model maintenance"
-  description: "Fork execution modes, autonomous outcome records, and reviewed model catalog refresh."
+  description: "Fork execution modes, autonomous outcome records, reviewed model catalog refresh, and project technology guidance."
   audiences:
     - "software-project-maintainers"
     - "agent-team-operators"
   default_provision: false
   skills:
     - "flow"
+    - "maintain-technology-skills"
     - "models-refresh"
 crux-infrastructure:
   name: "crux infrastructure & lifecycle"

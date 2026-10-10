@@ -1,0 +1,17 @@
+{
+  "name": "@omnitech/e2e-live-session",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test:browser": "node scripts/run.mjs",
+    "test:browser:install": "playwright install chromium webkit",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint src tests scripts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
+  }
+}

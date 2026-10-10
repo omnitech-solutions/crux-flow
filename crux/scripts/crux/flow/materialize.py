@@ -25,7 +25,8 @@ def updates(plugin: Path, effective: dict, *, repo: Path,home: Path,scope: str,
     previous=mapping(decode(receipt_raw)) if receipt_raw else {'files':{},'aliases':{}}
     if previous.get('host',host)!=host or previous.get('scope',scope)!=scope:
         raise FlowError('projection receipt scope mismatch')
-    rendered=hosts.roles(plugin,effective,engine=engine)
+    from . import technology
+    rendered=hosts.roles(plugin,effective,engine=engine,preload=technology.preload(repo) if scope=='project' else None)
     proposed={_name(root,native['agents']/name):raw for name,raw in rendered['files'].items()}
     if include_skills:
         for name,raw in hosts.skills(plugin,host,engine=engine or plugin.resolve()).items():

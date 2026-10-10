@@ -1,0 +1,87 @@
+{
+ "case": "test_c_the_same_prompt_with_the_flow_skill_run_first_reads_the_same_references[engine-ai-runtime]",
+ "consumer": "engine",
+ "model": "sonnet",
+ "prompt": "/crux-flow:flow Sketch a provider adapter for a new OpenAI-compatible endpoint. Do not edit files.",
+ "runs": 3,
+ "passes": 3,
+ "router_loaded": 3,
+ "cost_usd": 0.3524,
+ "observations": [
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "packages/ai-engine/src/providers/anthropic.ts",
+    "bionic/adrs/ADR-0004-one-model-contract-and-streaming-port-ending-in-on.md",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "packages/ai-engine/src/providers/ai-sdk.ts",
+    "packages/ai-engine/src/failure.ts",
+    "packages/ai-engine/src/index.ts"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "## Sketch: OpenAI-compatible provider adapter (no files edited)\n\n**What the repo gave me.** The source files here are one-line fixtures: `providers/anthropic.ts`, `providers/ai-sdk.ts`, `failure.ts` and `index.ts` each hold only a comment. The three ADR bodies stop after their opening paragraph. So the real port types (`ModelProvider`, `Failure`, the terminal event) aren't visible, and the type names in the sketch below are placeholders to be matched against the real ones.\n\n### Placement and fit\n- **File:** `packages/ai-engine/src/providers/openai-compatible.ts`, next to `anthropic.ts`. This i",
+   "cost_usd": 0.12137699999999998,
+   "turns": 15,
+   "router_loaded": true,
+   "families": {
+    "ai-runtime": true,
+    "storage": false,
+    "logging": false
+   },
+   "pass": true
+  },
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "bionic/adrs/ADR-0004-one-model-contract-and-streaming-port-ending-in-on.md",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "packages/ai-engine/src/providers/anthropic.ts",
+    "packages/ai-engine/src/providers/ai-sdk.ts",
+    "bionic/research/references/contract.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "## Sketch: OpenAI-compatible provider adapter (read-only, no files edited)\n\n### What I could and couldn't verify\n- `providers/openai.ts` / `ai-sdk.ts` / `anthropic.ts` are **one-line fixtures** (`// fixture: OpenAI-compatible provider adapter`). There is no real port type or adapter to copy yet.\n- The three ADRs the router names (0002, 0004, 0028) are truncated in this checkout to frontmatter and a first line. So the port's exact shape (ADR-0004, \"one terminal event\") is **not** confirmed. The sketch's type names are placeholders.\n- What is solid is `contract.md` \u00a70 and AGENTS.md. A host build",
+   "cost_usd": 0.1201584,
+   "turns": 11,
+   "router_loaded": true,
+   "families": {
+    "ai-runtime": true,
+    "storage": false,
+    "logging": false
+   },
+   "pass": true
+  },
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "bionic/adrs/ADR-0004-one-model-contract-and-streaming-port-ending-in-on.md",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "packages/ai-engine/src/providers/anthropic.ts",
+    "packages/ai-engine/src/providers/ai-sdk.ts"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "Nothing was edited. The repository here is a skeleton, so the sketch below uses placeholder names that you'll need to align with the real port types.\n\n## What the repo gave me\n\n- `providers/anthropic.ts` and `providers/ai-sdk.ts` each contain a single `// fixture:` comment line, so there is no real adapter to copy.\n- ADR-0002, ADR-0004 and ADR-0028 are readable only as frontmatter and a title plus a few lines of context. I haven't seen the actual port types (`ModelProvider`, the streaming event union or `Failure`), so every name below marked *(assumed)* must be checked against `contracts/` and",
+   "cost_usd": 0.11085659999999999,
+   "turns": 9,
+   "router_loaded": true,
+   "families": {
+    "ai-runtime": true,
+    "storage": false,
+    "logging": false
+   },
+   "pass": true
+  }
+ ]
+}

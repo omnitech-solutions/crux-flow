@@ -1,0 +1,67 @@
+{
+ "case": "test_c_the_same_prompt_with_the_flow_skill_run_first_reads_the_same_references[studio-persistence]",
+ "consumer": "studio",
+ "model": "sonnet",
+ "prompt": "/crux-flow:flow Add a nullable archived_at column to the interview answers table and say exactly how to produce the migration. Do not edit files.",
+ "runs": 3,
+ "passes": 0,
+ "router_loaded": 0,
+ "cost_usd": 0.3018,
+ "observations": [
+  {
+   "skills": [],
+   "reads": [
+    "packages/database/package.json",
+    "packages/database/drizzle/20261001000000_init/migration.sql"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "I made no changes. This checkout is a skeleton, so I can't point to the real table definition, but the migration procedure is fixed by `packages/database/package.json`.\n\n## What's missing here\n\n- There is no interview-answers schema in the tree. `packages/database/src/index.ts` is a stub, and there is no `drizzle.config.*`, no `scripts/write-migration-names.mjs`, and no `*schema.ts`.\n- The only migration is `packages/database/drizzle/20261001000000_init/migration.sql`, which contains just `-- fixture migration`.\n- I can't confirm the table's name, its owning package, or its schema name. Per ru",
+   "cost_usd": 0.10539899999999999,
+   "turns": 10,
+   "router_loaded": false,
+   "families": {
+    "persistence": false,
+    "ui": false
+   },
+   "pass": false
+  },
+  {
+   "skills": [],
+   "reads": [
+    "packages/database/package.json",
+    "packages/database/drizzle/20261001000000_init/migration.sql",
+    "bionic/invariants/schema-files-and-migrations-agree.md"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "Nothing was edited. This checkout is only a skeleton, so the exact schema file and table name can't be confirmed, but the migration procedure is fully defined.\n\n## What I found\n\n- **No interview answers table exists in this tree.** A search for `interview_answers` or `interviewAnswers` outside `bionic/` returned nothing. Per rule 2 in `AGENTS.md`, the owning domain package defines the table, not `database`. Locate that package's Drizzle schema file before editing.\n- **There is no `drizzle.config.*` and no `write-migration-names.mjs`** in this checkout. `packages/database/package.json` referenc",
+   "cost_usd": 0.1071848,
+   "turns": 11,
+   "router_loaded": false,
+   "families": {
+    "persistence": false,
+    "ui": false
+   },
+   "pass": false
+  },
+  {
+   "skills": [],
+   "reads": [
+    "packages/database/package.json",
+    "packages/database/drizzle/20261001000000_init/migration.sql"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "No files were edited. This checkout can't produce the migration yet, because the interview-answers table isn't defined in it.\n\n## What the repo contains\n\n- **No table definition.** There is no `interview_answers` or `interviewAnswers` anywhere outside `bionic/`, and no Drizzle schema file (`*schema*.ts`) at all.\n- **No `drizzle.config.*`**, and no `packages/database/scripts/write-migration-names.mjs`. The package scripts `db:generate` and `db:names` point at it.\n- **The only migration is a placeholder:** `packages/database/drizzle/20261001000000_init/migration.sql` contains just `-- fixture mi",
+   "cost_usd": 0.0891798,
+   "turns": 9,
+   "router_loaded": false,
+   "families": {
+    "persistence": false,
+    "ui": false
+   },
+   "pass": false
+  }
+ ]
+}

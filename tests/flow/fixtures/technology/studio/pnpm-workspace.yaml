@@ -1,0 +1,37 @@
+packages:
+  - apps/*
+  - packages/*
+  - products/*
+  - e2e/*
+allowBuilds:
+  esbuild: false
+  sharp: false
+  # tesseract.js's postinstall only prints a funding notice; denied explicitly.
+  tesseract.js: false
+  tldjs: false
+
+catalog:
+  "@types/react": ^19.3.0
+  "@types/react-dom": ^19.3.0
+  "@types/node": ^22.19.0
+  react: ^19.3.0
+  react-dom: ^19.3.0
+  tsx: ^4.21.0
+  typescript: ^5.9.3
+  vitest: ^4.1.2
+  # zod 4.6+ emits a "starts_with" JSON-Schema format that the assistant's ajv rejects; pinned until that validator learns it.
+  zod: 4.4.3
+  # Drizzle 1.0 is a release candidate: the pin is exact on purpose (no caret), so an RC bump is always deliberate and lands in every package at once.
+  drizzle-orm: 1.0.0-rc.4
+  drizzle-kit: 1.0.0-rc.4
+  hono: ^4.12.8
+  # One esbuild for the Next build, the interview bundle, the worker and the gateway.
+  esbuild: ^0.28.0
+  jszip: ^3.10.1
+  github-slugger: ^2.0.0
+  tsup: ^8.5.0
+  jsdom: ^29.1.1
+  "@testing-library/react": ^16.3.2
+  "@testing-library/jest-dom": ^7.0.0
+  "@anthropic-ai/claude-agent-sdk": ^0.3.220
+  server-only: ^0.0.1

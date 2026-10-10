@@ -78,6 +78,9 @@ def parser() -> argparse.ArgumentParser:
         cmd.add_argument('--transaction', required=True)
         cmd.add_argument('--scope', choices=('project', 'user', 'source'), default='project')
         _mutation(cmd)
+    tech=sub.add_parser('technology'); tc=tech.add_subparsers(dest='action',required=True)
+    cmd=tc.add_parser('check'); cmd.add_argument('--upstream',action='store_true',help='also ask each pinned source whether it moved (network, read-only)')
+    cmd=tc.add_parser('sync'); _mutation(cmd)
     cmd=sub.add_parser('version'); cmd.add_argument('--check',action='store_true',help='exit 2 when the installed launcher is not this checkout\'s current build')
     sub.add_parser('guide')
     return root
@@ -378,6 +381,12 @@ def main(argv: list[str] | None=None,*,plugin: Path=PLUGIN,runner=execute,execut
                 if managed.receipt(root, args.transaction) != snapshot:
                     raise FlowError('transaction changed after approval')
                 result = managed.rollback(root, args.transaction, recover=args.action == 'recover')
+        elif args.command=='technology':
+            from . import technology
+            if args.action=='check':
+                code,result=technology.check(plugin,args.repo)
+                if args.upstream and not result.get('surface_absent'): result['upstream_freshness']=technology.freshness(args.repo,fetch=fetch)
+            else: code,result=technology.sync(plugin,args.repo,dry_run=args.dry_run,approve=lambda p:_approve(p,args,confirm))
         elif args.command=='upstream':
             from . import upstream
             if args.action=='check': result=upstream.available(args.repository or policy.load_definition(plugin)['identity']['upstream_repository'])

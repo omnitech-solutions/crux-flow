@@ -8,11 +8,13 @@ from typing import Any
 
 import models_catalog
 
-from .common import FlowError, HOSTS, canonical, decode, identity, integer, mapping, model_id, digest
+from .common import FlowError, HOSTS, canonical, decode, identity, integer, mapping, model_id, digest, text
 from .managed import read_file
 
 CONFIG = '.crux-flow.yml'
-FIELDS = {'config_version','mode','models','budget_minutes','roles'}
+FIELDS = {'config_version','mode','models','budget_minutes','roles','technology'}
+PREFERENCES = FIELDS - {'technology'}   # technology guidance is project data, never part of the effective policy
+RISKS = ('read-only','writes','destructive','external')
 EFFORTS = {'claude': {'low','medium','high','xhigh','max'}, 'codex': {'low','medium','high','xhigh','max','ultra'}}
 
 
@@ -38,7 +40,53 @@ def read_config(path: Path) -> dict[str, Any]:
                 _pin(pin,host)
         else:
             _pin(pins,None)
+    if 'technology' in data:
+        _technology(data['technology'])
     return data
+
+
+def _names(value: Any, label: str) -> list[str]:
+    if not isinstance(value,list) or any(not isinstance(item,str) or not item.strip() for item in value) or len(set(value))!=len(value):
+        raise FlowError(f'technology {label} must be a list of distinct non-empty strings')
+    return value
+
+
+def _technology(value: Any) -> dict:
+    """Shape only. Whether an id is in the catalog or a path exists is the technology check's finding, not a parse error."""
+    from .managed import relative
+    section=mapping(value,allowed={'router','owner','map','preload','exclude','never','layers'},required={'owner','layers'})
+    if section['owner'] not in {'flow','project'}: raise FlowError('technology owner must be flow or project')
+    if re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*',section.get('router','technology-references')) is None or len(section.get('router',''))>64:
+        raise FlowError('invalid technology router name')
+    if 'map' in section: relative(text(section['map'],maximum=400,label='technology map path'))
+    _names(section.get('preload',[]),'preload'); _names(section.get('never',[]),'never')
+    for reason in mapping(section.get('exclude',{})).values(): text(reason,maximum=400,label='technology exclusion reason')
+    if not isinstance(section['layers'],list) or not section['layers']: raise FlowError('technology needs at least one layer')
+    seen=set()
+    for layer in section['layers']:
+        mapping(layer,allowed={'id','paths','technologies','read','rules','commands','never'},required={'id','paths'})
+        if not isinstance(layer['id'],str) or re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*',layer['id']) is None or layer['id'] in seen:
+            raise FlowError('technology layer ids must be distinct lowercase names')
+        seen.add(layer['id'])
+        if not _names(layer['paths'],'layer paths'): raise FlowError('a technology layer needs at least one path')
+        _names(layer.get('technologies',[]),'layer technologies'); _names(layer.get('never',[]),'layer never-list')
+        read=mapping(layer.get('read',{}),allowed={'project','captures'})
+        for name in [*layer['paths'],*_names(read.get('project',[]),'project references'),*_names(read.get('captures',[]),'captures'),*_names(layer.get('rules',[]),'rules')]:
+            relative(name)
+        commands=layer.get('commands',[])
+        if not isinstance(commands,list): raise FlowError('technology commands must be a list')
+        ids=set()
+        for command in commands:
+            mapping(command,allowed={'id','cwd','argv','risk','requires'},required={'id','cwd','argv','risk'})
+            if not isinstance(command['id'],str) or re.fullmatch(r'[a-z0-9]+(?:[:-][a-z0-9]+)*',command['id']) is None or command['id'] in ids:
+                raise FlowError('technology command ids must be distinct lowercase names within a layer')
+            ids.add(command['id'])
+            if command['cwd']!='.': relative(text(command['cwd'],maximum=400,label='command working directory'))
+            if not isinstance(command['argv'],list) or not command['argv'] or any(not isinstance(part,str) or not part or '\x00' in part for part in command['argv']):
+                raise FlowError('a technology command needs an argument vector of non-empty strings')
+            if command['risk'] not in RISKS: raise FlowError('unknown technology command risk')
+            _names(command.get('requires',[]),'command prerequisites')
+    return section
 
 
 def _pin(value: Any, host: str | None) -> dict:
@@ -179,8 +227,10 @@ def resolve(plugin: Path, repo: Path, home: Path, host: str, invocation: dict | 
         mapping(preferences,allowed={'personal','project','invocation','bindings'},required={'personal','project','invocation','bindings'})
     personal=copy.deepcopy(preferences['personal']) if preferences else read_config(home/CONFIG)
     project=copy.deepcopy(preferences['project']) if preferences else read_config(repo/CONFIG)
+    if 'technology' in personal: raise FlowError('technology guidance belongs to a project configuration')
+    project.pop('technology',None)   # kept out of the effective policy, so its edits never touch a frozen run
     explicit=copy.deepcopy(invocation if invocation is not None else preferences['invocation'] if preferences else {})
-    mapping(explicit,allowed=FIELDS-{'config_version'})
+    mapping(explicit,allowed=PREFERENCES-{'config_version'})
     sources={}
     def choose(key: str, fallback: Any) -> Any:
         for label,config in [('invocation',explicit),('project',project),('personal',personal)]:

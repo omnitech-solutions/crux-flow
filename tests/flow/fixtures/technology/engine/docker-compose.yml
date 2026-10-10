@@ -1,0 +1,4 @@
+# Fixture: the one service the technology check reads. The image line is the engine's.
+services:
+  postgres:
+    image: postgres:17-alpine

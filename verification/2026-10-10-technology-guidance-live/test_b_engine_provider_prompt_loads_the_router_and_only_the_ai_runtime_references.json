@@ -1,0 +1,140 @@
+{
+ "case": "test_b_engine_provider_prompt_loads_the_router_and_only_the_ai_runtime_references",
+ "consumer": "engine",
+ "model": "sonnet",
+ "prompt": "Sketch a provider adapter for a new OpenAI-compatible endpoint. Do not edit files.",
+ "runs": 5,
+ "passes": 5,
+ "router_loaded": 5,
+ "cost_usd": 0.5566,
+ "observations": [
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "bionic/adrs/ADR-0004-one-model-contract-and-streaming-port-ending-in-on.md",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "packages/ai-engine/src/providers/anthropic.ts",
+    "packages/ai-engine/src/providers/ai-sdk.ts",
+    "packages/ai-engine/src/failure.ts"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "Checking the existing provider files and `failure.ts`. They're all one-line stubs, so I'll sketch against the repo rules and ADR titles instead.\n\n## Sketch: OpenAI-compatible provider adapter (not written to disk)\n\n**Where it goes:** `packages/ai-engine/src/providers/openai-compatible.ts`. This is the `model-providers` layer, and `providers/ai-sdk.ts` already holds an OpenAI-compatible stub. Before creating a new file, check whether this endpoint can be a configuration of that adapter, since rule 7 prefers extending what exists.\n\n**What I couldn't confirm:** the stubs define no `ModelProvider`",
+   "cost_usd": 0.1067294,
+   "turns": 11,
+   "router_loaded": true,
+   "families": {
+    "ai-runtime": true,
+    "storage": false,
+    "logging": false
+   },
+   "pass": true
+  },
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "bionic/adrs/ADR-0004-one-model-contract-and-streaming-port-ending-in-on.md",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "packages/ai-engine/src/providers/anthropic.ts",
+    "packages/ai-engine/src/providers/ai-sdk.ts"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "I've read the provider references and the existing provider files, and I'm writing the sketch now. The files under `providers/` are one-line fixtures, so there's no real port type in the repo to copy yet.\n\n## What I found\n\n- `providers/anthropic.ts` and `providers/ai-sdk.ts` are placeholder comments only. There is no implemented port, `failure.ts` or `engine.ts` in the tree to mirror.\n- The ADR bodies I could read were header-only, so ADR-0004's actual port shape isn't visible to me.\n- `contract.md` shows how a host names a provider: `modelProvider({ kind: \"anthropic\", apiKey })`, never by imp",
+   "cost_usd": 0.1140046,
+   "turns": 11,
+   "router_loaded": true,
+   "families": {
+    "ai-runtime": true,
+    "storage": false,
+    "logging": false
+   },
+   "pass": true
+  },
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "bionic/adrs/ADR-0004-one-model-contract-and-streaming-port-ending-in-on.md",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "packages/ai-engine/src/providers/anthropic.ts",
+    "packages/ai-engine/src/providers/ai-sdk.ts"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "Here is a sketch, nothing edited. The repo is mostly stubs, so the port types below are assumptions to check, not copies.\n\n## What I found\n\n- `providers/` has only `anthropic.ts` and `ai-sdk.ts`, each a one-line fixture comment.\n- There is no `failure.ts`, no model port type and no `createAiEngine` in the tree. I can't confirm the real names (`ModelProvider`, `Failure`, the terminal event).\n- `package.json` declares both `openai@7.25.0` and `@ai-sdk/openai-compatible`.\n- ADR-0028 amends ADR-0002 so an AI SDK provider may sit behind the engine's own port. That is the only reason the second depe",
+   "cost_usd": 0.1030282,
+   "turns": 10,
+   "router_loaded": true,
+   "families": {
+    "ai-runtime": true,
+    "storage": false,
+    "logging": false
+   },
+   "pass": true
+  },
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "bionic/adrs/ADR-0004-one-model-contract-and-streaming-port-ending-in-on.md",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "packages/ai-engine/src/providers/anthropic.ts",
+    "packages/ai-engine/src/providers/ai-sdk.ts",
+    "packages/ai-engine/src/contracts/model.ts",
+    "packages/ai-engine/src/failure.ts",
+    "packages/ai-engine/src/engine.ts"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "The repo is a skeleton: `providers/ai-sdk.ts`, `contracts/model.ts`, `failure.ts` and `engine.ts` each hold a one-line fixture comment, and the ADRs are truncated. The sketch below therefore uses **placeholder names** for the port and failure types. Check them against `contracts/model.ts` and `failure.ts` once those exist.\n\n## Where it goes\n\n`packages/ai-engine/src/providers/openai-compatible.ts` (the `model-providers` layer). Because the file is new and the provider SDK is imported only there, nothing else changes except the host wiring below.\n\nThe OpenAI SDK (`7.25.0`) already supports a cus",
+   "cost_usd": 0.1168288,
+   "turns": 13,
+   "router_loaded": true,
+   "families": {
+    "ai-runtime": true,
+    "storage": false,
+    "logging": false
+   },
+   "pass": true
+  },
+  {
+   "skills": [
+    "technology-references"
+   ],
+   "reads": [
+    "bionic/adrs/ADR-0002-the-engine-is-a-thin-layer-over-provider-sdks-with.md",
+    "bionic/adrs/ADR-0004-one-model-contract-and-streaming-port-ending-in-on.md",
+    "bionic/adrs/ADR-0028-any-ai-sdk-provider-may-sit-behind-the-engines-own.md",
+    "packages/ai-engine/src/providers/anthropic.ts",
+    "packages/ai-engine/src/providers/ai-sdk.ts",
+    "packages/ai-engine/src/contracts/model.ts",
+    "packages/ai-engine/src/failure.ts",
+    "packages/ai-engine/src/engine.ts",
+    "packages/ai-engine/src/index.ts"
+   ],
+   "handback": "",
+   "dispatched": [],
+   "result": "Status: I've read the provider row's files. `anthropic.ts`, `ai-sdk.ts`, `contracts/model.ts`, `failure.ts` and `engine.ts` are each a one-line fixture comment, and the ADRs are truncated stubs. The real port and `Failure` types aren't in the tree, so the sketch below uses placeholder names where marked. Nothing was edited.\n\n## Sketch: `packages/ai-engine/src/providers/openai-compatible.ts`\n\n```ts\n// [DOMAIN] An OpenAI-compatible endpoint (vLLM, Ollama, OpenRouter, a gateway) behind the engine's\n// own model port. The OpenAI SDK is the transport; its types never leave this file.\nimport type { ",
+   "cost_usd": 0.1160098,
+   "turns": 14,
+   "router_loaded": true,
+   "families": {
+    "ai-runtime": true,
+    "storage": false,
+    "logging": false
+   },
+   "pass": true
+  }
+ ]
+}

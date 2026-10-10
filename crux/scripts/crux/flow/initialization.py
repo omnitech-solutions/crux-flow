@@ -5,7 +5,7 @@ from pathlib import Path
 import bionic_config
 
 from .common import FlowError, canonical, decode, digest, identity, mapping
-from . import hosts, lifecycle, managed, materialize, policy, repository
+from . import hosts, lifecycle, managed, materialize, policy, repository, technology
 from .processes import execute
 
 INIT_RECEIPT='.crux-flow/receipts/init.json'
@@ -105,6 +105,10 @@ def init_repository(plugin: Path,*,repo: Path,home: Path,selected: dict[str,str]
         policy.read_config(repo/policy.CONFIG)
         if mode is not None: config_report['note']='existing project configuration retained; use crux-flow mode set to change it'
     config_plan=managed.plan(repo,config_changes,owner='repository-config') if config_changes else None
+    # Technology guidance is one more planned step. It is shown with the rest, written only for a Flow-owned router,
+    # and a broken reference stops that step alone: it never stops a host from being configured.
+    try: technology_plan,technology_report=technology.plan(plugin,repo)
+    except FlowError as exc: technology_plan,technology_report=None,{'status':'failed','reason':str(exc)}
     effective_mode=policy.resolve(plugin,repo,home,'codex',invocation)['mode']
     plans={}; failed={}
     with lifecycle.install_source(plugin,source) as built:
@@ -145,13 +149,18 @@ def init_repository(plugin: Path,*,repo: Path,home: Path,selected: dict[str,str]
             except (FlowError,OSError) as exc:
                 failed[host]=str(exc) if isinstance(exc,FlowError) else 'host could not be planned'
         public={'operation':'init','repo':str(repo),'config':{**config_report,**(config_plan.public() if config_plan else {})},
-                'hosts':{h:p['public'] for h,p in plans.items()},'failed':failed,'skipped':skipped,'docs':'initialize if the documentation tree is absent' if docs else 'not requested'}
+                'hosts':{h:p['public'] for h,p in plans.items()},'failed':failed,'skipped':skipped,'docs':'initialize if the documentation tree is absent' if docs else 'not requested',
+                'technology':technology_report}
         public['plan_digest']=identity(public)
         if dry_run: return {'status':'planned',**public}
-        if failed and not plans: return _summary({},failed,skipped,config_report,{'status':'not-attempted'},effective_mode)
-        if not plans and config_plan is None: return _summary({},{},skipped,config_report,{'status':'not-attempted'},effective_mode)
-        if _has_work(config_plan,plans,docs,repo) and (approve is None or not approve(public)): raise FlowError('operation cancelled')
+        if failed and not plans: return {**_summary({},failed,skipped,config_report,{'status':'not-attempted'},effective_mode),'technology':technology_report}
+        if not plans and config_plan is None and technology_plan is None:
+            return {**_summary({},{},skipped,config_report,{'status':'not-attempted'},effective_mode),'technology':technology_report}
+        if (technology_plan is not None or _has_work(config_plan,plans,docs,repo)) and (approve is None or not approve(public)): raise FlowError('operation cancelled')
         if config_plan is not None: managed.apply(config_plan,expected_digest=config_plan.plan_digest)
+        if technology_plan is not None:
+            managed.apply(technology_plan,expected_digest=technology_plan.plan_digest)
+            technology_report={**{k:v for k,v in technology_report.items() if k!='plan'},'status':'synced','drift':False,'paths':[]}
         results={}; applied_project=False
         for host,item in plans.items():
             try:
@@ -191,7 +200,7 @@ def init_repository(plugin: Path,*,repo: Path,home: Path,selected: dict[str,str]
                 results[host]={'status':'failed','reason':str(exc) if isinstance(exc,FlowError) else 'host configuration failed; inspect the scoped transaction journal'}
         for host,reason in failed.items(): results[host]={'status':'failed','reason':reason}
         docs_report=_docs(plugin,repo,home,selected,results,runner,approve,docs)
-        return _summary(results,{},skipped,config_report,docs_report,effective_mode)
+        return {**_summary(results,{},skipped,config_report,docs_report,effective_mode),'technology':technology_report}
 
 
 def _has_work(config_plan,plans: dict,docs: bool,repo: Path) -> bool:

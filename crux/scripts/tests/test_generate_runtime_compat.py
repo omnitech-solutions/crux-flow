@@ -366,7 +366,7 @@ class CliContractTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(payload["drifted"], [])
         # A gate that measured nothing would also print an empty drift list.
-        self.assertEqual(payload["targets"], 50)
+        self.assertEqual(payload["targets"], 51)
 
     def test_seeded_drift_makes_the_cli_exit_one_with_json_on_stdout(self):
         """Positive control for the row above, through the same CLI."""
@@ -430,11 +430,11 @@ class CliContractTests(unittest.TestCase):
 class RealTreeTests(unittest.TestCase):
     """Facts about THIS checkout, which the synthetic lanes cannot assert."""
 
-    def test_the_projection_covers_50_of_the_54_catalogued_skills(self):
+    def test_the_projection_covers_51_of_the_55_catalogued_skills(self):
         targets = gen.resolve_targets(REPO_ROOT)
         catalogued = gen._catalogued_skills(REPO_ROOT)
-        self.assertEqual(len(catalogued), 54)
-        self.assertEqual(len(targets), 50)
+        self.assertEqual(len(catalogued), 55)
+        self.assertEqual(len(targets), 51)
         self.assertEqual(len(gen.EXEMPT_SKILLS), 4)
         self.assertEqual(len(targets) + len(gen.EXEMPT_SKILLS), len(catalogued))
 
