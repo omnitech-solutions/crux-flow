@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "crux run snapshot (format_version 1)",
+  "title": "crux run snapshot (format_version 1 or 2)",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -16,7 +16,11 @@
   ],
   "properties": {
     "format_version": {
-      "const": "1"
+      "type": "string",
+      "enum": [
+        "1",
+        "2"
+      ]
     },
     "run_id": {
       "type": "string",
@@ -60,7 +64,7 @@
         "string",
         "null"
       ],
-      "pattern": "^[0-9a-f]{40}$"
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})(?![\\s\\S])"
     },
     "abandonment": {
       "type": [
@@ -524,6 +528,277 @@
     },
     "summary": {
       "type": "string"
+    },
+    "implementation_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "slot",
+          "book_id",
+          "run_id",
+          "book_content_hash",
+          "revision",
+          "gate_prompt",
+          "deciding_record",
+          "retained_subject",
+          "context"
+        ],
+        "properties": {
+          "slot": {
+            "type": "string",
+            "pattern": "^(?:(?:implementation|verify)-[1-9]\\d*|patch)(?![\\s\\S])"
+          },
+          "book_id": {
+            "type": "string",
+            "pattern": "^(?:(?!(?:PB|ADR|RUN|BRIEF)-)[A-Z][A-Z0-9]{1,9}-)?PB-\\d{4}(?![\\s\\S])"
+          },
+          "run_id": {
+            "type": "string",
+            "pattern": "^RUN-\\d{3}(?![\\s\\S])"
+          },
+          "book_content_hash": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
+          },
+          "revision": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\\\x00-\\x1f\\x7f]+(?:/[^/\\\\\\x00-\\x1f\\x7f]+)*(?![\\s\\S])"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+              }
+            }
+          },
+          "gate_prompt": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "deciding_record": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\\\x00-\\x1f\\x7f]+(?:/[^/\\\\\\x00-\\x1f\\x7f]+)*(?![\\s\\S])"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+              }
+            }
+          },
+          "retained_subject": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\\\x00-\\x1f\\x7f]+(?:/[^/\\\\\\x00-\\x1f\\x7f]+)*(?![\\s\\S])"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+              }
+            }
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\\\x00-\\x1f\\x7f]+(?:/[^/\\\\\\x00-\\x1f\\x7f]+)*(?![\\s\\S])"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+              }
+            }
+          }
+        }
+      },
+      "$comment": "Shape admission is not approval. Only successful advance appends binding with DONE; consumers require committed full history."
+    },
+    "migration_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "slot",
+          "book_id",
+          "run_id",
+          "book_content_hash",
+          "batch",
+          "gate_prompt",
+          "deciding_record",
+          "retained_subject",
+          "context"
+        ],
+        "properties": {
+          "slot": {
+            "type": "string",
+            "pattern": "^implementation-[1-9]\\d*(?![\\s\\S])"
+          },
+          "book_id": {
+            "type": "string",
+            "pattern": "^(?:(?!(?:PB|ADR|RUN|BRIEF)-)[A-Z][A-Z0-9]{1,9}-)?PB-\\d{4}(?![\\s\\S])"
+          },
+          "run_id": {
+            "type": "string",
+            "pattern": "^RUN-\\d{3}(?![\\s\\S])"
+          },
+          "book_content_hash": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
+          },
+          "gate_prompt": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "deciding_record": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\\\x00-\\x1f\\x7f]+(?:/[^/\\\\\\x00-\\x1f\\x7f]+)*(?![\\s\\S])"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+              }
+            }
+          },
+          "retained_subject": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\\\x00-\\x1f\\x7f]+(?:/[^/\\\\\\x00-\\x1f\\x7f]+)*(?![\\s\\S])"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+              }
+            }
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\\\x00-\\x1f\\x7f]+(?:/[^/\\\\\\x00-\\x1f\\x7f]+)*(?![\\s\\S])"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+              }
+            }
+          },
+          "batch": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/\\\\\\x00-\\x1f\\x7f]+(?:/[^/\\\\\\x00-\\x1f\\x7f]+)*(?![\\s\\S])"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+              }
+            }
+          }
+        }
+      },
+      "$comment": "Shape admission is not approval. Only successful advance appends binding with DONE; consumers require committed full history."
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "format_version"
+        ],
+        "properties": {
+          "format_version": {
+            "const": "1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "implementation_bindings": {
+            "type": "null",
+            "const": false,
+            "$comment": "Presence is forbidden in this format; both constraints are supported and cannot hold together."
+          },
+          "migration_bindings": {
+            "type": "null",
+            "const": false,
+            "$comment": "Presence is forbidden in this format; both constraints are supported and cannot hold together."
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "format_version"
+        ],
+        "properties": {
+          "format_version": {
+            "const": "2"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "implementation_bindings"
+        ]
+      }
+    }
+  ]
 }
