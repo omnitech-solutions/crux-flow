@@ -6,7 +6,7 @@ import time
 from typing import Callable
 import uuid
 
-from .common import FlowError, PLUGIN, canonical, decode, identity, integer, mapping, text, utc_now
+from .common import FlowError, PLUGIN, check_format, canonical, decode, identity, integer, mapping, text, utc_now
 from . import managed, policy, provenance, upstream_api
 
 COUNTED={'delegate':'delegates','review':'reviewers','review-repair':'repair_cycles','council':'council_rounds'}
@@ -15,6 +15,11 @@ STOP_REASONS={'BLOCKED','BUDGET_EXHAUSTED','CANCELLED'}
 
 
 def validate(run: dict, plugin: Path=PLUGIN) -> None:
+    version=check_format(run,'run')
+    if 'flow' not in run:
+        if version=='2': raise FlowError("format_version '2' is upstream's council-gated cycle run: Flow reads it (history inspect) and never executes it; advance it with run-promptbook")
+        raise FlowError('not a Flow run: no flow block')
+    if version!='1': raise FlowError("a Flow run is format_version '1'; Flow does not execute a format 2 run")
     validator=upstream_api.load(plugin,'validate-promptbook.py')
     from tempfile import TemporaryDirectory
     import yaml
@@ -48,7 +53,7 @@ def load(path: Path, *, verify_book: bool=True) -> dict:
     if verify_book:
         book_raw=managed.read_file(repo,managed.relative(flow['book']))
         if book_raw is None: raise FlowError('pinned promptbook missing')
-        book=mapping(decode(book_raw))
+        book=mapping(decode(book_raw)); check_format(book,'promptbook')
         if upstream_api.book_hash(PLUGIN,book)!=run['book_content_hash']:
             raise FlowError('frozen promptbook was edited')
         if book['id']!=run['book_id'] or book['current_run']!=run['run_id']:

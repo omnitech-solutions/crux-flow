@@ -5,7 +5,7 @@ from pathlib import Path
 
 import bionic_config
 
-from .common import FlowError, PLUGIN, decode, mapping, text, utc_now
+from .common import FlowError, PLUGIN, check_format, decode, mapping, text, utc_now
 from . import managed, upstream_api
 
 
@@ -13,10 +13,10 @@ def inspect(path: Path) -> dict:
     raw=managed.read_file(path.parent,path.name)
     if raw is None: raise FlowError('historical run not found')
     if path.suffix=='.md': return {'format':'legacy-markdown','path':str(path),'execution':'read-only; use the upstream documented migration route','status':'not-inferred'}
-    run=mapping(decode(raw)); version=run.get('flow',{}).get('schema_version')
-    result={'format':'flow-v2' if version=='2' else 'flow-v1' if version=='1' else 'upstream-yaml',
+    run=mapping(decode(raw)); upstream_format=check_format(run,'run'); version=run.get('flow',{}).get('schema_version')
+    result={'format':'flow-v2' if version=='2' else 'flow-v1' if version=='1' else 'upstream-yaml-format-2' if upstream_format=='2' else 'upstream-yaml',
             'path':str(path.resolve()),'book_id':run.get('book_id'),'run_id':run.get('run_id'),'status':run.get('status'),
-            'current_prompt':run.get('current_prompt'),'execution':'current' if version=='2' else 'original workflow or explicit successor',
+            'current_prompt':run.get('current_prompt'),'execution':'current' if version=='2' else 'upstream council-gated cycle run; advance it with run-promptbook, never through Flow' if upstream_format=='2' else 'original workflow or explicit successor',
             'pending_prompts':[{'n':p.get('n'),'title':p.get('title'),'state':p.get('state')} for p in run.get('prompts',[]) if p.get('state') not in {'done','skipped'}]}
     if version=='1':
         flow=run['flow']; result['legacy_flow_status']=flow.get('status')

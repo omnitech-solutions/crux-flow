@@ -18,6 +18,19 @@ class FlowError(ValueError):
     pass
 
 
+# Run and promptbook formats Flow reads. Upstream 3.27 writes "2" for cycle, patch and iterate books (council-gated, with
+# implementation bindings) and "1" for ordinary books; Flow executes only its own "1" runs and reads "2" for inspection.
+READABLE_FORMATS = ('1', '2')
+
+
+def check_format(document: dict, what: str) -> str:
+    """The document's format_version, or a refusal that names the format and the ones Flow reads."""
+    version = document.get('format_version')
+    if version not in READABLE_FORMATS:
+        raise FlowError(f'{what} format_version {version!r} is not one Flow reads (Flow reads {", ".join(repr(v) for v in READABLE_FORMATS)})')
+    return version
+
+
 class StrictLoader(yaml.SafeLoader):
     pass
 

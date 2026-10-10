@@ -69,10 +69,12 @@
  },
  "supported_formats": {
   "run": [
-   "1"
+   "1",
+   "2"
   ],
   "promptbook": [
-   "1"
+   "1",
+   "2"
   ],
   "manifest": [
    "5"
