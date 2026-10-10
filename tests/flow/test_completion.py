@@ -91,12 +91,43 @@ def test_council_attempt_requires_a_material_justification(project):
     assert path.read_bytes() == before
 
 
-def test_claude_delegation_targets_match_projected_role_names(tmp_path):
-    effective = policy.resolve(PLUGIN, tmp_path, tmp_path / 'home', 'claude')
+@pytest.mark.parametrize('mode', ['aggressive', 'balanced', 'thorough'])
+@pytest.mark.parametrize('host', ['claude', 'codex', 'opencode', 'omp'])
+def test_no_flow_mode_role_can_delegate(tmp_path, mode, host):
+    # One orchestrator; every delegate is a leaf. A role generated for a Flow mode holds no delegation grant on
+    # any host, and every one of them is told so in the text it starts with.
+    effective = policy.resolve(PLUGIN, tmp_path, tmp_path / 'home', host, invocation={'mode': mode})
+    rendered = hosts.roles(PLUGIN, effective)
+    assert rendered['files']
+    for name, raw in rendered['files'].items():
+        text = raw.decode()
+        assert 'You are a leaf' in text, name
+        if host == 'codex':
+            continue   # Codex roles carry no delegation tool; the instruction is the control
+        head = yaml.safe_load(text.split('---', 2)[1])
+        if host == 'claude':
+            assert 'Agent' not in head['tools'], name
+            assert 'Agent' in head['disallowedTools'], name
+        elif host == 'opencode':
+            subagent = [rule for rule in head['permissions'] if rule['action'] == 'subagent']
+            assert subagent == [{'action': 'subagent', 'resource': '*', 'effect': 'deny'}], name
+        else:
+            assert head['spawns'] == [] and 'task' not in head['tools'], name
+
+
+def test_upstream_mode_keeps_upstream_delegation_grants(tmp_path):
+    # Upstream mode is upstream's own behaviour: its chain of delegating roles is left as upstream wrote it.
+    effective = policy.resolve(PLUGIN, tmp_path, tmp_path / 'home', 'claude', invocation={'mode': 'upstream'})
     rendered = hosts.roles(PLUGIN, effective)
     head = yaml.safe_load(rendered['files']['crux-flow-dev-lead.md'].split(b'---')[1])
     assert 'Agent(crux-flow-developer)' in head['tools']
     assert 'Agent(developer)' not in head['tools']
+    assert 'You are a leaf' not in rendered['files']['crux-flow-dev-lead.md'].decode()
+
+
+def test_a_flow_mode_delegate_is_told_its_unit(tmp_path):
+    effective = policy.resolve(PLUGIN, tmp_path, tmp_path / 'home', 'claude')
+    rendered = hosts.roles(PLUGIN, effective)
     assert 'do not start another run' in rendered['files']['crux-flow-developer.md'].decode().lower()
 
 

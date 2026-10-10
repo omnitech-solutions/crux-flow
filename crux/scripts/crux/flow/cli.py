@@ -68,7 +68,7 @@ def parser() -> argparse.ArgumentParser:
     cmd=ms.add_parser('apply'); cmd.add_argument('--proposal',type=Path,required=True); cmd.add_argument('--unattended-policy',type=Path); _mutation(cmd)
     cmd=ms.add_parser('rollback'); cmd.add_argument('--scope',choices=('source','user','project'),default='project'); cmd.add_argument('--transaction',required=True); _mutation(cmd)
     up=sub.add_parser('upstream'); us=up.add_subparsers(dest='action',required=True)
-    cmd=us.add_parser('check'); cmd.add_argument('--repository')
+    cmd=us.add_parser('check'); cmd.add_argument('--repository'); cmd.add_argument('--fetch',action='store_true',help='also ask the upstream repository for its latest release (network, read-only)')
     cmd=us.add_parser('prepare'); cmd.add_argument('--repository'); cmd.add_argument('--ref',required=True); cmd.add_argument('--output',type=Path,required=True)
     cmd=us.add_parser('verify'); cmd.add_argument('--candidate',type=Path,required=True); cmd.add_argument('--full',action='store_true'); cmd.add_argument('--test-seconds',type=int,default=600)
     transactions = sub.add_parser('transactions')
@@ -389,7 +389,9 @@ def main(argv: list[str] | None=None,*,plugin: Path=PLUGIN,runner=execute,execut
             else: code,result=technology.sync(plugin,args.repo,dry_run=args.dry_run,approve=lambda p:_approve(p,args,confirm))
         elif args.command=='upstream':
             from . import upstream
-            if args.action=='check': result=upstream.available(args.repository or policy.load_definition(plugin)['identity']['upstream_repository'])
+            if args.action=='check':
+                result=upstream.inspect(plugin,args.repo,fetch=args.fetch,repository=args.repository)
+                code=0 if result['surface']['state']=='clean' else 1
             elif args.action=='prepare': result=upstream.prepare(args.repo,args.output,ref=args.ref,repository=args.repository,plugin=plugin)
             else: result=upstream.verify(args.candidate,full=args.full,test_seconds=args.test_seconds)
             if result.get('status') in {'conflict','refused'}: code=2

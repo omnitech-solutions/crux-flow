@@ -42,7 +42,7 @@ DESCRIPTION_LIMIT=1024; BODY_LINES=80; MAX_FILES=200_000
 def load_catalog(plugin: Path) -> dict:
     raw=managed.read_file(plugin,CATALOG)
     if raw is None: raise FlowError('technology catalog missing')
-    data=mapping(decode(raw),allowed={'schema_version','families','technologies'},required={'schema_version','families','technologies'})
+    data=mapping(decode(raw),allowed={'schema_version','families','technologies','references'},required={'schema_version','families','technologies'})
     if type(data['schema_version']) is not int or data['schema_version']!=1: raise FlowError('invalid technology catalog version')
     for purpose in mapping(data['families']).values(): text(purpose,maximum=400)
     for key,row in mapping(data['technologies']).items():
@@ -66,6 +66,15 @@ def load_catalog(plugin: Path) -> dict:
             if (source['lifecycle']=='active')==('replaced_by' in source): raise FlowError('a moved or deprecated source names its replacement; an active one does not')
             # Unknown compatibility is recorded as unknown. A wildcard would claim every version was checked.
             if text(source['compatibility'],maximum=120) in {'*','any','all'}: raise FlowError('compatibility is a stated range or "unknown", never a wildcard')
+    # A reference family a project routes to by choice: its page is the project's own, so nothing detects it,
+    # nothing is fetched for it and no project is obliged to route or exclude it.
+    for key,row in mapping(data.setdefault('references',{})).items():
+        if re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*',key) is None or key in data['technologies']: raise FlowError('invalid reference id')
+        mapping(row,allowed={'name','family','terms','purpose'},required={'name','family','terms','purpose'})
+        text(row['name'],maximum=80); text(row['purpose'],maximum=600)
+        if row['family'] not in data['families']: raise FlowError('reference names an unknown reference family')
+        if not isinstance(row['terms'],list) or not row['terms']: raise FlowError('a reference needs at least one trigger term')
+        for name in row['terms']: text(name,maximum=200)
     return data
 
 
@@ -155,7 +164,8 @@ def region(config: dict,catalog: dict,detected: dict[str,str]) -> str:
         read=layer.get('read',{})
         order=[f'{label} {_paths(values)}' for label,values in (('project',read.get('project',[])),('pinned captures',read.get('captures',[]))) if values]
         if ids: order.append('official docs at the declared version '+', '.join(known[i]['docs'] for i in ids))
-        cells=[f'`{layer["id"]}`',_paths(layer['paths']),'; '.join(_stamp(known[i]['name'],detected.get(i,'not declared')) for i in ids),
+        pages=[f'{catalog["references"][i]["name"]} (project page)' for i in layer.get('references',[]) if i in catalog.get('references',{})]
+        cells=[f'`{layer["id"]}`',_paths(layer['paths']),'; '.join([*(_stamp(known[i]['name'],detected.get(i,'not declared')) for i in ids),*pages]),
                '; then '.join(order),_paths(layer.get('rules',[])),'; '.join(_command(c) for c in layer.get('commands',[])),'; '.join(layer.get('never',[]))]
         lines.append('| '+' | '.join(_cell(c) for c in cells)+' |')
     # The repository-wide never-list is enforced by the check and deliberately not printed: a router that names a
@@ -172,6 +182,10 @@ def description(config: dict,catalog: dict) -> str:
     for layer in config['layers']:
         for i in layer.get('technologies',[]):
             if i in known and known[i]['terms'][0] not in names: names.append(known[i]['terms'][0])
+    for layer in config['layers']:
+        for i in layer.get('references',[]):
+            row=catalog.get('references',{}).get(i)
+            if row and row['terms'][0] not in names: names.append(row['terms'][0])
     listed=', '.join(names) if names else 'the configured layers'
     return ('Routes a code change in this repository to the vetted references, repository rules and bound commands for the layer it touches. '
             f'Use before writing, reviewing or debugging code that involves {listed}, or when asked which reference, version or command applies to a path. '
@@ -275,7 +289,7 @@ def inspect(plugin: Path,repo: Path) -> dict | None:
     name=config.get('router','technology-references'); errors=[]; warnings=[]
     try: layout=bionic_config.load_config(repo,require_tree=False); docs=layout.docs_root; docs_dir=docs.relative_to(repo.resolve()).as_posix()
     except (bionic_config.BionicConfigError,ValueError): docs=None; docs_dir='bionic'
-    routed=[]
+    routed=[]; pages=[]
     for layer in config['layers']:
         where=f'technology.layers.{layer["id"]}'
         for glob in layer['paths']:
@@ -285,6 +299,10 @@ def inspect(plugin: Path,repo: Path) -> dict | None:
             elif key not in detected: errors.append(_error(key,where+'.technologies','routed, but no manifest in this repository declares it'))
             elif key not in routed: routed.append(key)
         read=layer.get('read',{})
+        for key in layer.get('references',[]):
+            if key not in catalog['references']: errors.append(_error(key,where+'.references','not a reference in the Flow catalog'))
+            elif not read.get('project'): errors.append(_error(key,where+'.references',"a reference is the project's own page; name that page under read.project"))
+            elif key not in pages: pages.append(key)
         for page in [*read.get('project',[]),*layer.get('rules',[])]:
             if not (repo/page).is_file(): errors.append(_error(page,where,'referenced page does not exist'))
         for page in read.get('captures',[]):
@@ -341,6 +359,9 @@ def inspect(plugin: Path,repo: Path) -> dict | None:
             if not told or len(told)>DESCRIPTION_LIMIT: errors.append(_error(place,'description',f'a description of at most {DESCRIPTION_LIMIT} characters is required'))
             for key in routed:
                 if not any(_word(term,told) for term in known[key]['terms']): errors.append(_error(place,'description',f'lacks a trigger term for {known[key]["name"]} ({", ".join(known[key]["terms"])})'))
+            for key in pages:
+                row=catalog['references'][key]
+                if not any(_word(term,told) for term in row['terms']): errors.append(_error(place,'description',f'lacks a trigger term for {row["name"]} ({", ".join(row["terms"])})'))
             for key,row in known.items():
                 if key not in routed and _word(row['terms'][0],told): errors.append(_error(place,'description',f'names {row["name"]}, which no layer routes'+('' if key in detected else ' and no manifest declares')))
             if len(body_.strip().splitlines())>BODY_LINES: warnings.append(f'{place}: the router body is over {BODY_LINES} lines; move detail into references')

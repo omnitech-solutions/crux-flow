@@ -1,0 +1,76 @@
+{
+ "name": "failed-check-blocks-acceptance",
+ "claim": "A failing declared check exits nonzero, is recorded as failed, and the run cannot advance past it.",
+ "steps": [
+  {
+   "write": {
+    "change.json": "{\"goal\": \"Fix add() so it adds\", \"change_kind\": \"repair\", \"outcomes\": [{\"id\": \"add-fixed\", \"outcome\": \"add(2, 3) returns 5\", \"evidence\": \"the check passes\", \"constraints\": [\"keep the signature\"], \"writes\": [\"calc.py\"]}], \"checks\": [{\"id\": \"tests\", \"argv\": [\"$PY\", \"-c\", \"import calc; assert calc.add(2,3)==5\"], \"inputs\": [\"calc.py\"], \"toolchain\": \"Python 3\"}]}"
+   }
+  },
+  {
+   "cli": [
+    "run",
+    "start",
+    "--host",
+    "codex",
+    "--spec",
+    "change.json"
+   ],
+   "exit": 0,
+   "capture": {
+    "RUN": "run"
+   },
+   "stdout": {
+    "status": "ACTIVE"
+   }
+  },
+  {
+   "cli": [
+    "run",
+    "advance",
+    "--file",
+    "$RUN",
+    "--result",
+    "edited nothing"
+   ],
+   "exit": 0
+  },
+  {
+   "cli": [
+    "run",
+    "check",
+    "--file",
+    "$RUN",
+    "--label",
+    "tests"
+   ],
+   "exit": "nonzero",
+   "stdout": {
+    "status": "failed"
+   }
+  },
+  {
+   "snapshot": true
+  },
+  {
+   "cli": [
+    "run",
+    "advance",
+    "--file",
+    "$RUN",
+    "--result",
+    "claim the tests pass"
+   ],
+   "exit": "nonzero"
+  },
+  {
+   "unchanged": true
+  },
+  {
+   "run": {
+    "status": "in_progress",
+    "flow.checks.-1.status": "failed"
+   }
+  }
+ ]
+}

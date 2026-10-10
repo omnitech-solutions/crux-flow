@@ -1,0 +1,86 @@
+{
+ "name": "balanced-delegate-budget-is-two",
+ "claim": "Balanced allows two delegates and refuses the third.",
+ "steps": [
+  {
+   "write": {
+    "change.json": "{\"goal\": \"Fix add() so it adds\", \"change_kind\": \"repair\", \"outcomes\": [{\"id\": \"add-fixed\", \"outcome\": \"add(2, 3) returns 5\", \"evidence\": \"the check passes\", \"constraints\": [\"keep the signature\"], \"writes\": [\"calc.py\"]}], \"checks\": [{\"id\": \"tests\", \"argv\": [\"$PY\", \"-c\", \"import calc; assert calc.add(2,3)==5\"], \"inputs\": [\"calc.py\"], \"toolchain\": \"Python 3\"}]}"
+   }
+  },
+  {
+   "cli": [
+    "run",
+    "start",
+    "--host",
+    "codex",
+    "--spec",
+    "change.json",
+    "--mode",
+    "balanced"
+   ],
+   "exit": 0,
+   "capture": {
+    "RUN": "run"
+   },
+   "stdout": {
+    "status": "ACTIVE"
+   }
+  },
+  {
+   "cli": [
+    "run",
+    "attempt",
+    "--file",
+    "$RUN",
+    "--kind",
+    "delegate",
+    "--invocation",
+    "helper-1",
+    "--justification",
+    "unit A"
+   ],
+   "exit": 0
+  },
+  {
+   "cli": [
+    "run",
+    "attempt",
+    "--file",
+    "$RUN",
+    "--kind",
+    "delegate",
+    "--invocation",
+    "helper-2",
+    "--justification",
+    "unit B"
+   ],
+   "exit": 0
+  },
+  {
+   "snapshot": true
+  },
+  {
+   "cli": [
+    "run",
+    "attempt",
+    "--file",
+    "$RUN",
+    "--kind",
+    "delegate",
+    "--invocation",
+    "helper-3",
+    "--justification",
+    "unit C"
+   ],
+   "exit": "nonzero"
+  },
+  {
+   "unchanged": true
+  },
+  {
+   "run": {
+    "flow.effective_policy.mode": "balanced"
+   }
+  }
+ ]
+}

@@ -342,6 +342,59 @@ def test_a_damaged_catalog_is_refused(tmp_path,damage):
     with pytest.raises(FlowError): api().load_catalog(plugin)
 
 
+# ---- reference families a project routes to by choice -------------------------------------------------
+
+def test_application_boundaries_is_a_reference_no_manifest_declares_and_no_project_must_route(engine,studio):
+    catalog=api().load_catalog(PLUGIN); row=catalog['references']['application-boundaries']
+    assert row['family']=='architecture' and row['family'] in catalog['families'] and 'application-boundaries' not in catalog['technologies']
+    for term in ('application boundaries','route','service','repository','SQL','form','component','CSS'): assert term in row['terms']
+    assert 'no universal directory structure' in row['purpose'] and "project" in row['purpose']
+    for repo in (engine,studio): assert 'application-boundaries' not in api().detect(repo,catalog)      # never detected, so never owed
+
+
+def test_a_routed_reference_is_named_in_the_generated_router_and_needs_the_projects_own_page(engine):
+    code,_=api().sync(PLUGIN,engine); assert code==0
+    before=(engine/ROUTER).read_text(); assert 'Application boundaries' not in before and 'application boundaries' not in before
+    edit(engine,lambda s: layer(s,'engine-core').update(references=['application-boundaries']))
+    code,report=api().check(PLUGIN,engine); assert code==1 and report['drift'] is True and report['validation_errors']==[]
+    code,_=api().sync(PLUGIN,engine); assert code==0
+    head,body=api()._split((engine/ROUTER).read_text())
+    assert 'application boundaries' in head['description'] and len(head['description'])<=1024
+    assert 'Application boundaries (project page)' in body and 'bionic/research/references/contract.md' in body
+    code,report=api().check(PLUGIN,engine); assert code==0 and report['validation_errors']==[]
+    edit(engine,lambda s: layer(s,'engine-core').update(references=['clean-architecture']))
+    assert 'clean-architecture: not a reference in the Flow catalog' in errors(api().check(PLUGIN,engine)[1])
+    edit(engine,lambda s: layer(s,'engine-core').update(references=['application-boundaries'],read={}))
+    assert any(line.startswith("application-boundaries: a reference is the project's own page") for line in errors(api().check(PLUGIN,engine)[1]))
+
+
+def test_a_project_owned_router_must_carry_a_trigger_term_of_a_reference_it_routes(studio):
+    head,_=api()._split((studio/ROUTER).read_text()); told=head['description']
+    row=api().load_catalog(PLUGIN)['references']['application-boundaries']
+    first=next(row_ for row_ in yaml.safe_load((studio/'.crux-flow.yml').read_text())['technology']['layers'] if row_.get('read',{}).get('project'))['id']
+    before=errors(api().check(PLUGIN,studio)[1])
+    edit(studio,lambda s: layer(s,first).update(references=['application-boundaries']))
+    after=errors(api().check(PLUGIN,studio)[1]); missing=[line for line in after if 'lacks a trigger term for Application boundaries' in line]
+    assert bool(missing)==(not any(api()._word(term,told) for term in row['terms'])) and set(before)<=set(after)|set(missing)
+    path=studio/ROUTER; path.write_text(path.read_text().replace('description: ','description: Application boundaries (route, service, repository, SQL). ',1))
+    assert not any('Application boundaries' in line for line in errors(api().check(PLUGIN,studio)[1]))
+
+
+@pytest.mark.parametrize('damage',[
+    lambda text: text.replace('"application-boundaries": {','"hono": {',1),                       # collides with a technology id
+    lambda text: text.replace('"family": "architecture"','"family": "layers"',1),
+    lambda text: text.replace('"terms": ["application boundaries", "route", "service", "repository", "domain logic", "SQL", "form", "component", "CSS"]','"terms": []'),
+    lambda text: text.replace('"name": "Application boundaries",','"name": "Application boundaries", "detect": {"files": ["package.json"]},'),
+])
+def test_a_damaged_reference_entry_is_refused(tmp_path,damage):
+    from crux.flow.common import FlowError
+    plugin=tmp_path/'plugin'; (plugin/'catalog').mkdir(parents=True)
+    original=(PLUGIN/'catalog/flow-technology.json').read_text(); changed=damage(original)
+    assert changed!=original
+    (plugin/'catalog/flow-technology.json').write_text(changed)
+    with pytest.raises(FlowError): api().load_catalog(plugin)
+
+
 # ---- delegates ----------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize('host',['claude','codex','opencode','omp'])

@@ -1,0 +1,116 @@
+{
+ "name": "accepted-run",
+ "claim": "A run is accepted only after the implementation, a fresh declared check with a receipt, and an independent review attestation; the shared writer then completes it.",
+ "steps": [
+  {
+   "write": {
+    "change.json": "{\"goal\": \"Fix add() so it adds\", \"change_kind\": \"repair\", \"outcomes\": [{\"id\": \"add-fixed\", \"outcome\": \"add(2, 3) returns 5\", \"evidence\": \"the check passes\", \"constraints\": [\"keep the signature\"], \"writes\": [\"calc.py\"]}], \"checks\": [{\"id\": \"tests\", \"argv\": [\"$PY\", \"-c\", \"import calc; assert calc.add(2,3)==5\"], \"inputs\": [\"calc.py\"], \"toolchain\": \"Python 3\"}]}"
+   }
+  },
+  {
+   "cli": [
+    "run",
+    "start",
+    "--host",
+    "codex",
+    "--spec",
+    "change.json"
+   ],
+   "exit": 0,
+   "capture": {
+    "RUN": "run"
+   },
+   "stdout": {
+    "status": "ACTIVE"
+   }
+  },
+  {
+   "write": {
+    "calc.py": "def add(a, b):\n    return a + b\n"
+   }
+  },
+  {
+   "cli": [
+    "run",
+    "advance",
+    "--file",
+    "$RUN",
+    "--result",
+    "add() returns a + b"
+   ],
+   "exit": 0
+  },
+  {
+   "cli": [
+    "run",
+    "check",
+    "--file",
+    "$RUN",
+    "--label",
+    "tests"
+   ],
+   "exit": 0,
+   "stdout": {
+    "status": "passed",
+    "evidence_class": "owned-command-execution",
+    "execution.exit_code": 0
+   }
+  },
+  {
+   "cli": [
+    "run",
+    "advance",
+    "--file",
+    "$RUN",
+    "--result",
+    "tests executed"
+   ],
+   "exit": 0
+  },
+  {
+   "run": {
+    "status": "in_progress"
+   }
+  },
+  {
+   "write": {
+    "review.json": "{\"reviewer\": \"separate-session\", \"independent\": true, \"evidence\": \"read calc.py and the check receipt\", \"findings\": []}"
+   }
+  },
+  {
+   "cli": [
+    "run",
+    "review",
+    "--file",
+    "$RUN",
+    "--report",
+    "review.json"
+   ],
+   "exit": 0
+  },
+  {
+   "cli": [
+    "run",
+    "advance",
+    "--file",
+    "$RUN",
+    "--result",
+    "review accepted"
+   ],
+   "exit": 0,
+   "stdout": {
+    "status": "COMPLETED"
+   }
+  },
+  {
+   "run": {
+    "status": "completed",
+    "prompts.0.state": "done",
+    "prompts.1.state": "done",
+    "prompts.2.state": "done",
+    "flow.reviews.-1.evidence_class": "external-attestation",
+    "flow.checks.-1.status": "passed"
+   }
+  }
+ ]
+}

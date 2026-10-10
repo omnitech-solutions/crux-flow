@@ -1,32 +1,46 @@
 # Crux Flow integration seams
 
-## Baseline and ownership
+Every point where Flow touches upstream Crux or a host, whether the seam is official, and the test that pins it.
+Baseline: Bionic Crux 3.25.1, commit `732c355a5bc3130f6cd3763214f7c908b302a3e8` (`reference-source.json`).
+The source files, not the public catalog, are the contract for this version.
 
-Upstream baseline: Bionic Crux 3.25.1, commit
-`732c355a5bc3130f6cd3763214f7c908b302a3e8`. The supplied Codex fork was
-`b56bdb4d6ef2055eeb138d980e44eadc36dae2d4`. This checkout completes the recovered
-assistant implementation; it does not reintroduce the former `crux/flow/` runtime.
+`crux/surface/record.json` pins the machine-checkable half of this page (see `tests/flow/test_surface.py`); the audit
+`verification/2026-10-10-upstream-and-integrity-audit.md` gives line numbers and the upstream 3.27.4 comparison.
 
-The source files below, not a potentially newer or older website catalog, are the
-executable contracts for this version. The public catalog remains useful for naming
-and purpose: https://bionic-coding.com/crux/catalog/ .
+## Official seams
 
-| Responsibility | Existing Crux seam | Flow integration | Why this boundary |
+| Responsibility | Upstream seam | Flow integration | Pinned by |
 |---|---|---|---|
-| Documentation location | `crux/scripts/bionic_config.py` | `crux/scripts/crux/flow/authoring.py`, `initialization.py` | Reuse the configured documentation root; do not assume `bionic/`. |
-| Record numbering | `crux/scripts/record_numbers.py` | `authoring.py` | Preserve existing PB/RUN allocation and names. |
-| Book and run validation | `crux/schemas/promptbook.schema.json`, `run.schema.json`, `crux/scripts/validate-promptbook.py` | `upstream_api.py`, `workflow.py`, `records.py` | Ordinary multi-prompt books; a versioned, bounded run extension rather than a second book format. |
-| Progress and completion | `crux/scripts/advance-run.py` | `records.py`, `evidence.py`; gate call in the shared writer | Prompt state is authoritative. Flow cannot mark a parallel ledger complete while native prompts remain pending. |
-| Native model identities | `crux/catalog/models.yml`, `crux/scripts/models_catalog.py` | `policy.py`, `models.py`, authored `flow-bindings.json` | Use the existing model identities and a fork-owned override layer; upstream mode remains separate. |
-| API helper/council identities | `crux/scripts/crux/_config/llm_router_config.json` | `policy.py`, `api_calls.py` | Resolve existing router roles and pass exact selections to owned calls; no new model gateway. |
-| Host role projection | `crux/scripts/codex_agents.py`, `opencode_agents.py`, `crux/agents/*.md` | `hosts.py`, `materialize.py` | Reuse model/permission semantics while rendering host-specific files and honest unsupported-control reports. |
-| Skill discovery and derived catalogs | `crux/skills/*/SKILL.md`, `crux/scripts/validate-catalog.py`, `generate-runtime-compat.py` | Flow/model-refresh skills and three registered authored JSON catalogs | Register genuine authored sources separately from regenerated `skills.json`/`agents.json`; use the native writers for derived outputs. |
-| Provider execution and bounded councils | `crux/scripts/crux/core/llm_caller.py`, `crux/scripts/crux/council/async_council.py` | `api_calls.py`, `processes.py` | Remaining budgets reach the actual owned invocation; native unobserved delegation is not misrepresented as enforced. |
-| Project records and knowledge lifecycle | Existing Crux authoring, journal and architecture skills | Flow instructions delegate affected records through their owning skills | Do not reimplement research, architecture extraction, journal indexes or wholesale vault maintenance in Flow. |
-| Technology guidance (which reference applies to which path) | Project-local skills (`.agents/skills`), the research source pages and their refresh skills, the `check-drift` roster, the authored-catalog registry in `validate-catalog.py` | `technology.py`, `generate-technology-references.py`, authored `flow-technology.json`, the `technology` section in `policy.py`, one preload argument in `hosts.py::roles` | The router is a project skill, so it never passes through Flow's skill rewriting and never collides with a plugin skill. The research pages already are the lock. Flow renders and checks; it does not fetch, install or decide eligibility by model. |
-| Repository activation (which workflow plugin owns a repository) | Each host's official project-scoped plugin setting: Claude `.claude/settings.json` `enabledPlugins`; Codex `.codex/config.toml` `[plugins."id"]` | `repository.py`, `initialization.py` (`init`, `deinit`) | Activation is a product decision made with the host's own seam, never by shadowing, redirects or role-name collisions. Identities come from the host inventory. |
-| Installation and release ownership | Native host plugin interfaces and original projection contracts | `lifecycle.py`, `managed.py`, `packaging.py`, `setup.py` | These are fork-owned operator services; transactional file ownership is separate from external native registration and compensation. User-scope Flow stays inert while an upstream plugin is enabled, so repositories opt in explicitly. |
-| Upstream maintenance | Real Git release ancestry and native generators/tests | `upstream.py`, `testing.py` | Replay commits in an isolated candidate; update the pin, regenerate and verify without altering the working branch or installed release. |
+| Documentation location | `scripts/bionic_config.py` (`load_config`, `docs_dir`) | `authoring.py`, `initialization.py` | `test_records.py` (`project` fixture uses `docs_dir: knowledge`) |
+| Record numbering | `scripts/record_numbers.py` (`scan_records`) | `authoring.py` | `test_records.py::test_book_uses_existing_schema_layout_counter_and_real_units` |
+| Book and run validation | `schemas/promptbook.schema.json`, `schemas/run.schema.json`, `validate-promptbook.py` | `upstream_api.py`, `workflow.py`, `records.py` | same test; surface `schemas` |
+| Native model identities | `catalog/models.yml`, `scripts/models_catalog.py` | `policy.py`, `models.py`, overlay `flow-bindings.json` | `test_models.py` |
+| API helper and council identities | `scripts/crux/_config/llm_router_config.json` | `policy.py`, `api_calls.py` | `test_completion.py` |
+| Host role projection | `scripts/codex_agents.py`, `opencode_agents.py`, `agents/*.md` | `hosts.py`, `materialize.py` | `test_hosts.py`, `test_drive_and_identity.py` |
+| Skill discovery and derived catalogs | `skills/*/SKILL.md`, `validate-catalog.py`, `generate-runtime-compat.py` | `flow`, `models-refresh`, `maintain-technology-skills`; three registered authored catalogs | `test_completion.py::test_fork_catalog_sources_are_explicitly_validated_without_regeneration` |
+| Drift roster | `skills/check-drift/SKILL.md` table | rows for `generate-technology-references.py` and `generate-flow-surface.py` | `test_technology.py::test_regenerator_keeps_the_sibling_contract`, `test_surface.py` |
+| Technology guidance | project-local skills (`.agents/skills`), research source pages | `technology.py`, `generate-technology-references.py`, `flow-technology.json`; one preload argument in `hosts.py::roles` | `test_technology.py` |
+| Repository activation | each host's project plugin setting | `repository.py`, `initialization.py` | `test_init.py`; `test_native.py` (opt-in) |
+| Install and release | native host plugin interfaces | `lifecycle.py`, `managed.py`, `packaging.py`, `setup.py` | `test_lifecycle.py`, `test_packaging.py`, `test_publish.py` |
+| Upstream maintenance | Git release ancestry | `upstream.py` (`check`, `prepare`, `verify`), `testing.py` | `test_upstream.py` (fixture history), `test_surface.py` |
+
+## Non-official seams
+
+These are patches to upstream-owned files, private reaches and text rewrites. Each carries a risk when upstream changes; each is pinned so a change is noticed. `patched_upstream_files` and `text_rewrites` in `crux/surface/declaration.json` are the authoritative lists; the record stores a digest of every patched file.
+
+| What | Where | Risk | Pinned by |
+|---|---|---|---|
+| Shared run writer calls Flow's gate and `advance_file` when a run has `flow` | `crux/scripts/advance-run.py:435-437`, `:551-564`; plus a patch-completion preflight at `:475-507`, `:603-616` | Highest. Upstream 3.27.4 rewrote this file (gate info, council gate, implementation bindings); the patch does not apply | `scenarios/original-writer-cannot-bypass-the-gate.json`, `test_records.py::test_original_writer_cannot_skip_check_or_complete_with_missing_review` |
+| `flow` block in the run schema | `crux/schemas/run.schema.json` | High. Upstream changed `format_version` to 1 or 2 in the same region | surface `schemas`; `test_records.py` validates a run against it |
+| Bounded council, frozen router digest, role-named Anthropic helpers | `crux/scripts/crux/council/async_council.py`, `crux/scripts/crux/core/llm_caller.py`, `crux/scripts/crux/core/__init__.py` | High for `async_council.py` (upstream changed it), medium for the others | surface digests; `test_completion.py` |
+| Authored-catalog registry | `crux/scripts/validate-catalog.py` | Medium | `test_completion.py` |
+| Owned Swift parser deadline | `crux/scripts/crux/arch/packs/swift.py` | Low; needs the optional parser dependencies to exercise | `crux/scripts/tests/test_swift_parse_deadline.py` (full suite only) |
+| Role and catalog data | `crux/catalog/models.yml`, `bundles.yml`, `skills.json`; `crux/scripts/codex_agents.py` | Medium; `skills.json` is regenerated | `test_models.py`, `test_hosts.py` |
+| Eight skills edited | `archive-promptbook`, `call-llm`, `check-drift`, `dev-cycle`, `fix-directly`, `iterate`, `patch-cycle`, `run-promptbook` (and `run-promptbook/references/advance.md`) | Medium; text-level | surface skill contract digests |
+| Upstream modules executed in-process, private functions called | `upstream_api.py::load` runs `advance-run.py`, `validate-promptbook.py`, `check-promptbook-index.py`; calls `_splice`, `_check_base_commit_pin` | Medium; signatures are pinned by argument name | surface `upstream_scripts` |
+| Skill text rewritten on export | `hosts.py:127` (`/crux:` to `/crux-flow:`), `:128` (drops the runtime-compat block), `:140` (prepends routing text) | Medium; relies on upstream's text shape | surface `text_rewrites` markers |
+| Role bodies replaced, `Agent(...)` targets renamed | `hosts.py:64` (no `commander`), `:84` | Medium | `test_hosts.py`, `test_completion.py::test_claude_delegation_targets_match_projected_role_names` |
+| Packaging copies `crux/` as the engine and expects `crux/scripts` on the path | `packaging.py`, `pyproject.toml` `pythonpath` | Low | `test_packaging.py` |
 
 ## Host seams
 
@@ -94,5 +108,5 @@ or a closed Desktop application. Installed payloads and active runs stay pinned;
 upgrades prepare the next compatible session rather than modifying loaded history.
 
 The current source snapshot has provenance but not the original Git object database.
-The updater refuses to manufacture ancestry. Integrate the supplied upstream-relative
-patch on a genuine baseline branch before using upstream preparation.
+`upstream prepare` refuses to manufacture ancestry, and `upstream check` reports the blockers offline.
+Integrate the supplied upstream-relative patch on a genuine baseline branch before using preparation.

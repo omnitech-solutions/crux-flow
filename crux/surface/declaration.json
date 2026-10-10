@@ -1,0 +1,152 @@
+{
+ "schema_version": 1,
+ "requires": {
+  "advance-run.py": [
+   "--outcome",
+   "--result",
+   "--artifacts",
+   "--abandon",
+   "--reason",
+   "--book"
+  ],
+  "validate-promptbook.py": [],
+  "check-promptbook-index.py": [],
+  "validate-catalog.py": [
+   "--dry-run",
+   "--repo-root"
+  ],
+  "generate-runtime-compat.py": [
+   "--dry-run",
+   "--repo-root"
+  ],
+  "generate-routing-table.py": [
+   "--dry-run",
+   "--repo-root"
+  ]
+ },
+ "dynamic_seams": {
+  "advance-run.py": {
+   "abandon": [
+    "run",
+    "reason"
+   ],
+   "_check_base_commit_pin": [
+    "run",
+    "run_path"
+   ],
+   "advance": [
+    "run",
+    "outcome",
+    "result",
+    "artifacts"
+   ],
+   "_splice": [
+    "text",
+    "before",
+    "after"
+   ],
+   "main": [
+    "argv"
+   ]
+  },
+  "validate-promptbook.py": {
+   "validate_file": [
+    "path",
+    "kind_override"
+   ],
+   "frozen_plan_subset": [
+    "book"
+   ],
+   "compute_book_hash": [
+    "book_dict"
+   ]
+  },
+  "check-promptbook-index.py": {
+   "book_stems": [
+    "directory"
+   ]
+  }
+ },
+ "supported_formats": {
+  "run": [
+   "1"
+  ],
+  "promptbook": [
+   "1"
+  ],
+  "manifest": [
+   "5"
+  ],
+  "flow_extension": [
+   "1",
+   "2"
+  ]
+ },
+ "flow_skills": [
+  "flow",
+  "models-refresh",
+  "maintain-technology-skills"
+ ],
+ "delegation": {},
+ "hard_on_removal": [
+  "flow_cli",
+  "upstream_scripts",
+  "imports",
+  "drift_roster",
+  "skills"
+ ],
+ "patched_upstream_files": [
+  "catalog/bundles.yml",
+  "catalog/models.yml",
+  "catalog/skills.json",
+  "schemas/run.schema.json",
+  "scripts/advance-run.py",
+  "scripts/codex_agents.py",
+  "scripts/crux/arch/packs/swift.py",
+  "scripts/crux/core/__init__.py",
+  "scripts/crux/core/llm_caller.py",
+  "scripts/crux/council/async_council.py",
+  "scripts/validate-catalog.py",
+  "skills/archive-promptbook/SKILL.md",
+  "skills/call-llm/SKILL.md",
+  "skills/check-drift/SKILL.md",
+  "skills/dev-cycle/SKILL.md",
+  "skills/fix-directly/SKILL.md",
+  "skills/iterate/SKILL.md",
+  "skills/patch-cycle/SKILL.md",
+  "skills/run-promptbook/SKILL.md",
+  "skills/run-promptbook/references/advance.md"
+ ],
+ "text_rewrites": [
+  {
+   "file": "scripts/crux/flow/hosts.py",
+   "marker": "/crux-flow:",
+   "what": "plugin skills: /crux: command references become /crux-flow:"
+  },
+  {
+   "file": "scripts/crux/flow/hosts.py",
+   "marker": "## Installed runtime and routing",
+   "what": "plugin skills: a routing preamble is prepended to every SKILL.md body"
+  },
+  {
+   "file": "scripts/crux/flow/hosts.py",
+   "marker": "BEGIN GENERATED: runtime-compat",
+   "what": "plugin skills: the generated runtime-compat block is removed"
+  },
+  {
+   "file": "scripts/crux/flow/hosts.py",
+   "marker": "Primary session owns orchestration",
+   "what": "role bodies (non-upstream modes): replaced by Flow's instructions"
+  },
+  {
+   "file": "scripts/crux/flow/hosts.py",
+   "marker": "Agent\\(([^)]+)\\)",
+   "what": "Claude role tools: Agent(x) targets are renamed crux-flow-x"
+  },
+  {
+   "file": "scripts/advance-run.py",
+   "marker": "from crux.flow.records import guard_advance",
+   "what": "the shared run writer calls Flow's gate when a run carries a flow extension"
+  }
+ ]
+}

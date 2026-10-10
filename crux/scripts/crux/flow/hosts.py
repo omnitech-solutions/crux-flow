@@ -41,7 +41,7 @@ def _instructions(plugin: Path, role: str, policy: dict) -> str:
             'Read-only requests create no run. Follow the frozen effective policy for active work. '
             'Use existing Crux knowledge, numbering and run-promptbook records, not a second state store. '
             'Do not start a council, forge a helper or add a review merely because a capability exists. '
-            'Do not delegate from an unsupported child context. Preserve host/admin restrictions.\n\n'
+            'You are a leaf: start no agent, sub-agent or worker of your own on any runtime; what you cannot finish, hand back to the parent as work orders. Preserve host/admin restrictions.\n\n'
             f'Rendered mode: {policy["mode"]}; generated configuration, runtime loading unobserved. '
             'The parent gives you Outcome, Evidence, Constraint and the permitted write set. '
             'Report findings and evidence to that parent; do not claim the entire run is complete after your unit.\n')
@@ -81,7 +81,13 @@ def roles(plugin: Path, policy: dict, *, engine: Path | None=None, preload: dict
         elif host=='claude':
             projected={key:head[key] for key in ('description','tools','disallowedTools','maxTurns','memory','isolation') if key in head}
             if isinstance(projected.get('tools'), str):
-                projected['tools'] = re.sub(r'Agent\(([^)]+)\)', lambda match: 'Agent(' + ', '.join('crux-flow-' + part.strip() for part in match[1].split(',')) + ')', projected['tools'])
+                if upstream:
+                    projected['tools'] = re.sub(r'Agent\(([^)]+)\)', lambda match: 'Agent(' + ', '.join('crux-flow-' + part.strip() for part in match[1].split(',')) + ')', projected['tools'])
+                else:   # one orchestrator, every delegate a leaf: a Flow-mode role is granted no delegation tool
+                    projected['tools'] = ', '.join(tool for tool in re.split(r',\s*(?![^()]*\))', projected['tools']) if not tool.strip().startswith('Agent'))
+            if not upstream:
+                denied=[tool.strip() for tool in str(projected.get('disallowedTools','')).split(',') if tool.strip()]
+                projected['disallowedTools']=', '.join([*denied,*([] if 'Agent' in denied else ['Agent'])])
             projected['name']='crux-flow-'+name; projected['model']=assignment['model']
             if assignment['effort'] is not None: projected['effort']=assignment['effort']
             elif 'effort' in head: projected['effort']=head['effort']
@@ -90,9 +96,13 @@ def roles(plugin: Path, policy: dict, *, engine: Path | None=None, preload: dict
             files[f'crux-flow-{name}.md']=_markdown(projected,body)
         elif host=='opencode':
             native=mapping(decode(opencode_agents.transform(name,fm,assignment['model'])))
-            for rule in native['permissions']:
-                if rule['action']=='subagent' and rule['resource']!='*':
-                    rule['resource']='crux-flow-'+rule['resource']
+            if upstream:
+                for rule in native['permissions']:
+                    if rule['action']=='subagent' and rule['resource']!='*':
+                        rule['resource']='crux-flow-'+rule['resource']
+            else:   # a Flow-mode role may start no subagent
+                native['permissions']=[*(rule for rule in native['permissions'] if rule['action']!='subagent'),
+                                       {'action':'subagent','resource':'*','effect':'deny'}]
             if 'name' in native or 'metadata' in native:
                 raise FlowError('unsafe OpenCode V2 frontmatter')
             files[f'crux-flow-{name}.md']=_markdown(native,body)
@@ -100,7 +110,8 @@ def roles(plugin: Path, policy: dict, *, engine: Path | None=None, preload: dict
             tools=[]; spawns=[]; missing=[]
             for tool in sorted(source.tools):
                 spawn=re.fullmatch(r'Agent\(([^)]+)\)',tool)
-                if spawn: spawns.append('crux-flow-'+spawn[1])
+                if spawn:
+                    if upstream: spawns.append('crux-flow-'+spawn[1])
                 elif tool in TOOL_MAP: tools.append(TOOL_MAP[tool])
                 else: missing.append(tool)
             if spawns: tools.append('task')

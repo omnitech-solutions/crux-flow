@@ -8,7 +8,16 @@
     "ai-runtime": "Model provider SDKs, agent runtimes and the protocols they speak.",
     "testing": "Unit, integration and browser test runners.",
     "native": "Native desktop application code.",
-    "operations": "Logging and local service orchestration."
+    "operations": "Logging and local service orchestration.",
+    "architecture": "How responsibilities are divided inside an application. The page is the project's own; nothing is detected from a manifest."
+  },
+  "references": {
+    "application-boundaries": {
+      "name": "Application boundaries",
+      "family": "architecture",
+      "terms": ["application boundaries", "route", "service", "repository", "domain logic", "SQL", "form", "component", "CSS"],
+      "purpose": "Who owns transport, application services, domain rules, repositories and UI composition in this repository, as one narrowly scoped page the project writes: a decision table (what you are about to write, and where it belongs), the imports each layer may use, and the commands that check it, all derived from the project's own packages and folders. It prescribes no universal directory structure."
+    }
   },
   "technologies": {
     "typescript": {

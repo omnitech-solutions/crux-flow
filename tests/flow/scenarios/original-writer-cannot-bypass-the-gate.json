@@ -1,0 +1,54 @@
+{
+ "name": "original-writer-cannot-bypass-the-gate",
+ "claim": "Upstream's own advance-run.py, run directly on a Flow run, refuses to mark a checked unit done on a bare claim and leaves the record byte-identical.",
+ "steps": [
+  {
+   "write": {
+    "change.json": "{\"goal\": \"Fix add() so it adds\", \"change_kind\": \"repair\", \"outcomes\": [{\"id\": \"add-fixed\", \"outcome\": \"add(2, 3) returns 5\", \"evidence\": \"the check passes\", \"constraints\": [\"keep the signature\"], \"writes\": [\"calc.py\"]}], \"checks\": [{\"id\": \"tests\", \"argv\": [\"$PY\", \"-c\", \"import calc; assert calc.add(2,3)==5\"], \"inputs\": [\"calc.py\"], \"toolchain\": \"Python 3\"}]}"
+   }
+  },
+  {
+   "cli": [
+    "run",
+    "start",
+    "--host",
+    "codex",
+    "--spec",
+    "change.json"
+   ],
+   "exit": 0,
+   "capture": {
+    "RUN": "run"
+   },
+   "stdout": {
+    "status": "ACTIVE"
+   }
+  },
+  {
+   "cli": [
+    "run",
+    "advance",
+    "--file",
+    "$RUN",
+    "--result",
+    "fixed"
+   ],
+   "exit": 0
+  },
+  {
+   "snapshot": true
+  },
+  {
+   "writer": [
+    "--outcome",
+    "done",
+    "--result",
+    "merely claimed"
+   ],
+   "exit": "nonzero"
+  },
+  {
+   "unchanged": true
+  }
+ ]
+}

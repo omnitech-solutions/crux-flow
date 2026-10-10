@@ -7,7 +7,7 @@ import sys
 import tempfile
 
 from .common import FlowError, canonical, decode, digest, identity, mapping, integer
-from . import managed, policy, testing
+from . import managed, policy, surface, testing
 from .processes import execute
 
 RECORD='crux-flow-upstream-candidate.json'
@@ -83,7 +83,7 @@ def prepare(checkout: Path,output: Path,*,ref: str,repository: str | None,plugin
         provenance.update(upstream_commit=upstream_commit, upstream_version=tag.removeprefix('v'))
         managed.write_file(output, 'reference-source.json', canonical(provenance), 0o644)
     generated = []
-    for script in ('validate-catalog.py', 'generate-runtime-compat.py', 'generate-routing-table.py'):
+    for script in ('validate-catalog.py', 'generate-runtime-compat.py', 'generate-routing-table.py', 'generate-flow-surface.py'):   # the surface record last: it refuses to bless a broken surface
         path = output / 'crux/scripts' / script
         if not path.is_file():
             continue
@@ -125,3 +125,33 @@ def verify(candidate: Path,*,full: bool=False,test_seconds: int=600,runner=execu
     passed=len(checks)==len(commands) and all(c['status']=='ok' for c in checks) and stable
     return {'status':'verified' if passed else 'refused','commit':record['commit'],'tree_digest':record['tree_digest'],'tree_stable':stable,
             'checks':checks,'activation':'not-activated','native_loading':'unobserved','provider_delivery':'unobserved'}
+
+
+def readiness(checkout: Path, pinned: str) -> list[str]:
+    """What stops `prepare` from running here. Offline and read-only; an empty list means the documented procedure can start."""
+    blockers=[]
+    if not (checkout/'.git').exists(): return ['not a Git checkout: a flattened export is not history']
+    try:
+        if _git(['status','--porcelain','--untracked-files=all'],cwd=checkout).strip(): blockers.append('the working tree is not clean: commit and verify the fork first')
+    except FlowError: blockers.append('Git could not report the working tree status')
+    try: _git(['merge-base','--is-ancestor',pinned,'HEAD'],cwd=checkout)
+    except FlowError: blockers.append(f'the pinned upstream commit {pinned[:12]} is not an ancestor of HEAD: replaying fork commits needs real ancestry')
+    return blockers
+
+
+def inspect(plugin: Path, checkout: Path, *, fetch: bool=False, repository: str | None=None, observe=available) -> dict:
+    """What is vendored, what the surface record says about it, whether the procedure can run here and, with `fetch`, what is latest.
+    Compatibility of a newer release is judged on a prepared candidate (`prepare` regenerates and checks its surface), never guessed here."""
+    identity_=policy.load_definition(plugin)['identity']; source=repository or identity_['upstream_repository']
+    code,payload=surface.check(plugin)
+    state='broken' if payload.get('broken') else 'drift' if payload.get('drift') else 'clean'
+    result={'vendored':{'version':identity_['upstream_version'],'commit':identity_['upstream_commit'],'repository':source},
+            'surface':{'state':state,'hard':payload.get('hard',0),'notice':payload.get('notice',0),
+                       'problems':[e['error'] for e in payload.get('validation_errors',[])]+[c['path'] for c in payload.get('changes',[]) if c['severity']=='hard']},
+            'procedure':{'ready':not (blockers:=readiness(checkout,identity_['upstream_commit'])),'blockers':blockers,
+                         'steps':['upstream prepare --ref latest --output DIR','upstream verify --candidate DIR --full']},
+            'latest':None,'network':fetch}
+    if fetch:
+        found=observe(source); latest=found['latest']
+        result['latest']={**latest,'behind':semver(latest['tag'])>semver(identity_['upstream_version'])}
+    return result

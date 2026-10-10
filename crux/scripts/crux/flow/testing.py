@@ -22,6 +22,7 @@ def preflight(*,full: bool=False) -> dict:
 def commands(candidate: Path,*,full: bool=False,test_seconds: int=600) -> list[dict]:
     integer(test_seconds,low=1,high=3600)
     result=[{'name':'catalog','argv':['uv','run','--group','test','python','crux/scripts/validate-catalog.py','--dry-run'],'seconds':60},
+            {'name':'surface','argv':['uv','run','--group','test','python','crux/scripts/generate-flow-surface.py','--dry-run'],'seconds':120},
             {'name':'reference','argv':['uv','run','--group','test','python','-m','pytest','tests/flow','-m','not upstream and not native and not provider','-q'],'seconds':test_seconds}]
     if full: result.append({'name':'upstream','argv':['uv','run','--group','upstream-test','python','-m','pytest','crux/scripts/tests','-q'],'seconds':1800})
     result.append({'name':'package','argv':['uv','run','--script','./crux-flow','package','--output',str(candidate/'.cache/candidate-verification-build')],'seconds':120})

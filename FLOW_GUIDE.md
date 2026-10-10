@@ -251,6 +251,7 @@ It is guidance. It adds no step to a run, no gate, no permission and no new work
 | Part | Where | Who owns it |
 |---|---|---|
 | The catalog: each technology, how a manifest declares it, its trigger terms, its official documentation, and any vetted upstream skill source with its licence | `crux/catalog/flow-technology.json`, shipped with Flow | Flow |
+| The reference families a project may route to by choice, each with its trigger terms and what its page must hold. `application-boundaries`: who owns transport, services, domain rules, repositories and UI composition, as the project's own page derived from its own packages and folders, with no universal directory structure | the `references` section of `crux/catalog/flow-technology.json` | Flow names the family; the project writes the page |
 | The layers of this repository | the `technology` section of `.crux-flow.yml` | the project |
 | The router skill | `.agents/skills/<router>/SKILL.md`, with a copy under `.claude/skills` and `.omp/skills` when those folders are not links to it | Flow when `owner: flow`; the project when `owner: project` |
 | The pins | the project's research source pages (`source_url` with a commit, `captured_at`, `raw_path`) | the project, through `ingest-research` and the refresh skills |
@@ -278,6 +279,7 @@ Each layer:
 | `id` | yes | Lowercase name, unique in the section. |
 | `paths` | yes | Paths or globs the layer covers. Each must match a file. |
 | `technologies` | no | Catalog ids that apply. Each must be declared by a manifest. |
+| `references` | no | Catalog reference ids that apply, such as `application-boundaries`. A reference is a page the project writes, so the layer must name that page under `read.project`. No manifest declares one and no project is obliged to route one. |
 | `read.project` | no | The project's own pages, read first. |
 | `read.captures` | no | Research source pages, read second. Each must carry a pin and an existing raw capture. |
 | `rules` | no | Decisions and invariants that govern the layer. |
@@ -535,6 +537,24 @@ technology:
         - {id: verify, cwd: ".", argv: [pnpm, run, verify], risk: read-only}
 ```
 
+## Orchestrating delegates
+
+One orchestrator; every delegate is a leaf. In aggressive, balanced and thorough modes the primary
+session dispatches every delegate and reviewer itself, and a delegate never starts an agent,
+sub-agent or worker of its own: nested delegation exhausts the host's concurrency cap, multiplies
+usage, escapes the mode's caps and puts work where nobody can see or stop it.
+
+| Where | What enforces it |
+|---|---|
+| Generated role files (Claude Code, OpenCode, OMP) | No delegation tool in the three Flow modes: `Agent` removed and denied, a subagent deny rule, no spawns (`hosts.py`; `test_no_flow_mode_role_can_delegate`) |
+| Every generated role, every host | The first instructions say "You are a leaf" |
+| Every brief | The `flow` skill requires the sentence in each delegation |
+| Upstream mode | Not applied: upstream's roles and their chain are unchanged (`test_upstream_mode_keeps_upstream_delegation_grants`) |
+
+What a long many-delegate session showed to work, and its pitfalls, is in
+`crux/skills/flow/references/orchestration.md`. It is read when a run fans out; it adds no step,
+gate or permission.
+
 ## Executable work and durable continuation
 
 The Flow skill creates a small project-owned JSON specification. Use actual project
@@ -665,22 +685,57 @@ selection as `install`, with an optional `--source` override.
 ## Repeatable upstream updates
 
 ```sh
-crux-flow upstream check
+crux-flow upstream check                  # offline, read-only: vendored version, surface state, what blocks the procedure
+crux-flow upstream check --fetch          # also asks the upstream repository for its latest release tag
 crux-flow --repo "$PWD" upstream prepare --ref latest --output /tmp/crux-next-candidate
 crux-flow upstream verify --candidate /tmp/crux-next-candidate --full
 ```
 
-Preparation requires a clean, real Git checkout containing the pinned upstream
-ancestor. It resolves an exact release, clones an isolated candidate, replays the
-fork commits, updates the candidate's upstream pin and regenerates owned catalogs.
-A changed integration point or failed regeneration refuses activation. Verification
-checks the recorded candidate identity and runs nonrecursive tests and packaging.
-It does not install, publish or change the working fork branch.
+`check` exits 0 when the surface record matches the live surface and 1 on DRIFT or BROKEN (see below); a newer upstream
+release is not a failure. It reports `procedure.ready` and the blockers: a real Git checkout, a clean tree, and the pinned
+upstream commit as an ancestor of `HEAD`.
 
-This source archive preserves reconstructed source provenance; it does not invent
-the original Git history. For long-term upstream maintenance, integrate it on a
-branch rooted at the recorded Crux 3.25.1 commit using the accompanying upstream
-patch. Daily operation and packaging do not need that historical checkout.
+`prepare` requires all three. It resolves an exact release, clones an isolated candidate, replays the fork commits, updates the
+candidate's upstream pin and regenerates the owned outputs: `validate-catalog.py`, `generate-runtime-compat.py`,
+`generate-routing-table.py` and, last, `generate-flow-surface.py`, which refuses to write while an invariant is broken. A
+conflicting replay or a failed regeneration refuses activation. `verify` checks the recorded candidate identity and runs the
+catalog check, the surface check, the nonrecursive tests and packaging. Neither installs, publishes or changes the working branch.
+
+### The surface record
+
+`crux/surface/record.json` is generated by `crux/scripts/generate-flow-surface.py` from the live source and
+`crux/surface/declaration.json` (what Flow requires, which formats it supports, which upstream files it patches, which upstream
+text it rewrites). It pins:
+
+| Section | Content |
+|---|---|
+| `flow_cli` | every `crux-flow` command with its flags, requirements and choices |
+| `upstream_scripts` | for each upstream script Flow calls: flags, seam function argument names, `main` exit codes |
+| `imports` | each upstream module Flow imports and whether each symbol it uses still exists |
+| `skills` | every skill: owner (`flow` or `upstream`), a digest of its frontmatter, the scripts its body calls |
+| `roles` | each role's tools and delegation targets per host and mode (models are left out) |
+| `schemas` | run and promptbook `format_version`, the Flow extension versions, manifest `schema_version`, `docs_dir` default, policy and technology versions |
+| `drift_roster`, `patched_upstream_files`, `text_rewrites`, `hooks` | the roster scripts, a digest of each patched upstream file, whether each rewritten text is still found, hook files |
+
+```sh
+python3 crux/scripts/generate-flow-surface.py --dry-run   # exit 0 clean; 1 with JSON on DRIFT or BROKEN; the check-drift row
+python3 crux/scripts/generate-flow-surface.py             # rewrites the record whole; refuses while BROKEN
+```
+
+BROKEN (hard) means an essential does not hold, so regenerating would bless a broken surface: an upstream script or a flag
+Flow passes is gone; a seam function changed its arguments; an imported symbol is gone; a role gained a delegation target; a
+run, promptbook or manifest format Flow does not read appeared; the roster lost the surface row; rewritten upstream text is no
+longer found. DRIFT means the record is out of date. Within it, a removed command, upstream script, import, roster row or skill is
+`hard`; everything else (an added flag, a changed skill contract, a role losing a tool, a moved upstream version) is a
+`notice`. Read the changes, then regenerate in the same commit as the change that caused them.
+
+Not built: `crux-flow upstream update`, one verb that runs prepare, verify and the regeneration and refuses on a hard failure.
+`prepare` already regenerates the record and `verify` already checks it, so the verb would only chain them; it waits for a
+checkout with real ancestry, where it can be tested on a real release.
+
+This source archive preserves reconstructed source provenance; it does not invent the original Git history. For long-term
+upstream maintenance, integrate it on a branch rooted at the recorded Crux 3.25.1 commit using the accompanying upstream patch.
+Daily operation and packaging do not need that historical checkout.
 
 ## Verification and platform boundary
 
@@ -689,6 +744,11 @@ uv run --group test python -m pytest
 uv run --group test python tools/verify.py --core
 uv run --group upstream-test python tools/verify.py --full
 ```
+
+Beyond the unit tests: `tests/flow/test_scenarios.py` drives the real CLI and upstream's own writer through scripted scenarios
+(`tests/flow/scenarios/*.json`, one claim each); `tests/flow/test_run_properties.py` walks the run state machine with seeded random
+actions; `tests/flow/test_behaviour_live.py` (opt in) asks free OpenRouter models whether they follow the skill's rules and reports a
+rate. The README's "How to prove it" lists each command.
 
 The full upstream group declares Crux's pinned grammar/extractor dependencies. The
 verifier preflights dependencies before starting broad suites. Offline host adapters

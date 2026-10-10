@@ -1,0 +1,77 @@
+{
+ "name": "edit-after-check-makes-evidence-stale",
+ "claim": "A check receipt is fingerprinted to its inputs; editing an input afterwards invalidates it.",
+ "steps": [
+  {
+   "write": {
+    "change.json": "{\"goal\": \"Fix add() so it adds\", \"change_kind\": \"repair\", \"outcomes\": [{\"id\": \"add-fixed\", \"outcome\": \"add(2, 3) returns 5\", \"evidence\": \"the check passes\", \"constraints\": [\"keep the signature\"], \"writes\": [\"calc.py\"]}], \"checks\": [{\"id\": \"tests\", \"argv\": [\"$PY\", \"-c\", \"import calc; assert calc.add(2,3)==5\"], \"inputs\": [\"calc.py\"], \"toolchain\": \"Python 3\"}]}"
+   }
+  },
+  {
+   "cli": [
+    "run",
+    "start",
+    "--host",
+    "codex",
+    "--spec",
+    "change.json"
+   ],
+   "exit": 0,
+   "capture": {
+    "RUN": "run"
+   },
+   "stdout": {
+    "status": "ACTIVE"
+   }
+  },
+  {
+   "write": {
+    "calc.py": "def add(a, b):\n    return a + b\n"
+   }
+  },
+  {
+   "cli": [
+    "run",
+    "advance",
+    "--file",
+    "$RUN",
+    "--result",
+    "fixed"
+   ],
+   "exit": 0
+  },
+  {
+   "cli": [
+    "run",
+    "check",
+    "--file",
+    "$RUN",
+    "--label",
+    "tests"
+   ],
+   "exit": 0
+  },
+  {
+   "write": {
+    "calc.py": "def add(a, b):\n    return a + b\n# edited after the check\n"
+   }
+  },
+  {
+   "snapshot": true
+  },
+  {
+   "cli": [
+    "run",
+    "advance",
+    "--file",
+    "$RUN",
+    "--result",
+    "tests executed"
+   ],
+   "exit": "nonzero"
+  },
+  {
+   "unchanged": true
+  }
+ ]
+}

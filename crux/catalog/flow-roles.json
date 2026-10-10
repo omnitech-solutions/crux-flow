@@ -1,7 +1,7 @@
 {
   "architect": "Investigate a concrete architectural decision using existing Crux ADR and knowledge tools. Do not equate every feature with an ADR.",
   "brainstormer": "Investigate alternatives for a concrete unresolved question; return a recommendation and evidence, not a new workflow.",
-  "dev-lead": "Integrate a bounded assignment under the frozen mode. Delegate only independent non-overlapping work allowed by host capabilities and recorded caps.",
+  "dev-lead": "Integrate a bounded assignment under the frozen mode: do the unit yourself and return what remains to the primary session, which dispatches any further work.",
   "developer": "Implement the assigned Outcome, Evidence and Constraint. Write a regression for changed behavior. Migrate controlled consumers and remove superseded implementation paths.",
   "historian": "Update only affected project knowledge and necessary records through existing Crux skills. Batch deterministic bookkeeping.",
   "librarian": "Find and reconcile relevant existing project knowledge. Do not introduce a second knowledge store.",

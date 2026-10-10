@@ -64,12 +64,12 @@ def _technology(value: Any) -> dict:
     if not isinstance(section['layers'],list) or not section['layers']: raise FlowError('technology needs at least one layer')
     seen=set()
     for layer in section['layers']:
-        mapping(layer,allowed={'id','paths','technologies','read','rules','commands','never'},required={'id','paths'})
+        mapping(layer,allowed={'id','paths','technologies','references','read','rules','commands','never'},required={'id','paths'})
         if not isinstance(layer['id'],str) or re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*',layer['id']) is None or layer['id'] in seen:
             raise FlowError('technology layer ids must be distinct lowercase names')
         seen.add(layer['id'])
         if not _names(layer['paths'],'layer paths'): raise FlowError('a technology layer needs at least one path')
-        _names(layer.get('technologies',[]),'layer technologies'); _names(layer.get('never',[]),'layer never-list')
+        _names(layer.get('technologies',[]),'layer technologies'); _names(layer.get('references',[]),'layer references'); _names(layer.get('never',[]),'layer never-list')
         read=mapping(layer.get('read',{}),allowed={'project','captures'})
         for name in [*layer['paths'],*_names(read.get('project',[]),'project references'),*_names(read.get('captures',[]),'captures'),*_names(layer.get('rules',[]),'rules')]:
             relative(name)
