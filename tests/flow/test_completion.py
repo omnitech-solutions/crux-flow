@@ -382,3 +382,15 @@ def test_flow_mode_librarian_holds_no_shell_and_upstream_mode_keeps_upstream_rol
         assert [r for r in yaml.safe_load(upstream.split('---', 2)[1])['permissions'] if r['action'] == 'shell' and r.get('effect') == 'allow']
     elif host == 'omp':
         assert 'bash' in yaml.safe_load(upstream.split('---', 2)[1])['tools']
+
+
+def test_the_retained_release_keeps_the_mode_the_manifest_records(tmp_path, release):
+    # Upstream 3.27 ships an executable script (check-refutation-record.py); the retained copy used to be written 0644 and
+    # then failed its own manifest check ("release payload permission mismatch").
+    repo = tmp_path / 'repo'; home = tmp_path / 'home'; repo.mkdir(); home.mkdir(); native = Native('codex')
+    plan = lifecycle.plan_install(PLUGIN, Path(release['root']), repo=repo, home=home, host='codex', scope='user',
+        host_home=home / 'codex', executable='/test/codex', runner=native)
+    lifecycle.apply_install(plan, runner=native)
+    kept = [p for p in (home / lifecycle.STORE).rglob('check-refutation-record.py')]
+    assert kept and all(p.stat().st_mode & 0o111 for p in kept)
+    assert packaging.inspect(next(p for p in kept[0].parents if (p / 'release-manifest.json').exists()))['digest']

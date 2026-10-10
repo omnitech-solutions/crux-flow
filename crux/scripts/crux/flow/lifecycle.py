@@ -212,7 +212,8 @@ def plan_install(plugin: Path,source: Path,*,repo: Path,home: Path,host: str,sco
             files={}
         else:
             files={f'{STORE}/{release["digest"]}/{name}':path.read_bytes() for path,name in packaging._files(source_root)}
-        modes={name:0o755 if '/bin/' in name else 0o644 for name in files}
+        # The retained copy keeps the mode the release manifest records (an executable upstream script stays executable).
+        modes={f'{STORE}/{release["digest"]}/{name}':0o755 if path.stat().st_mode & 0o111 else 0o644 for path,name in packaging._files(source_root)} if files else {}
         release_plan=managed.plan(home,files,owner='release-retention',modes=modes)
         effective=policy.resolve(engine,repo,home,host)
         root,outputs,_=materialize.updates(engine,effective,repo=repo,home=home,scope=scope,

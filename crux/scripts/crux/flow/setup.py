@@ -54,7 +54,8 @@ def setup(plugin: Path,*,repo: Path,home: Path,selected: dict[str,str],runner=ex
             return {'state':'partial','hosts':outcomes,'cli':'not activated','plan':public}
         if not plans:
             updates={f'{lifecycle.STORE}/{release["digest"]}/{name}':path.read_bytes() for path,name in packaging._files(Path(built['root']))}
-            managed.apply(managed.plan(home,updates,owner='CLI-release-retention',modes={p:0o755 if '/bin/' in p else 0o644 for p in updates}))
+            modes={f'{lifecycle.STORE}/{release["digest"]}/{name}':0o755 if path.stat().st_mode & 0o111 else 0o644 for path,name in packaging._files(Path(built['root']))}
+            managed.apply(managed.plan(home,updates,owner='CLI-release-retention',modes=modes))
         try: activation=managed.apply(command_plan)
         except (FlowError,OSError):
             return {'state':'partial','hosts':outcomes,'cli':'activation failed; inspect the scoped transaction journal','plan':public}
