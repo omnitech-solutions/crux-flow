@@ -37,9 +37,8 @@ providers:
 aliases:
   fable-latest: openrouter/anthropic/claude-fable-5.1
   opus-latest: openrouter/anthropic/claude-opus-5.5
-  opus-stable: openrouter/anthropic/claude-opus-4.8
   sonnet-latest: openrouter/anthropic/claude-sonnet-5.5
-  haiku-latest: openrouter/anthropic/claude-haiku-4.5
+  haiku-latest: openrouter/anthropic/claude-haiku-5.5
   kimi-latest: openrouter/moonshotai/kimi-k3
   sol-latest: openrouter/openai/gpt-6.1-sol
   qwen-max: openrouter/qwen/qwen3.8-2.4t-a95b
@@ -67,7 +66,9 @@ aliases:
 # override does in the Table 4 header. Re-pointing an authorized override to a
 # successor model is a catalog edit that records its own basis.
 agents:
-  architect: flagship
+  architect:
+    level: flagship
+    opencode: opus-latest
   brainstormer: flagship
   # commander: Claude Code override to Opus 5.5, from the 2026-09-22 trial.
   # Opus met every acceptance criterion for the commander at 55% lower cost
@@ -76,7 +77,7 @@ agents:
   commander:
     level: apex
     claude: claude-opus-5-5
-    opencode: glm-latest
+    opencode: kimi-latest
   dev-lead:
     level: flagship
   developer:
@@ -142,7 +143,7 @@ levels:
       verified: "2026-09-22"
       source: "Codex 0.155.1 models_cache.json fetched 2026-09-22"
   flagship:
-    claude: opus
+    claude: claude-opus-5-5
     opencode: sol-latest
     codex:
       model: gpt-6.1-sol

@@ -35,6 +35,30 @@ This skill is portable across Claude Code, Codex, and OpenCode. This section ove
 
 Promptbooks separate the frozen plan in `<docs_dir>/promptbooks/active/` from the run snapshot in `<docs_dir>/promptbooks/runs/`. Start, advance, and abandon change run state, never prompt content. Status derives a view without changing run state. Resolve the repository and `<docs_dir>` through `crux-config.py` before following any operation. Live execution accepts structured `.yaml` books and runs only. Historical `.md` records remain readable through status and documentation readers.
 
+## Explicit execution formats
+
+Structured YAML format one retains its original structure, hash and cycle classification.
+New cycle books use format two; their runs use format two with initial
+`implementation_bindings: []`. Format two requires a hash-bound `cycle_kind` and
+complete `implementation_slots`, including an explicit empty list for incidental choices.
+It refuses grandfathering, unknown kinds, invalid counts and module order before
+classification, even without run-start history. Never convert a live or archived run
+implicitly. Historical Markdown remains readable under the existing refusal boundary.
+Implementation Decisions preserve reasoning without governing authority. Only a
+successful lawful close writes approval. Independently reviewed results establish
+historical delivery; source verification at the queried revision establishes current state.
+No Implementation Decision authorizes extra scope, spend or external actions.
+
+Book/run format and council evidence versions are independent. Live execution of
+both book formats uses the current attempt-aware gate. New council records use
+format two and attempts use format one. A legacy council record is admissible
+only when committed run-start history proves its pre-cutover base.
+New formal closes retain gate context three with approval profile four.
+Historical context two/profile three and context one/profile two remain immutable and serve historical replay only.
+Never choose an approval profile from the book format or substitute a current registry
+for a committed historical context. Unknown or inconsistent context refuses approval.
+Keep frozen books unchanged; record execution corrections through the owning historian.
+
 ## Select the operation
 
 Choose one operation from the user's intent and **read its exact local reference before the first side effect**. The references are part of this skill's installed directory. If the selected reference is missing or unreadable, refuse that operation and report the missing path. Do not substitute another operation's procedure or rely on memory.
@@ -43,10 +67,11 @@ Choose one operation from the user's intent and **read its exact local reference
 |---|---|---|
 | Start a new run | `references/start.md` | Creates snapshot, updates book and indexes, records start op |
 | Complete, skip, or block a prompt | `references/advance.md` | Updates snapshot and book pointer only |
+| Issue or advance a gate prompt | `references/gates.md` | Council runner or reviewer reports as evidence; the gate check decides |
 | Deliberately abandon a run | `references/abandon.md` | Records run-level abandonment and book pointer |
 | Ask for status, progress, or how to resume | `references/status.md` | Reads state; only explicit Markdown writes an artifact and one log operation |
 
-If an active run already exists, continue through its authorized prompts without per-step permission. Only the stop points in `docs/AGENTS.md` §11 apply. A prompt's assignment carries the book's whole Evidence and Constraint, even when its Outcome is narrowed. Preserve independent review and required gates. An advance changes exactly the run snapshot and active-book pointer; it does not regenerate indexes, call `log-work`, or add a per-prompt log entry. Status does not advance the run. A completed or deliberately abandoned run is archived through `archive-promptbook`.
+If an active run already exists, continue through its authorized prompts without per-step permission. Only the stop points in `docs/AGENTS.md` §11 apply. Before you issue every prompt, run the gate-information query `advance-run.py <run> --book <book> --gate-info --prompt <n>` (a commander holds no shell, so it dispatches the historian) and follow any `correction_notice` before you act on the prompt text. Read `references/gates.md` when the query reports the class `council`, `module-close` or `independent-review`. When `adr_acceptance_pending` is non-empty, do not issue the prompt; the "Module close on an `adr-*` module" paragraph in `references/gates.md` section 4 names the remedy for each entry. A prompt's assignment carries the book's whole Evidence and Constraint, even when its Outcome is narrowed. Preserve independent review and required gates. Every `--outcome` needs a resolvable book whose content hash matches the run's `book_content_hash`. An ordinary advance changes the run snapshot and active-book pointer; a formal format-two close also retains immutable evaluated gate context; it does not regenerate indexes, call `log-work`, or add a per-prompt log entry. Status does not advance the run. A completed or deliberately abandoned run is archived through `archive-promptbook`.
 
 ## Objectives context for execution
 
@@ -96,6 +121,16 @@ After resolving `<docs_dir>`, identify the exact active book path and its pointe
 | `.md` | (ignored) | refuse start, advance, or abandon before mutation |
 
 For a `.md` book or run, name every affected path and refuse before mutation. Give the state-specific route: if all remaining prompts can be **truthfully** completed, use public Crux `v3.23.2` (tag `v3.23.2`, commit `08ee30ec2f1d1b4b0ce970f2e1582bb4f83cd20d`) on a copy to finish and archive the Markdown run. Convert the book before its run, validate YAML, then upgrade. An already archived eligible Markdown run can be converted there. The tag has **no verified deliberate Markdown-abandon route**. If a run cannot finish, keep its original `in_progress` state and bytes: it is stranded and non-retryable on the current distribution. It remains readable history, and separate YAML books and runs may proceed. Never mark an unfinished prompt done or skipped merely to migrate; never convert an in-progress run in place. The upgrade guide gives acquisition steps. Status may read historical `.md` records without changing them.
+
+## Orchestration rules a run follows
+
+The commander, dev-lead, developer and historian agent definitions, the cycle module templates and `run-promptbook`'s `references/gates.md` carry these rules. This section summarizes each rule; those sources carry the full text.
+
+- **Tester.** One designated tester runs the full suite; the dev-lead may run its own; one full suite runs at a time. The tester may reuse a matching passing record for an unchanged tree.
+- **Commit lane.** A run has one commit lane. The tester's window runs from the tester's dispatch until the tester returns. The agent that dispatched the tester holds the window. While it is open, that agent commits nothing to the main checkout, convenes no council, runs no live-tree tool, and dispatches no agent that does.
+- **Hand-back.** A hand-back with work in flight states that first, then lists each running dispatch with its result file.
+- **Worktree base.** Developer worktrees start from the run's current HEAD or are rebased before integration.
+- **Owner exception.** An owner-exception record is written only from the owner's own instruction. The owner's instruction is a decision the owner stated in the owner's own message in the session. An agent report, a result file, a run note or a council verdict is never an owner's instruction.
 
 ## When to use
 

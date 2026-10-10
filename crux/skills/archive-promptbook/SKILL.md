@@ -35,7 +35,7 @@ The terminal-state operation for a promptbook's lifecycle. A book is born in `do
 
 | extension | `format_version` | route |
 |---|---|---|
-| `.yaml` | present | validate and continue with top-level YAML keys (`status`, `completed_at`, `archive_note`) per `promptbook.schema.json` / `run.schema.json` |
+| `.yaml` | `"1"` or `"2"` | validate and continue with top-level YAML keys (`status`, `completed_at`, `archive_note`) per `promptbook.schema.json` / `run.schema.json` |
 | `.yaml` | absent | malformed YAML; refuse before mutation |
 | `.md` | (ignored) | refuse before mutation, naming the book and run paths |
 
@@ -44,6 +44,15 @@ For a `.md` book or run, refuse before mutation and name both affected paths: `<
 **Archived books are immutable.** Once a book lives under `docs/promptbooks/archive/`, no skill — including this one — may rewrite, re-archive, or un-archive it. To pursue further work, author a successor book that names this one in its prose (per the abandon rule in `docs/AGENTS.md` §4) — never re-open an archived one.
 
 Pairs with: `author-promptbook` (creates the book), `run-promptbook` (executes prompts and writes run snapshots). Distinct from `audit-docs` (catches drift, never archives) and from `log-work` (journals progress, never moves files).
+
+## Preserve the execution format and reasoning
+
+Archive format-one and format-two YAML records under the semantics they started with.
+Unknown or missing versions refuse. Never upgrade history during archival. Format-two
+slot declarations, approval bindings, reviewed revisions and results remain addressable
+under the book/run/slug identity after the book moves. Archival grants no governing or
+current-state authority to an Implementation Decision. It changes neither reviewed
+reasoning nor independently reviewed delivery evidence.
 
 ## When to use
 
@@ -130,6 +139,8 @@ Run `uv run "${CRUX_PLUGIN_ROOT}/scripts/crux-config.py"` from the repo root (or
 
 ### 1. Verify preconditions
 
+Before book discovery or recursive walking, prune retained demonstration holdings: list the holdings once with `uv run "${CRUX_PLUGIN_ROOT}/scripts/authority-view.py" retained-roots --repo-root <repo-root>` and skip each listed root during recursive walks; test one path with `uv run "${CRUX_PLUGIN_ROOT}/scripts/authority-view.py" retained --repo-root <repo-root> <path>` (exit 0, `retained` true or false). Never read held configuration, books or runs to establish parent archive eligibility. Held records contribute no indexes or allocation counts. A layout refusal stops the walk before any archive mutation. The holding contract is `docs/AGENTS.md` §3; direct concern globs need no recursive scan.
+
 - Identify the book's exact path under `docs/promptbooks/active/` and its pointed-to run path. Apply the Markdown refusal above if either is `.md`, before reading archive eligibility or changing any file. Confirm the YAML book has `status: active` and is in `active/` (not `archive/`).
 - Read the current YAML run snapshot at `docs/promptbooks/runs/<id>-<slug>/run-<current_run>.yaml`.
 - Determine which eligibility path applies. For Path 1, walk every prompt and confirm each state is `done`, `skipped`, or `blocked`. For Path 2, read the run's `abandonment.kind` and confirm it is `deliberate`.
@@ -140,7 +151,12 @@ Run `uv run "${CRUX_PLUGIN_ROOT}/scripts/crux-config.py"` from the repo root (or
     docs/promptbooks/active/<id>-<slug>.yaml
   ```
 
-  Refuse the archive on a non-zero exit, and surface the reported errors. **The order is the point.** The next bullet branches on `cycle_kind`, and `cycle_kind` is not in the frozen-plan subset that `book_content_hash` covers — so flipping a book from `patch` to `adr` mid-run moves no hash, trips no `CHK-PB-BIND`, and silently deletes the containment gate the tier pays for. The validator catches the flip: a flipped book still carries the `blast_radius` and per-prompt `phase` fields that only a `cycle_kind: patch` book may carry, so it no longer validates as the kind it now claims to be. Pin `--kind promptbook` rather than relying on auto-detect, so a book whose keys were edited cannot be validated as some other kind.
+  Refuse the archive on a non-zero exit, and surface the reported errors. **The order is the point.** The next bullet branches on `cycle_kind`, and in format one, `cycle_kind` is not in the frozen-plan subset that `book_content_hash` covers — so flipping a book from `patch` to `adr` mid-run moves no hash, trips no `CHK-PB-BIND`, and silently deletes the containment gate the tier pays for. The validator catches the flip: a flipped book still carries the `blast_radius` and per-prompt `phase` fields that only a `cycle_kind: patch` book may carry, so it no longer validates as the kind it now claims to be. Pin `--kind promptbook` rather than relying on auto-detect, so a book whose keys were edited cannot be validated as some other kind.
+- For format two, canonical hash binding also covers kind and full implementation
+  slots. Validate the chosen format before branching and require the pointed-to run
+  to retain its own format and frozen hash. Do not treat unknown history as permission
+  to grandfather or bypass a close.
+
 - For a `cycle_kind: patch` book, run the blast-radius check and read its exit code as the three-lane gate above.
 - If any precondition fails, **refuse** (see above). Do not write anything.
 
@@ -165,7 +181,7 @@ In `docs/promptbooks/archive/<id>-<slug>.yaml`:
 
 - Set `status: archived` (was `active`).
 - Set `current_run: null` and `current_prompt: null` — there is no active run against an archived book. This skill is the SOLE writer that nulls `current_run`; `run-promptbook` leaves the book's pointer untouched on both a completed and an abandoned advance.
-- Leave `created_at`, `total_prompts`, `forked_from`, `tags`, `title`, `id`, `format_version`, `cycle_kind`, `blast_radius`, `goal`, `strategy`, `prompts` (including each prompt's `phase`), and `modules`/`run_autonomy` if present untouched.
+- Leave `created_at`, `total_prompts`, `forked_from`, `tags`, `title`, `id`, `format_version`, `cycle_kind`, `blast_radius`, `goal`, `strategy`, `prompts` (including each prompt's `phase`), and `modules`/`run_autonomy`/`implementation_slots` if present untouched. Preserve all run approval bindings and result references.
 
 **Write the `archive_note` mapping field** (per the `promptbook.schema.json` `archive_note` object). `status` / `current_run` / `current_prompt` are top-level YAML keys; the archive note becomes a top-level `archive_note` mapping:
 
@@ -231,7 +247,7 @@ Report to the user:
 - [ ] Eligibility came from the book's CURRENT run, by exactly one of the two paths — `completed` with every prompt terminal, or `abandoned` with `abandonment.kind: deliberate`.
 - [ ] A `superseded` abandonment, or an `abandoned` run with no `abandonment` mapping, was REFUSED.
 - [ ] Current run snapshot has `completed_at: <timestamp>` set; on Path 1 `status: completed`, on Path 2 `status: abandoned` and the `abandonment` mapping both left untouched.
-- [ ] `validate-promptbook.py --kind promptbook` ran on the book and exited 0 BEFORE anything branched on `cycle_kind` (the guard against a mid-run kind flip, which the binding hash does not cover).
+- [ ] `validate-promptbook.py --kind promptbook` ran on the book and exited 0 BEFORE anything branched on `cycle_kind` (the guard against a mid-run kind flip; format two also hash-binds the kind).
 - [ ] For a `cycle_kind: patch` book: `check-blast-radius.py` exited 0, and its exit code was read as a three-lane gate (1 = finding, 2 = fail-closed), not as a log line.
 - [ ] No per-prompt entries in the run snapshot were modified.
 - [ ] Book file is now at `docs/promptbooks/archive/<id>-<slug>.<ext>` (same extension as source); nothing remains at the active path.

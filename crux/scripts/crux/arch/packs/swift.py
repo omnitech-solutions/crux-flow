@@ -65,6 +65,8 @@ from typing import NamedTuple
 from . import swift_generators, swift_prune, swift_xcinputs, swift_xcode
 
 from ..core import (
+    _retained_source_filter,
+    _retained_source_walk,
     DetectResult,
     InputClass,
     Probe,
@@ -386,9 +388,10 @@ def detect(root: Path) -> DetectResult:
     top-level `.swift` file, nor an `.xcodeproj` directory with no
     `project.pbxproj` inside it (a stripped or partial checkout).
     """
+    held = _retained_source_filter(root)
     markers: list[str] = []
     for entry in sorted(root.iterdir()) if root.is_dir() else []:
-        if entry.is_symlink():
+        if entry.is_symlink() or held(entry):
             continue
         name = entry.name
         if name == "Package.swift" and entry.is_file():
@@ -436,7 +439,7 @@ def _swift_walk(root: Path):
     `*.xcodeproj` bundle for `project.pbxproj` — still can, without walking
     further into it.
     """
-    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+    for dirpath, dirnames, filenames in _retained_source_walk(root, root):
         dirp = Path(dirpath)
         rel_dir = "" if dirp == Path(root) else _rel_str(root, dirp)
         normal: list[str] = []

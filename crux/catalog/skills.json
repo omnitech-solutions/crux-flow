@@ -183,7 +183,7 @@
   {
     "id": "council",
     "name": "council",
-    "description": "Convene multiple models to evaluate approaches, tradeoffs, or architectural decisions and return their judgments.",
+    "description": "Convene a three-provider council to judge a decision (\"run the council\", \"ask the council\"); inside a cycle run, the council runner writes the council record that is the gate's evidence.",
     "tags": [
       "verification",
       "multi-model",
@@ -237,7 +237,7 @@
   {
     "id": "dev-cycle",
     "name": "dev-cycle",
-    "description": "Plan an architectural change through a full development cycle with ADRs, council approval, implementation, and independent review.",
+    "description": "Plan an architectural change or a replaceable implementation choice through council review, implementation, and independent review.",
     "tags": [
       "promptbooks",
       "workflow",
@@ -248,7 +248,7 @@
       "crux-docs"
     ],
     "risk_level": "low",
-    "routing_note": "Net-new/architectural work. Allocates next `PB-NNNN`; assembles a modular cycle book (\u2265 13 prompts, `cycle_kind: adr`) from ADR / dev / review modules. See `dev-cycle/SKILL.md`.",
+    "routing_note": "Architectural work or significant implementation choices under unchanged constraints. Allocates next `PB-NNNN`; assembles a modular cycle book (\u2265 13 prompts, kind adr or implementation) with council and independent review. See `dev-cycle/SKILL.md`.",
     "triggers": [
       "start a cycle",
       "new dev cycle",
@@ -980,7 +980,7 @@
   {
     "id": "run-adr-council",
     "name": "run-adr-council",
-    "description": "Run a structured multi-model council review of a specified ADR and return its verdict for the ADR approval gate.",
+    "description": "Run a multi-model council review of a specified ADR; inside a cycle run, its council record is the ADR approval gate's evidence.",
     "tags": [
       "council",
       "adr",
@@ -995,7 +995,7 @@
     "requires_env": [
       "OPENROUTER_API_KEY"
     ],
-    "routing_note": "Reads the ADR, fences its body as data, invokes the async council, returns a structured verdict; no per-ADR driver.",
+    "routing_note": "Inside a run it passes the ADR to run-council.py as a --subject, which run-council.py fences as data. Its council record is the gate evidence. Outside a run the async driver fences the ADR body itself and is informational. There is no per-ADR driver.",
     "triggers": [
       "run the council on ADR-NNNN",
       "council review ADR-NNNN",

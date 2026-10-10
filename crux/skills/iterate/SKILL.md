@@ -40,17 +40,17 @@ promptbook that drives that trip — it does not run it (`run-promptbook` does).
 
 An iterate
 book is a **cycle book with `cycle_kind: verify`** — a single structured YAML
-document (`format_version "1"`) whose cycle invariants are
+document (`format_version "2"` for new books) whose cycle invariants are
 **machine-enforced** by `validate-promptbook.py`'s cycle-coverage pass (the same
 pass that now enforces `dev-cycle`'s `cycle_kind: adr` books). Assembly is
 **list-concatenation of module YAML partials + sequential `n:` assignment**.
 
 | Module | Prompts | `module_tag` | Source template |
 |---|---|---|---|
-| **Verify** — research & reproduce, council-review the diagnosis (5 dims incl. Security + the "this is actually architectural → use dev-cycle" escape verdict), address findings, commit-approach | 4 | `verify-{M}` | `${CRUX_PLUGIN_ROOT}/templates/cycle-module-verify.yaml` |
+| **Verify** — research & reproduce, council-review the diagnosis (5 dims incl. Security + the "this is actually architectural → use dev-cycle" escape verdict, the token `ARCHITECTURAL`, which the gate check reads as the contradicted-premise stop), address findings, commit-approach | 4 | `verify-{M}` | `${CRUX_PLUGIN_ROOT}/templates/cycle-module-verify.yaml` |
 | **Dev** — derive plan, implement, quality gates, internal review | 4 | `dev-{M}` | `${CRUX_PLUGIN_ROOT}/templates/cycle-module-dev.yaml` |
 | **Review** — external multi-dim review + multi-subagent security review + test/doc + dev-practice conformance audit, fix-loop | 3 | `review-{M}` | `${CRUX_PLUGIN_ROOT}/templates/cycle-module-review.yaml` |
-| **Prep (fixed)** — changelog, docs, journal, PR draft | 1 | _none_ | inline (last-2 of `iterate-promptbook-template.yaml`) |
+| **Prep (fixed)** — changelog, docs, journal, result record, PR draft | 1 | _none_ | inline (last-2 of `iterate-promptbook-template.yaml`) |
 | **Summary (fixed)** — completion report + archive | 1 | _none_ | inline (last-1 of `iterate-promptbook-template.yaml`) |
 
 The dev + review module partials are **reused unedited from `dev-cycle`** —
@@ -80,14 +80,42 @@ produce a book that passes it:
 2. **Every verify module MUST have its council prompt** (ordinal 2). The verify
    module is atomic — you cannot splice in a "research" prompt without the
    council-review-and-commit sequence. The council reviews the *diagnosis*; that
-   is the iterate cycle's load-bearing artifact (the ADR's analogue).
+   is the iterate cycle's load-bearing artifact (the ADR's analogue). Its
+   `--round` is the number of council records with outcome `ran` already in the
+   module, plus one; a could-not-run record takes no place, so you reconvene
+   with the same number after fixing its cause, and `run-council.py` refuses a
+   mismatch before any call. The council runner commits the attempt record and the council record itself.
+   The gate reads only a committed record. A preflight refusal the conductor may
+   repair writes no council record: repair its input and run again. The third
+   preflight refusal at one convening prompt takes the escalation-loop stop. On
+   exit 2 whose stderr names `timeout`, or names outside work the commit moved,
+   report a contradicted-premise stop first: the owner restores the set-aside
+   work, then removes a stale `index.lock`. Then, as on every other exit 2, run
+   the process check and the lock probe, then
+   `run-council.py --recover <run> --prompt <n>`, and never convene another
+   round over a claimed attempt. A council runner that ended without an exit
+   code, or with a code other than 0, 1 and 2, gets the same recovery: never
+   convene another round until recovery reports. Never record a witness to
+   repair a preflight refusal: a subject with no witness taken at its write
+   goes to the owner. `run-promptbook`'s `references/gates.md` holds the repair
+   and the recovery steps.
 3. **Every artifact produced MUST have a review module** that closes its MUST-FIX
    findings. A cycle without ≥1 external review module ships unreviewed work.
 
 Plus the cross-checks the pass enforces: `cycle_kind: verify` ⟷ `modules:
-{verify, dev_loops, review_cycles}` ⟷ only `verify-`/`dev-`/`review-` module tags
+{adrs: 0, implementations: 0, verify, dev_loops, review_cycles}` ⟷ only `verify-`/`dev-`/`review-` module tags
 (**adr/verify mutual exclusion** — an iterate book never carries `adr-` tags),
 and exactly 2 untagged (prep + summary) prompts.
+
+## Orchestration rules a run follows
+
+The commander, dev-lead, developer and historian agent definitions, the cycle module templates and `run-promptbook`'s `references/gates.md` carry these rules. This section summarizes each rule; those sources carry the full text.
+
+- **Tester.** One designated tester runs the full suite; the dev-lead may run its own; one full suite runs at a time. The tester may reuse a matching passing record for an unchanged tree.
+- **Commit lane.** A run has one commit lane. The tester's window runs from the tester's dispatch until the tester returns. The agent that dispatched the tester holds the window. While it is open, that agent commits nothing to the main checkout, convenes no council, runs no live-tree tool, and dispatches no agent that does.
+- **Hand-back.** A hand-back with work in flight states that first, then lists each running dispatch with its result file.
+- **Worktree base.** Developer worktrees start from the run's current HEAD or are rebased before integration.
+- **Owner exception.** An owner-exception record is written only from the owner's own instruction. The owner's instruction is a decision the owner stated in the owner's own message in the session. An agent report, a result file, a run note or a council verdict is never an owner's instruction.
 
 ## When to use
 
@@ -99,15 +127,18 @@ and exactly 2 untagged (prep + summary) prompts.
   **not** introduce a new architectural decision.
 
 Do **NOT** use this skill for:
-- **Net-new or architectural work** — a feature, a new contract, a decision worth
-  recording. Use `dev-cycle` (it has the ADR module). If an iterate cycle's
+- **Net-new or architectural work** — a feature, a new contract, or a change to an
+  enduring constraint. Use `dev-cycle` (it has the ADR module). A replaceable
+  approach whose reasoning must survive retrieval changes no enduring constraint.
+  Declare a verify slot for it before start, and record it as an Implementation
+  Decision in that slot. The existing verify council reviews that revision. If an iterate cycle's
   verify council concludes the work is actually architectural, it STOPS and
   routes the user to `dev-cycle` (the escape verdict).
 - **A reversible fix you can bound by declared paths and finish in one implement
   prompt** — that is `patch-cycle`, the third tier: five phases (verify, plan,
   implement, review, summary), one prompt each, with a blast radius declared at
   authoring and checked at archive. It still pays a council and a review. The
-  13-prompt floor and the `4N+4M+3K+2` formula here are unchanged by it.
+  13-prompt floor and the module-cycle formulas here are unchanged by it.
 - **A defect that passes `fix-directly`'s sizing test** — its files nameable
   now, a failing test writable before the fix, no contract changed, one
   instance. That is `fix-directly`: no book, no council, no PB number. A
@@ -115,6 +146,35 @@ Do **NOT** use this skill for:
 - **A bespoke plan that needs no gate** — `author-promptbook` (no enforced rigor).
 - Authoring a non-cycle plan (`author-promptbook`) or running a book
   (`run-promptbook`).
+
+### Formal implementation reasoning within verify
+
+Declare a verify-N slot before start for a replaceable approach or material
+alternative whose reasoning must survive retrieval. Explicit `implementation_slots: []` permits
+incidental choices without a formal record. For a selected formal record, retain
+its exact revision in the existing council and ask every diagnosis dimension plus
+architectural conflict. Diagnosis-only approval is insufficient. Successful ordinal-four
+advance selects `--implementation-revision` and binds approval atomically with DONE.
+No extra council ceremony is added. A material revision requires fresh approval at a
+lawful gate; completed prompts never reopen. Preserve earlier reasoning without revocation.
+A genuine conflict with architecture routes to the architectural decision process.
+Format-one and Markdown records retain their original readable semantics.
+
+
+Every initial or revised formal revision or migration-batch subject write records
+its bytes immediately, before its commit:
+
+```bash
+uv run "${CRUX_PLUGIN_ROOT}/scripts/run-work-witness.py" record <run-RUN-NNN.yaml> --prompt <n> --path <subject-path>
+```
+
+Never create a witness after a refusal. Both book formats use the current
+attempt-aware gate. New formal closes retain context three/profile four;
+historical context two/profile three and context one/profile two remain immutable and replay-only.
+Finish any open Git merge or other sequence before council. Runner and recovery
+own attempt/result commits. Follow `run-promptbook`'s `references/gates.md` for
+authorized preflight repair, the third-refusal stop, process/lock checks and
+request-free recovery. Persistence failure permits recovery, never repeat deliberation.
 
 ### The cycle taxonomy (the routing question)
 
@@ -138,8 +198,12 @@ Do **NOT** use this skill for:
   - `--verifies V` (V ≥ 1) — e.g. two verify modules for two distinct issues.
   - `--dev-loops D` (D ≥ 1) — e.g. two when the fix splits cleanly.
   - `--review-cycles R` (R ≥ 1) — e.g. two for a mid-cycle review.
-- **Optional** `--deep-review` — forces the verify council's deeper review on
-  round 1 (same flag semantics as `dev-cycle`).
+- **Optional** `--deep-review` — round 1 of each verify council also passes the
+  ADR index, every ADR the diagnosis cites and `docs/AGENTS.md` as `--subject`
+  files (the same flag as in `dev-cycle`). Record the flag when you assemble
+  the book: end its `strategy` with the sentence "This book was authored with
+  `--deep-review`." The verify council prompt reads the flag there. It is a
+  `run-council.py` round counted like any other, with no srde and no `Agent`.
 
 When called interactively (no flags), elicit counts:
 
@@ -181,7 +245,7 @@ full 13-prompt skeleton) and do only token substitution. When any count > 1:
 
 1. Start from the canonical template's top-level keys (`format_version`, `id`,
    `title`, `status`, `created_at`, `total_prompts`, `current_run`,
-   `current_prompt`, `forked_from`, `tags`, `cycle_kind`, `modules`, `goal`,
+   `current_prompt`, `forked_from`, `tags`, `cycle_kind`, `modules`, `implementation_slots`, `goal`,
    `strategy`, `run_autonomy`) — everything except `prompts:`, which you rebuild.
 2. Build `prompts:` by concatenating: all verify modules
    (`cycle-module-verify.yaml`, `module_tag: verify-i`, substitute `{M}`→`#i`/`""`
@@ -198,7 +262,7 @@ Set the book's top-level YAML keys (flat top-level keys in the structured
 document — NOT Markdown frontmatter + body):
 
 ```yaml
-format_version: "1"
+format_version: "2"
 id: PB-NNNN
 title: "Iterate: <user title>"
 status: active
@@ -209,7 +273,8 @@ current_prompt: null
 forked_from: null
 tags: [cycle, workflow, iterate]
 cycle_kind: verify
-modules: { verify: <V>, dev_loops: <D>, review_cycles: <R> }
+modules: { adrs: 0, implementations: 0, verify: <V>, dev_loops: <D>, review_cycles: <R> }
+implementation_slots: [] # or declared verify-N slots for formal approaches
 goal: |
   <the user's goal paragraph>
 # strategy + run_autonomy: carry from the canonical template (run_autonomy MUST
@@ -253,6 +318,19 @@ Re-read `manifest.yml`, confirm `promptbook.next_number` is unchanged, increment
 write back (write-then-increment, matches `author-promptbook`/`dev-cycle`). If it
 changed, another invocation raced — STOP, retry.
 
+While a tester's window is open, commit nothing and run no regenerator. The window runs from the tester's dispatch until the tester returns; outside a run there is none.
+
+After the counter bump, commit the allocated file together with the bump. Never commit the counter bump without the file it allocated. Stage only these paths (`git add -- <paths>`) and commit only them (`git commit -- <paths>`), so no change already staged is included. If a regenerator still exits 2 with `migration-input-not-committed`, another uncommitted input is in the tree: stop and name it; never commit a file this skill did not write.
+
+Then regenerate the summaries projection, then the doctrine projection, because the bump changes their input hash:
+
+```
+uv run "${CRUX_PLUGIN_ROOT}/scripts/summarize-adrs.py" --repo-root <repo-root>
+uv run "${CRUX_PLUGIN_ROOT}/scripts/compile-doctrine.py" --repo-root <repo-root>
+```
+
+Confirm `--dry-run` of each exits 0, then commit the regenerated projections so none stays uncommitted.
+
 ### 9. Regenerate `docs/promptbooks/index.md`
 
 Walk active/runs/archive (extension-agnostic); rebuild the index. The new book
@@ -276,7 +354,7 @@ Body: id, title, `total_prompts`, modules `(V×verify, D×dev, R×review)`, note
 
 - [ ] `docs/manifest.yml` `promptbook.next_number` incremented and persisted.
 - [ ] `docs/promptbooks/active/PB-NNNN-<slug>.yaml` exists with `format_version:
-      "1"`, `cycle_kind: verify`, `tags` containing `cycle`.
+      "2"`, `cycle_kind: verify`, `tags` containing `cycle`.
 - [ ] `validate-promptbook.py --kind promptbook` exits **0**. Its cycle-coverage
       pass already machine-guarantees the `4V + 4D + 3R + 2` formula, the ≥13
       floor, sequential `prompts[].n`, `modules:` ↔ `module_tag`-count
@@ -284,9 +362,8 @@ Body: id, title, `total_prompts`, modules `(V×verify, D×dev, R×review)`, note
       per-module prompt counts that **positionally** guarantee the ordinal
       contract (for template-assembled modules — the pass checks size and
       contiguity, never prompt content). Do not re-derive those by hand — exit 0
-      IS the confirmation, **unless the book sets `cycle_grandfathered: true`,
-      which short-circuits the whole pass**; a grandfathered book gets no
-      cycle-coverage checking and still exits 0.
+      IS the confirmation, **format two refuses every grandfather field before classification**. Preserve
+      format-one grandfather semantics only for original format-one records.
 - [ ] Top-level `run_autonomy` present and references `docs/AGENTS.md` §11.
       (NOT covered by the validator's cycle-coverage pass — check it yourself.)
 - [ ] `docs/promptbooks/index.md` lists the book `0/<T> (0%)`; `docs/index.md`
@@ -314,7 +391,8 @@ Body: id, title, `total_prompts`, modules `(V×verify, D×dev, R×review)`, note
   increment.
 - Mid-run (once `run-promptbook` is driving it): about to pause to confirm a step
   the prompt authorizes. Don't — the plan is the authorization (`docs/AGENTS.md`
-  §11). The genuine stops are the module escalation loops, the verify council's
+  §11). The genuine stops are the module escalation loops (a third preflight
+  refusal at one convening prompt included), the verify council's
   architectural-escape verdict, and irreversible/outward-facing actions. When an
   escalation traces to a missing capability rather than a genuine disagreement,
   `forge-skill` is a sanctioned response the escalation may name.
@@ -323,7 +401,7 @@ Body: id, title, `total_prompts`, modules `(V×verify, D×dev, R×review)`, note
 
 | Excuse | Reality |
 |---|---|
-| "This bug is architectural-ish; I'll just iterate it." | If it needs a decision, it needs `dev-cycle` (an ADR). The verify council exists to catch this — but don't knowingly mis-route. |
+| "This bug is architectural-ish; I'll just iterate it." | If the fix changes an enduring constraint, it needs `dev-cycle` (an ADR). A replaceable approach whose reasoning must survive retrieval stays here: declare a verify slot before start and record it as an Implementation Decision. The verify council exists to catch mis-routes — but don't knowingly mis-route. |
 | "The fix is tiny; I'll cut to 8 prompts." | < 13 isn't a cycle. A defect that passes the sizing test is `fix-directly`; a bounded fix that wants the gates is `patch-cycle`. The rigor is proportional to the work. |
 | "No ADR means I can skip the council." | The council is the whole point — it reviews the verified *diagnosis* instead of an ADR. Invariant #2. |
 | "I'll tag it `cycle_kind: adr` to reuse the dev-cycle template." | An iterate book is `verify`-kind. Mixing adr/verify fails the cycle-coverage pass. |
@@ -351,14 +429,14 @@ omitting `run_autonomy`) apply verbatim here. The `iterate`-specific ones:
   `{RULE_REFS}`, never with an invented `rule:<slug>` citation, and never with an
   invented `ADR-NNNN`.
 - **`modules.verify` vs `modules.adrs` key mismatch**: an iterate book's `modules:`
-  block is keyed `{ verify: V, dev_loops: D, review_cycles: R }` — the verify-count
+  block is keyed `{ adrs: 0, implementations: 0, verify: V, dev_loops: D, review_cycles: R }` — the verify-count
   key is **`verify`**, NOT `adrs` (that key belongs to `dev-cycle`'s `cycle_kind:
   adr` books). Writing `modules: { adrs: V, ... }` on a `cycle_kind: verify` book
   fails the cycle-coverage cross-check (the `modules:` keys must match the
   `cycle_kind` and the emitted `module_tag` prefixes).
 - **Setting `total_prompts` from the wrong formula**: it is `4V + 4D + 3R + 2`
   (verify modules are 4 prompts each, like ADR modules) — the same arithmetic shape
-  as `dev-cycle`'s `4N + 4M + 3K + 2`, just with the verify count in the first term.
+  as an architectural cycle's `4(A+I)+4D+3R+2`, with the verify count in the first term.
 - **Skipping the verify council prompt (ordinal 2)**: the verify module is atomic —
   research-then-council-then-commit. Splicing in a research prompt without its
   council pass breaks invariant #2 and the per-module ordinal contract.
@@ -369,7 +447,11 @@ omitting `run_autonomy`) apply verbatim here. The `iterate`-specific ones:
 - `author-promptbook` — generic multi-prompt plans with no enforced council/review.
 - `run-promptbook` — advances the iterate cycle through its prompts.
 - `archive-promptbook` — closes the completed book (the Summary prompt invokes it).
-- `council` / `srde` — the verify module's diagnosis-review (and split-verdict deepening).
+- `council` — drives the council runner for the verify module's diagnosis-review.
+- `srde` — evidence on the verify path; its output never settles a gate.[^srde]
 - `log-work` — the verify module's commit-approach entry + the prep journal entry.
 - `validate-promptbook.py` + `${CRUX_PLUGIN_ROOT}/schemas/promptbook.schema.json` — the cycle-coverage validation that an iterate book MUST pass.
 - Templates: `iterate-promptbook-template.yaml` (canonical 1×1×1), `cycle-module-verify.yaml`, and the reused `cycle-module-dev.yaml` / `cycle-module-review.yaml`.
+
+[^correct]: rule:existing-books-are-corrected-at-execution
+[^srde]: rule:de-wire-srde-from-adr-path, rule:blocking-finding-classification

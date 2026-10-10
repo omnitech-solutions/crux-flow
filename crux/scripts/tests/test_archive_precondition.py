@@ -42,12 +42,23 @@ def _cli(args):
                           capture_output=True, text=True)
 
 
+def _bare_book_hash() -> str:
+    """The content hash of the bare fixture book. `--outcome` verifies the run's
+    `book_content_hash` against the book before it writes."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_vp_for_archive_precondition", ADVANCE.parent / "validate-promptbook.py")
+    vp = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(vp)
+    return vp.compute_book_hash(vp.load_yaml("id: PB-9001\n"))
+
+
 def _run_doc(run_id="RUN-001", n_prompts=2):
     return {
         "format_version": "1",
         "run_id": run_id,
         "book_id": "PB-9001",
-        "book_content_hash": "sha256:" + "0" * 64,
+        "book_content_hash": _bare_book_hash(),
         "started_at": "2026-07-22T00:00:00Z",
         "completed_at": None,
         "status": "in_progress",

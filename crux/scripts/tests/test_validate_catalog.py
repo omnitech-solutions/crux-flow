@@ -676,7 +676,7 @@ def _fields(findings: list[dict]) -> set[str]:
 # Anchors the V5 and V7 negative fixtures splice against. Named once here
 # because four fixtures share two of them and a respelled alias table has to
 # move one string, not four. `_assert_rule` asserts each splice landed.
-_OPUS_STABLE_ROW = "opus-stable: openrouter/anthropic/claude-opus-4.8"
+_PARKED_ALIAS_ROW = "glm-flash: openrouter/z-ai/glm-5.3-flash"
 # The standard level's Claude cell, as shipped. Named once so the next re-point
 # of that cell moves one string, not four fixtures.
 _STANDARD_CLAUDE_CELL = "  standard:\n    claude: claude-sonnet-5-5"
@@ -838,8 +838,8 @@ class ModelsCatalogNegativeTests(unittest.TestCase):
 
     def test_v0_agent_row_carrying_an_unknown_key(self):
         self._assert_rule("V0", lambda t: t.replace(
-            "  architect: flagship",
-            "  architect:\n    level: flagship\n    claude_model: opus"))
+            "  brainstormer: flagship",
+            "  brainstormer:\n    level: flagship\n    claude_model: opus"))
 
     def test_v0_non_string_claude_override(self):
         self._assert_rule("V0", lambda t: _set_agent_claude(t, "commander", "42"))
@@ -962,13 +962,13 @@ class ModelsCatalogNegativeTests(unittest.TestCase):
 
     # ── V5, three ──────────────────────────────────────────────────────────
     def test_v5_unknown_provider(self):
-        self._assert_rule("V5", lambda t: t.replace(_OPUS_STABLE_ROW, "opus-stable: bogus/kimi"))
+        self._assert_rule("V5", lambda t: t.replace(_PARKED_ALIAS_ROW, "glm-flash: bogus/kimi"))
 
     def test_v5_empty_slug_half(self):
-        self._assert_rule("V5", lambda t: t.replace(_OPUS_STABLE_ROW, "opus-stable: openrouter//x"))
+        self._assert_rule("V5", lambda t: t.replace(_PARKED_ALIAS_ROW, "glm-flash: openrouter//x"))
 
     def test_v5_pending_placeholder(self):
-        self._assert_rule("V5", lambda t: t.replace(_OPUS_STABLE_ROW, "opus-stable: PENDING"))
+        self._assert_rule("V5", lambda t: t.replace(_PARKED_ALIAS_ROW, "glm-flash: PENDING"))
 
     def test_v5_codex_model_absent_from_the_router_registry(self):
         self._assert_rule("V5", lambda t: t.replace("model: gpt-6.1-sol", "model: gpt-5.6"))
@@ -1064,7 +1064,7 @@ class ModelsCatalogNegativeTests(unittest.TestCase):
 
     def test_v9_raw_model_id_in_agents_level(self):
         self._assert_rule("V9", lambda t: t.replace(
-            "  architect: flagship", "  architect:\n    level: anthropic/x"))
+            "  brainstormer: flagship", "  brainstormer:\n    level: anthropic/x"))
 
     def test_v9_raw_model_id_in_agents_claude(self):
         self._assert_rule("V9", lambda t: _set_agent_claude(t, "commander", "anthropic/claude-opus-5.5"))

@@ -474,9 +474,11 @@ _CHILD_HOOK = r"""
 # `python -c` puts the working directory on `sys.path` as `""`, and the
 # import system lists that directory for every module it imports later. The
 # child imports nothing from its working directory (the driver's directory
-# is added below), so the entry is dropped: a listing the hook records is
-# then one the derive made, wherever the suite was started from.
-sys.path[:] = [p for p in sys.path if p not in ("", ".")]
+# is added below), so every spelling of that entry is dropped. PYTHONPATH
+# may supply its absolute path; distribution lookup lists that path too.
+_working_directory = os.path.realpath(os.getcwd())
+sys.path[:] = [p for p in sys.path if p not in ("", ".")
+               and os.path.realpath(p) != _working_directory]
 _allowed_prefixes = [os.path.realpath(p) for p in ALLOWED_PREFIXES]
 _listable = {os.path.realpath(p) for p in LISTABLE_DIRS}
 _events = ("subprocess.Popen", "os.system", "os.exec", "os.posix_spawn",
@@ -493,15 +495,106 @@ outside_listings = []
 # raises is recorded apart. It is still trapped, so no git process ever runs.
 _phase = ["derive"]
 
+# CPython's `open` audit event omits os.open's dir_fd. Capture that
+# argument at the Python boundary, then let the existing audit hook check
+# the attributed event. Descriptor listings use the same provenance.
+_native_open, _native_dup, _native_dup2, _native_close = (
+    os.open, os.dup, os.dup2, os.close)
+_native_pipe = os.pipe
+_native_pipe2 = getattr(os, 'pipe2', None)
+_fd_paths = {}
+_open_context = []
+_pipe_path = '<anonymous-pipe>'
+
+def _fd_identity(info):
+    # Permission changes do not change descriptor provenance.
+    return info.st_dev, info.st_ino, info.st_mode & 0o170000
+
+def _fd_path(fd):
+    entry = _fd_paths.get(fd)
+    if entry is not None:
+        real, identity = entry
+        try:
+            if _fd_identity(os.fstat(fd)) == identity:
+                if real == _pipe_path and identity[2] == 0o010000:
+                    return real
+                # A replacement symlink can reach the same moved inode.
+                # Its old allowed spelling no longer attributes this FD.
+                if (os.path.realpath(real) == real
+                        and _fd_identity(os.stat(real, follow_symlinks=False)) == identity):
+                    return real
+        except (OSError, ValueError):
+            pass
+    _fd_paths.pop(fd, None)
+    return '<unattributed-fd:' + str(fd) + '>'
+
+def _remember_fd(fd, real):
+    _fd_paths[fd] = real, _fd_identity(os.fstat(fd))
+
+def _attributed_open(path, flags, mode=0o777, *, dir_fd=None):
+    given = os.fsdecode(os.fspath(path))
+    if dir_fd is not None and not os.path.isabs(given):
+        base = _fd_path(dir_fd)
+        real = (('<unattributed-fd:' + str(dir_fd) + '>') if base == _pipe_path
+                else base if base.startswith('<unattributed-fd:')
+                else os.path.realpath(os.path.join(base, given)))
+    else:
+        real = os.path.realpath(given)
+    _open_context.append((real, flags))
+    try:
+        fd = _native_open(path, flags, mode, dir_fd=dir_fd)
+    finally:
+        _open_context.pop()
+    _remember_fd(fd, real)
+    return fd
+
+def _attributed_dup(fd):
+    real = _fd_path(fd)
+    duplicate = _native_dup(fd)
+    _remember_fd(duplicate, real)
+    return duplicate
+
+def _attributed_dup2(fd, fd2, inheritable=True):
+    real = _fd_path(fd)
+    duplicate = _native_dup2(fd, fd2, inheritable=inheritable)
+    _remember_fd(duplicate, real)
+    return duplicate
+
+def _attributed_close(fd):
+    try:
+        return _native_close(fd)
+    finally:
+        _fd_paths.pop(fd, None)
+
+def _remember_pipe(pair):
+    for fd in pair:
+        _remember_fd(fd, _pipe_path)
+    return pair
+
+def _attributed_pipe():
+    return _remember_pipe(_native_pipe())
+
+def _attributed_pipe2(flags):
+    return _remember_pipe(_native_pipe2(flags))
+
+def _traversal_handle(real, flags):
+    # Exact ancestors may be opened only as read-only directory handles.
+    # They are never added to the prefixes that admit contents or listings.
+    return (flags & os.O_DIRECTORY
+            and flags & os.O_ACCMODE == os.O_RDONLY
+            and not flags & (os.O_CREAT | os.O_TRUNC | os.O_APPEND)
+            and any(p.startswith(real.rstrip(os.sep) + os.sep)
+                    for p in _allowed_prefixes))
+
 def _hook_real_path(path):
-    # A listing of no path lists the working directory; a file descriptor
-    # names no path, so it is not recorded.
+    # A listing of no path lists the working directory. Unknown or stale
+    # descriptors fail the report rather than disappearing from it.
     if path is None:
         path = "."
     if isinstance(path, int):
-        return None
+        return _fd_path(path)
     try:
-        return os.path.realpath(os.fspath(path))
+        return os.path.realpath(os.fsdecode(os.fspath(path)))
     except (TypeError, ValueError, OSError):
         return None
 
@@ -520,14 +613,26 @@ def _hook(event, args):
         (advisory_fired if _phase[0] == "advisory" else fired).append(event)
         raise RuntimeError("process creation trapped: " + event)
     if event == "open" or event in _listing_events:
-        real = _hook_real_path(args[0])
+        context = _open_context[-1] if event == "open" and _open_context else None
+        real = context[0] if context else _hook_real_path(args[0])
+        # Subprocess prepares anonymous pipes before the process trap fires.
+        # Only verified pipe FDs admit fdopen; they admit no filesystem path.
+        if event == "open" and isinstance(args[0], int) and real == _pipe_path:
+            return
         if real is None or _is_allowed(real, _allowed_prefixes):
+            return
+        if context and _traversal_handle(real, context[1]):
             return
         if event in _listing_events and real in _listable:
             return
         (outside_opens if event == "open" else outside_listings).append(real)
 
 sys.addaudithook(_hook)
+os.open, os.dup, os.dup2, os.close = (
+    _attributed_open, _attributed_dup, _attributed_dup2, _attributed_close)
+os.pipe = _attributed_pipe
+if _native_pipe2 is not None:
+    os.pipe2 = _attributed_pipe2
 """
 
 #: The child-process bootstrap: applies the memory bound, pre-imports the

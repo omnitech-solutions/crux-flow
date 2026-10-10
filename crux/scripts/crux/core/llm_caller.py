@@ -13,6 +13,7 @@ dotenv loading, not from process env directly.
 """
 
 import json
+import re
 import types
 import httpx
 from functools import lru_cache
@@ -207,6 +208,15 @@ class ModelConfig:
     # and an entry with no type is refused on the text path rather than assumed.
     name: str = ""
     model_type: Optional[str] = "text"
+    # Served-model strings a gate council accepts from the gateway's reply for
+    # this entry. None: the entry declares no set, so a reply cannot be verified.
+    # An empty registry list is no declared set either, and loads as None.
+    accepted_served_models: Optional[Tuple[str, ...]] = None
+    # Served-provider labels a gate council accepts from the reply's top-level
+    # `provider` for this entry: the gateway's display labels ("Google AI
+    # Studio"), not the `serving_providers` slugs the request pins. None: the
+    # entry declares no set. An empty registry list loads as None.
+    accepted_served_providers: Optional[Tuple[str, ...]] = None
 
 
 # The only two values OpenRouter's `provider.data_collection` accepts. Anything
@@ -250,6 +260,9 @@ def get_model_config(model_name: str, *, registry: Optional[Dict[str, Any]] = No
             "escape hatch for a model no zero-retention endpoint serves."
         )
 
+    accepted = _string_set(model, model_name, 'accepted_served_models')
+    accepted_providers = _string_set(model, model_name, 'accepted_served_providers')
+
     return ModelConfig(
         api_string=model['api_string'],
         display_name=model['display_name'],
@@ -267,7 +280,111 @@ def get_model_config(model_name: str, *, registry: Optional[Dict[str, Any]] = No
         data_collection=data_collection,
         name=model_name,
         model_type=model.get('type'),
+        accepted_served_models=accepted,
+        accepted_served_providers=accepted_providers,
     )
+
+
+def _string_set(model: Dict[str, Any], model_name: str, field: str) -> Optional[Tuple[str, ...]]:
+    """The entry's `field` as a tuple of strings, or None when it declares none.
+
+    An absent key and an empty list both declare no set: an entry declaring no
+    set is unverified, and an empty list declares nothing. Anything other than a
+    list of strings raises `ValueError`.
+    """
+    value = model.get(field)
+    if value is not None and (
+        not isinstance(value, list) or not all(type(a) is str for a in value)
+    ):
+        raise ValueError(
+            f"model {model_name!r} sets {field} to something other than a list of strings"
+        )
+    return tuple(value) if value else None
+
+
+class Eligibility(NamedTuple):
+    """Whether a registry key may seat a gate council, and why not."""
+
+    eligible: bool
+    reason: str
+
+
+@lru_cache(maxsize=1)
+def retired_models() -> frozenset:
+    """The tombstoned model keys: removed from the registry, never aliased.
+
+    An absent list is the empty set. A list that holds a non-string raises
+    `ValueError`. Cleared by `invalidate_model_cache`.
+    """
+    raw = load_router_config().get('retired_models', [])
+    if not isinstance(raw, list) or not all(type(k) is str for k in raw):
+        raise ValueError("retired_models must be a list of strings")
+    return frozenset(raw)
+
+
+def provider_namespace(api_string: str) -> str:
+    """The vendor namespace of an api_string: the part before the first `/`.
+
+    Raises `ValueError` when there is no `/` or the part is empty.
+    """
+    head, sep, _ = api_string.partition("/")
+    if not sep or not head:
+        raise ValueError("api_string has no provider namespace")
+    return head
+
+
+def council_eligibility(key: str) -> Eligibility:
+    """Whether registry key `key` may seat a gate council.
+
+    Reads the raw registry. Order matters: a tombstoned key is `retired` by name
+    even when it is absent from `models`, and is never aliased to a successor.
+    """
+    if key in retired_models():
+        return Eligibility(False, "retired")
+    entry = load_router_config().get('models', {}).get(key)
+    if entry is None:
+        return Eligibility(False, "unknown")
+    if not isinstance(entry, dict):
+        return Eligibility(False, "malformed-entry")
+    kind = entry.get('type')
+    if type(kind) is not str:
+        return Eligibility(False, "malformed-entry")
+    if kind not in TEXT_MODEL_TYPES:
+        return Eligibility(False, "not-text")
+    pin = entry.get('serving_providers')
+    if not pin:
+        return Eligibility(False, "no-serving-pin")
+    if not isinstance(pin, list) or not all(type(p) is str for p in pin):
+        return Eligibility(False, "malformed-serving-pin")
+    # An empty list declares no set, the same as an absent key: an entry
+    # declaring no set is unverified.
+    accepted = entry.get('accepted_served_models')
+    if accepted is None or (isinstance(accepted, list) and not accepted):
+        return Eligibility(False, "no-accepted-set")
+    if not isinstance(accepted, list) or not all(type(a) is str for a in accepted):
+        return Eligibility(False, "malformed-accepted-set")
+    providers = entry.get('accepted_served_providers')
+    if providers is None or (isinstance(providers, list) and not providers):
+        return Eligibility(False, "no-accepted-provider-set")
+    if not isinstance(providers, list) or not all(type(a) is str for a in providers):
+        return Eligibility(False, "malformed-accepted-provider-set")
+    # Eligible means the seat can load: any other malformed field (a bad
+    # data_collection, a missing provider) would otherwise error the seat after
+    # the others had spent.
+    try:
+        get_model_config(key)
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return Eligibility(False, "malformed-entry")
+    # The gate also reads the vendor namespace of the api_string, so a seat whose
+    # api_string is not a string with one is not eligible.
+    api_string = entry.get('api_string')
+    try:
+        if type(api_string) is not str:
+            raise ValueError("api_string is not a string")
+        provider_namespace(api_string)
+    except ValueError:
+        return Eligibility(False, "malformed-entry")
+    return Eligibility(True, "ok")
 
 
 @lru_cache(maxsize=1)
@@ -485,6 +602,83 @@ class GatewayReply(NamedTuple):
     content: str
     finish_reason: Any
     refused: bool
+    # What the gateway reports it served: the top-level `model`, `provider` and
+    # `id` of the response body. Each is None unless it is a 1-200 character
+    # printable-ASCII string. The reply's own text, never the request's.
+    served_model: Optional[str] = None
+    served_provider: Optional[str] = None
+    generation_id: Optional[str] = None
+
+
+class ServedModelMismatchError(RuntimeError):
+    """The gateway reported a served model the registry entry does not accept.
+
+    Not a `ValueError`, so it never takes the `client-config` label. The message
+    is fixed: no part of the reply travels with it.
+    """
+
+
+class ServedProviderMismatchError(RuntimeError):
+    """The gateway reported a served provider the registry entry does not accept.
+
+    A separate class from `ServedModelMismatchError`, so the council labels it
+    `served-provider-mismatch`, a label of its own. Not a `ValueError`. The
+    message is fixed: no part of the reply travels with it.
+    """
+
+
+_PROVENANCE_VALUE = re.compile(r"[\x20-\x7e]{1,200}")
+
+
+def _provenance(data: Dict[str, Any], key: str) -> Optional[str]:
+    value = data.get(key)
+    if type(value) is str and _PROVENANCE_VALUE.fullmatch(value):
+        return value
+    return None
+
+
+def reply_provenance(data: Dict[str, Any]) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """The `(served_model, served_provider, generation_id)` a response body reports.
+
+    The ONE reader of those three fields: `parse_gateway_reply` returns them, and
+    the async council reads them before it parses the reply content, so a body
+    whose content is malformed still has its served model checked. Each value is
+    None unless it is a 1-200 character printable-ASCII string.
+    """
+    return (_provenance(data, 'model'), _provenance(data, 'provider'),
+            _provenance(data, 'id'))
+
+
+def check_served(cfg: ModelConfig, reply: "GatewayReply") -> None:
+    """Raise `ServedModelMismatchError` unless the reply's served model is accepted.
+
+    Exact string equality against the entry's declared set: no case folding, no
+    prefix or date-suffix matching, no normalization. An empty set declares
+    nothing, so it is refused like an absent one. The served provider is checked
+    separately, by `check_served_provider`, after this check.
+    """
+    if not cfg.accepted_served_models:
+        raise ServedModelMismatchError("registry entry declares no accepted served models")
+    if reply.served_model is None:
+        raise ServedModelMismatchError("reply reports no served model")
+    if reply.served_model not in cfg.accepted_served_models:
+        raise ServedModelMismatchError("reply served a model outside the accepted set")
+
+
+def check_served_provider(cfg: ModelConfig, reply: "GatewayReply") -> None:
+    """Raise `ServedProviderMismatchError` unless the reply's served provider is accepted.
+
+    The served provider is the reply's top-level `provider` field. It matches
+    only when it exactly equals a member of the entry's `accepted_served_providers`:
+    no case folding, no normalization, and no mapping from the `serving_providers`
+    slugs. An absent or empty set is refused, as is an absent provider.
+    """
+    if not cfg.accepted_served_providers:
+        raise ServedProviderMismatchError("registry entry declares no accepted served providers")
+    if reply.served_provider is None:
+        raise ServedProviderMismatchError("reply reports no served provider")
+    if reply.served_provider not in cfg.accepted_served_providers:
+        raise ServedProviderMismatchError("reply served a provider outside the accepted set")
 
 
 def parse_gateway_reply(data: Dict[str, Any], model: str) -> GatewayReply:
@@ -500,9 +694,12 @@ def parse_gateway_reply(data: Dict[str, Any], model: str) -> GatewayReply:
     no choices, yields empty text.
     """
     _ = model  # part of the signature the sync and async callers share; not read here
+    # Read before every early return: a reply with no choices still says what
+    # it was served by.
+    prov = reply_provenance(data)
     choices = data.get('choices') or []
     if not choices:
-        return GatewayReply("", None, False)
+        return GatewayReply("", None, False, *prov)
 
     choice = choices[0]
     if not isinstance(choice, dict):
@@ -510,7 +707,7 @@ def parse_gateway_reply(data: Dict[str, Any], model: str) -> GatewayReply:
         # uncaught AttributeError on `.get` below. transcribe-video's main() arm
         # does not catch AttributeError, so treat a non-dict choice as no
         # content rather than crash the caller.
-        return GatewayReply("", None, False)
+        return GatewayReply("", None, False, *prov)
     finish_reason = choice.get('finish_reason')
     refused = finish_reason == 'content_filter' or \
         choice.get('native_finish_reason') == 'refusal'
@@ -524,7 +721,7 @@ def parse_gateway_reply(data: Dict[str, Any], model: str) -> GatewayReply:
     content = message.get('content') or ""
     if not isinstance(content, str):
         raise MalformedResponseError("reply content is not text")
-    return GatewayReply(content, finish_reason, refused)
+    return GatewayReply(content, finish_reason, refused, *prov)
 
 
 def parse_gateway_response(data: Dict[str, Any], model: str) -> str:
@@ -647,11 +844,12 @@ def get_default_models(role: str) -> List[str]:
 def invalidate_model_cache():
     """Clear every registry-derived cache — model roles and the gateway timeout.
 
-    Call after modifying the router config at runtime; both caches read the same
-    file, so clearing one and not the other would leave the two out of step.
+    Call after modifying the router config at runtime; every cache reads the same
+    file, so clearing one and not the others would leave them out of step.
     """
     _load_model_roles.cache_clear()
     gateway_timeout_seconds.cache_clear()
+    retired_models.cache_clear()
 
 
 # Convenience functions - all resolve from model_roles in llm_router_config.json
@@ -706,6 +904,15 @@ __all__ = [
     "provider_object",
     "raise_for_gateway_status",
     "GatewayReply",
+    "ServedModelMismatchError",
+    "ServedProviderMismatchError",
+    "check_served",
+    "check_served_provider",
+    "reply_provenance",
+    "Eligibility",
+    "retired_models",
+    "provider_namespace",
+    "council_eligibility",
     "parse_gateway_reply",
     "parse_gateway_response",
     "call_gateway",

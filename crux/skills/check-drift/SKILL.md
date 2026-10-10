@@ -147,6 +147,8 @@ Shared exit-code semantics (the same contract `verify-code-docs`, CHK-CODE-4, CH
 
 **Warnings ride alongside, never change the verdict.** Read any top-level `warnings` key (`validate-catalog.py` emits one — the `models.yml` `verified:` staleness clock; `check-doctrine-reconciliation.py`'s S1 warn lane is similar). Surface it as WARNING beside the gate's verdict. A gate at exit 0 with a non-empty `warnings` list is a **clean pass worth reporting with its warning**, not a failure.
 
+**Shallow clones.** A tree that has published a clause migration needs full Git history. In a shallow clone (the default `actions/checkout` depth of 1 in CI, for example) the governing readers (summaries, doctrine, rules catalog, arch and reviews index) refuse with `history-unavailable`. Set `fetch-depth: 0` in CI, or run `git fetch --unshallow` locally. Report such a refusal as REFUSAL, never as drift.
+
 ### 3. The one roster exception — `derive-arch.py --dry-run` exit 2
 
 `derive-arch.py --dry-run` has a third lane the others do not: **exit 2, and stderr says which of two lanes it is** (copy the CHK-ARCH-1 distinction exactly).
