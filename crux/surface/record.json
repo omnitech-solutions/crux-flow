@@ -1308,6 +1308,7 @@
   "crux.core.llm_caller": {
    "file": "scripts/crux/core/llm_caller.py",
    "symbols": {
+    "CONFIG_PATH": true,
     "ModelConfig": true,
     "call_gateway": true
    }
@@ -1341,25 +1342,25 @@
  },
  "patched_upstream_files": {
   "catalog/bundles.yml": "bdfeb7abb08a20b5584902822d944c04208045c975b214145d2a6bd1cb9eb5a7",
-  "catalog/models.yml": "3222863d9a329ef4b0d63545abd07aa24ea291f310f3e65df389a3a481586f06",
-  "catalog/skills.json": "c9bcecbf338be67807ff527ffc12cc0b655da5def982af2cc9dbf86ea23f9959",
-  "schemas/run.schema.json": "4956a1aa9a86aad63a0f3b7b9cd4bca38fdaffa9a0e550bbe7ab227b3627bb40",
-  "scripts/advance-run.py": "8d90ff49a8e4ba0631022fdb4553fd170741b5fc17ffdc14a7c431bdbd779c81",
+  "catalog/models.yml": "7e50fa25600e5217c995882ca3e9e4d1e7a42b9d27a598c9e72f4dfecf8c8b74",
+  "catalog/skills.json": "504f62b2c7df8cfa443179f546011a4b5fba88e628ab62d90bbefd43d9c0354e",
+  "schemas/run.schema.json": "8eb8a05b00016c22dd02cce57f5e1706534887adb2342d5168f67018a473e696",
+  "scripts/advance-run.py": "4630b10b7a63706c1833c430f5c0197131dc6b86fe19058ef3a9bc24a006d537",
   "scripts/codex_agents.py": "f83577430206021f94af3ec80c8c5ae5698e5a36dd7ed2c205f0b5838a58af28",
-  "scripts/crux/arch/packs/swift.py": "f08a1b0267826179380059b92960c074686141c6f5abbcaecbbc971c46a1370e",
+  "scripts/crux/arch/packs/swift.py": "690f2952777f612faef77f4570441de1ffa7ab26f52dbacf93cceeb877b3f172",
   "scripts/crux/core/__init__.py": "1f6eac8c9603464c8e610dc9468fbee5cf3a3e7ee15b8374f0cf0ab1379e2786",
-  "scripts/crux/core/llm_caller.py": "2fcda959f6229a18a43eee9ce4dfc6daaa4fd919c43d7436f85fd6fc61ed7dac",
-  "scripts/crux/council/async_council.py": "e55b55baa64eea23faa030eac802791555421c8d0e324b9de25d0e10c468fcb4",
+  "scripts/crux/core/llm_caller.py": "f21a1a159eb6eefdf594ad236f108f9251d570ccdc0ef947489d66c5f4550b45",
+  "scripts/crux/council/async_council.py": "0dfda7dd404dce0516b834ed54d6d941410301f716be1ef47cbe40bff5e11096",
   "scripts/validate-catalog.py": "6c72e5f04c91adc78cf4a0353543680c9d2868838da303e540bd761f852f5ebb",
-  "skills/archive-promptbook/SKILL.md": "2c846ace6764ae78e3a4a8ca28d4ff50db231b018eda2ea097ac5c384a3aa7a2",
+  "skills/archive-promptbook/SKILL.md": "6056fcf7e29ea7e96d47afed159c9b24e5a2d0b30e08c85890f7977096ecc878",
   "skills/call-llm/SKILL.md": "627115efd2e01a2491d85a414c5e656d9b97035200aa2f680b94cbf53aa527b4",
-  "skills/check-drift/SKILL.md": "14e8eb354b0f06c40d7dfe60a05b284a37b9fcfdf2fc032be0b52c16c391adef",
-  "skills/dev-cycle/SKILL.md": "c57b279d5d0507514070e5ff018c729c6921c2ff73c59768bdbe697809d107ee",
+  "skills/check-drift/SKILL.md": "c0add4817751292fdce08c49f573eb41083529a67644701682cf698b5c279ac1",
+  "skills/dev-cycle/SKILL.md": "2b72e8bd7aff058b710517ad49dea7495957dc1f2273c576290a359f31a24799",
   "skills/fix-directly/SKILL.md": "2df508edadb988447de61f1217b7d0a1caafcf980eba0503a192d5d3bbeb4f26",
-  "skills/iterate/SKILL.md": "ff95c6a3593c6d0f6905ea148130273f32def7d710d359d2b8960448adb4f405",
-  "skills/patch-cycle/SKILL.md": "aa63e871d4972d0abea43e6b8c33b56d4356270835479127f2f164b2831ce915",
-  "skills/run-promptbook/SKILL.md": "985d69c758c387ce78feca248ff425f759944d0356eab5932f4a1fa03ee1c6fa",
-  "skills/run-promptbook/references/advance.md": "03b2ab82e2dc4ff0eb89bc8e5f706188bd26959947c2283f5128a897d3f48b6e"
+  "skills/iterate/SKILL.md": "f5a3eaa0f5418d1c9f769194ca567be06591cb333aa248c248166ccf349bf508",
+  "skills/patch-cycle/SKILL.md": "4b5c2cfe950a9edf5d4cd35ae781c60148f3c6963b8d6a80b793d7b911274046",
+  "skills/run-promptbook/SKILL.md": "73cff3a459ea88a3542ca358e5a27d1458e0a0f8f266398fab827a7a430997b2",
+  "skills/run-promptbook/references/advance.md": "e12fa04d37ae1d23c5a5ee6fdb0ffab79192a2ca6e955c3432ec9d2b8f14ab31"
  },
  "roles": {
   "architect": {
@@ -1834,9 +1835,37 @@
   },
   "librarian": {
    "claude": {
-    "*": {
+    "aggressive": {
      "spawns": [],
      "tools": [
+      "Glob",
+      "Grep",
+      "Read",
+      "Skill"
+     ]
+    },
+    "balanced": {
+     "spawns": [],
+     "tools": [
+      "Glob",
+      "Grep",
+      "Read",
+      "Skill"
+     ]
+    },
+    "thorough": {
+     "spawns": [],
+     "tools": [
+      "Glob",
+      "Grep",
+      "Read",
+      "Skill"
+     ]
+    },
+    "upstream": {
+     "spawns": [],
+     "tools": [
+      "Bash",
       "Glob",
       "Grep",
       "Read",
@@ -1853,9 +1882,34 @@
     }
    },
    "omp": {
-    "*": {
+    "aggressive": {
      "spawns": [],
      "tools": [
+      "glob",
+      "grep",
+      "read"
+     ]
+    },
+    "balanced": {
+     "spawns": [],
+     "tools": [
+      "glob",
+      "grep",
+      "read"
+     ]
+    },
+    "thorough": {
+     "spawns": [],
+     "tools": [
+      "glob",
+      "grep",
+      "read"
+     ]
+    },
+    "upstream": {
+     "spawns": [],
+     "tools": [
+      "bash",
       "glob",
       "grep",
       "read"
@@ -1863,13 +1917,44 @@
     }
    },
    "opencode": {
-    "*": {
+    "aggressive": {
      "spawns": [],
      "tools": [
       "glob",
       "grep",
       "list",
       "read",
+      "skill"
+     ]
+    },
+    "balanced": {
+     "spawns": [],
+     "tools": [
+      "glob",
+      "grep",
+      "list",
+      "read",
+      "skill"
+     ]
+    },
+    "thorough": {
+     "spawns": [],
+     "tools": [
+      "glob",
+      "grep",
+      "list",
+      "read",
+      "skill"
+     ]
+    },
+    "upstream": {
+     "spawns": [],
+     "tools": [
+      "glob",
+      "grep",
+      "list",
+      "read",
+      "shell",
       "skill"
      ]
     }
@@ -2194,10 +2279,12 @@
   ],
   "manifest_schema_version": "5",
   "promptbook_format_versions": [
-   "1"
+   "1",
+   "2"
   ],
   "run_format_versions": [
-   "1"
+   "1",
+   "2"
   ]
  },
  "skills": {
@@ -2205,6 +2292,7 @@
    "contract": "9019439343c9d23c6835d6b54c7102b34856e9286a6b8d7bb5bce1393f99408a",
    "owner": "upstream",
    "scripts_called": [
+    "authority-view.py",
     "check-blast-radius.py",
     "crux-config.py",
     "validate-promptbook.py"
@@ -2215,6 +2303,8 @@
    "owner": "upstream",
    "scripts_called": [
     "_yaml_min.py",
+    "advance-run.py",
+    "authority-view.py",
     "bionic-config.py",
     "check-blast-radius.py",
     "check-claude-compat.py",
@@ -2237,6 +2327,7 @@
     "generate-routing-table.py",
     "generate-runtime-compat.py",
     "generate-writing-rules.py",
+    "lint-governs-references.py",
     "migrate-instructions.py",
     "summarize-adrs.py",
     "validate-catalog.py",
@@ -2248,7 +2339,9 @@
    "owner": "upstream",
    "scripts_called": [
     "advance-run.py",
+    "compile-doctrine.py",
     "crux-config.py",
+    "summarize-adrs.py",
     "validate-promptbook.py"
    ]
   },
@@ -2299,6 +2392,7 @@
    "contract": "3e2a896f53fe977c1c90c850bc22578fe7942bc9ef58a6ab052d89e6bd6ae787",
    "owner": "upstream",
    "scripts_called": [
+    "authority-view.py",
     "check-journal-reference.py",
     "check_template_parity.py",
     "generate-journal-index.py",
@@ -2317,9 +2411,13 @@
    ]
   },
   "council": {
-   "contract": "0ce09acaa315c6c5b616f9eca6b094e4e8837cb828909db0d2e5724e5ca28fbe",
+   "contract": "0676d76faea99e5b5ca5013fb5cfeec36750dc93772478d0660d963241daaac9",
    "owner": "upstream",
-   "scripts_called": []
+   "scripts_called": [
+    "advance-run.py",
+    "run-council.py",
+    "run-work-witness.py"
+   ]
   },
   "derive-arch": {
    "contract": "e8bc6ef725deb906a2a1f4192da7576caca60f469fc9cfd0f627bf5373035909",
@@ -2332,10 +2430,14 @@
    ]
   },
   "dev-cycle": {
-   "contract": "eadf8349b6f94b17e4dbeb0344f60695247e0de155c690071c54297707dae628",
+   "contract": "8b9d8a22886d06df3632552a0ea0a373d3cd740d8708c40f7f8451ffeb6a2588",
    "owner": "upstream",
    "scripts_called": [
+    "compile-doctrine.py",
     "crux-config.py",
+    "run-council.py",
+    "run-work-witness.py",
+    "summarize-adrs.py",
     "validate-promptbook.py"
    ]
   },
@@ -2418,7 +2520,11 @@
    "contract": "8f58ee8cb11c84412f390fde2ca8a744082fc400548a9021e94b5a6c46f07bba",
    "owner": "upstream",
    "scripts_called": [
+    "compile-doctrine.py",
     "crux-config.py",
+    "run-council.py",
+    "run-work-witness.py",
+    "summarize-adrs.py",
     "validate-promptbook.py"
    ]
   },
@@ -2451,7 +2557,11 @@
    "owner": "upstream",
    "scripts_called": [
     "check-blast-radius.py",
+    "compile-doctrine.py",
     "crux-config.py",
+    "run-council.py",
+    "run-work-witness.py",
+    "summarize-adrs.py",
     "validate-promptbook.py"
    ]
   },
@@ -2465,7 +2575,12 @@
    "owner": "upstream",
    "scripts_called": [
     "check-governs-coverage.py",
+    "compile-doctrine.py",
     "crux-config.py",
+    "derive-arch.py",
+    "generate-adr-index.py",
+    "generate-index-rollup.py",
+    "generate-lineage.py",
     "summarize-adrs.py"
    ]
   },
@@ -2480,7 +2595,9 @@
    "scripts_called": [
     "bionic-config.py",
     "check_observations.py",
-    "crux-config.py"
+    "compile-doctrine.py",
+    "crux-config.py",
+    "summarize-adrs.py"
    ]
   },
   "prose-review": {
@@ -2494,7 +2611,9 @@
    "contract": "abb6c7b29af10a26b08174689a03045dcc497fcb695c8a0cd02dde419f127fda",
    "owner": "upstream",
    "scripts_called": [
-    "generate-journal-index.py"
+    "authority-view.py",
+    "generate-journal-index.py",
+    "implementation-decisions.py"
    ]
   },
   "read-news": {
@@ -2520,6 +2639,7 @@
    "contract": "2cbf1755e31c30cb7b4167798c496be317191827d1b78d9a8519f80989f86907",
    "owner": "upstream",
    "scripts_called": [
+    "authority-view.py",
     "compile-doctrine.py",
     "derive-arch.py",
     "summarize-adrs.py",
@@ -2559,21 +2679,27 @@
    "owner": "upstream",
    "scripts_called": [
     "adr-signals.py",
+    "authority-view.py",
     "compile-doctrine.py",
     "generate-reviews-index.py",
+    "implementation-decisions.py",
     "summarize-adrs.py",
     "untrusted.py"
    ]
   },
   "run-adr-council": {
-   "contract": "e26f89e62d81aff1b2495328a8b45a17b233059ae2c9fba4941bcce86ee9b98a",
+   "contract": "4800010f9d9e66a8141003f39589414fbfec6eba3677cc62fee5334142b627cf",
    "owner": "upstream",
-   "scripts_called": []
+   "scripts_called": [
+    "run-council.py",
+    "run-work-witness.py"
+   ]
   },
   "run-promptbook": {
    "contract": "97d0e5260198def236b27cd8e1a81c2a00743b4a07385fb337e559c3eee17fcd",
    "owner": "upstream",
    "scripts_called": [
+    "advance-run.py",
     "crux-config.py"
    ]
   },
@@ -2614,7 +2740,11 @@
    "contract": "fcaaeacf925a6d5af44ea3a95bf607b082357040fafcad52d0c8cc7bf810b289",
    "owner": "upstream",
    "scripts_called": [
+    "compile-doctrine.py",
+    "derive-arch.py",
     "generate-adr-index.py",
+    "generate-index-rollup.py",
+    "generate-lineage.py",
     "summarize-adrs.py"
    ]
   },
@@ -2696,9 +2826,9 @@
   }
  ],
  "upstream": {
-  "commit": "732c355a5bc3130f6cd3763214f7c908b302a3e8",
-  "plugin_json_version": "3.25.1",
-  "version": "3.25.1"
+  "commit": "06989514bc97de7b252d03979b5d2db08a61a919",
+  "plugin_json_version": "3.27.4",
+  "version": "3.27.4"
  },
  "upstream_scripts": {
   "advance-run.py": {
@@ -2712,7 +2842,19 @@
     "--book": {
      "required": false
     },
+    "--gate-info": {
+     "required": false
+    },
+    "--implementation-revision": {
+     "required": false
+    },
+    "--migration-batch": {
+     "required": false
+    },
     "--outcome": {
+     "required": false
+    },
+    "--prompt": {
      "required": false
     },
     "--reason": {
@@ -2726,6 +2868,21 @@
     }
    },
    "functions": {
+    "_adr_acceptance_pending": [
+     "run",
+     "book",
+     "run_dir",
+     "repo"
+    ],
+    "_adr_status": [
+     "repo",
+     "rel"
+    ],
+    "_block_lines": [
+     "text",
+     "start",
+     "eol"
+    ],
     "_block_scalars": [
      "node"
     ],
@@ -2737,6 +2894,10 @@
     "_check_base_commit_pin": [
      "run",
      "run_path"
+    ],
+    "_element": [
+     "run",
+     "n"
     ],
     "_emit": [
      "value"
@@ -2750,6 +2911,10 @@
     "_fail": [
      "msg"
     ],
+    "_format_two_or_fail": [
+     "run",
+     "book"
+    ],
     "_is_block_collection": [
      "node"
     ],
@@ -2760,6 +2925,22 @@
      "root",
      "path"
     ],
+    "_named_adr": [
+     "repo",
+     "text",
+     "pattern"
+    ],
+    "_notes_block_edit": [
+     "text",
+     "key_node",
+     "node",
+     "old",
+     "new",
+     "eol"
+    ],
+    "_notes_shape": [
+     "text"
+    ],
     "_now": [],
     "_path_text": [
      "path"
@@ -2767,6 +2948,51 @@
     "_preflight_patch_completion": [
      "book_path",
      "run_path"
+    ],
+    "_prior_adr_closes_or_fail": [
+     "run",
+     "book",
+     "run_path"
+    ],
+    "_prior_implementation_closes_or_fail": [
+     "run",
+     "book",
+     "run_path"
+    ],
+    "_prompt_text": [
+     "prompt"
+    ],
+    "_publish_format_two": [
+     "run_path",
+     "content",
+     "before",
+     "retained"
+    ],
+    "_read_in_repo": [
+     "repo",
+     "rel"
+    ],
+    "_record_subjects": [
+     "repo",
+     "rel"
+    ],
+    "_refuse_symlinked": [
+     "path",
+     "what"
+    ],
+    "_resolve_book_or_fail": [
+     "run_path",
+     "book_arg"
+    ],
+    "_route_note": [
+     "now",
+     "cur",
+     "gate",
+     "nxt_n",
+     "result",
+     "artifacts",
+     "verdict",
+     "prior"
     ],
     "_span": [
      "text",
@@ -2778,8 +3004,20 @@
      "before",
      "after"
     ],
+    "_start_fields_or_fail": [
+     "run",
+     "run_path",
+     "resolved"
+    ],
     "_terminators_are_uniform": [
      "text"
+    ],
+    "_tree_adr_path": [
+     "repo"
+    ],
+    "_withdrawn_fields": [
+     "book",
+     "n"
     ],
     "abandon": [
      "run",
@@ -2791,8 +3029,38 @@
      "result",
      "artifacts"
     ],
+    "append_run_note": [
+     "run",
+     "entry",
+     "shape"
+    ],
+    "block_in_place": [
+     "run",
+     "result",
+     "artifacts"
+    ],
+    "gate_info": [
+     "run",
+     "run_path",
+     "args"
+    ],
+    "keep_blocked_evidence": [
+     "run",
+     "outcome",
+     "result",
+     "artifacts",
+     "notes_shape"
+    ],
     "main": [
      "argv"
+    ],
+    "route_to_ordinal3": [
+     "run",
+     "gate",
+     "result",
+     "artifacts",
+     "verdict",
+     "notes_shape"
     ]
    },
    "main_returns": [
@@ -3191,6 +3459,11 @@
      "errors",
      "file_label"
     ],
+    "declared_empty_overlap_errors": [
+     "path",
+     "doc",
+     "file_label"
+    ],
     "detect_kind": [
      "doc"
     ],
@@ -3229,6 +3502,13 @@
     "validate_file": [
      "path",
      "kind_override"
+    ],
+    "validate_format_two": [
+     "book"
+    ],
+    "validate_format_two_run": [
+     "run",
+     "book"
     ]
    },
    "main_returns": [
