@@ -1,19 +1,22 @@
 from __future__ import annotations
 
-from dataclasses import fields
+from dataclasses import MISSING, fields
 from pathlib import Path
 
-from crux.core.llm_caller import ModelConfig, call_gateway
+from crux.core.llm_caller import CONFIG_PATH, ModelConfig, call_gateway
 from crux.council.async_council import AsyncCouncil, AsyncCouncilConfig
 
-from .common import FlowError, mapping, text
+from .common import FlowError, digest, mapping, text
 from . import records
 
 
 def _selected(run: dict,role: str) -> ModelConfig:
     row=run['flow']['effective_policy']['api']['roles'].get(role)
     if not isinstance(row,dict): raise FlowError('select one configured API role, not a council roster')
-    value=mapping(row['config'],allowed={f.name for f in fields(ModelConfig)},required={f.name for f in fields(ModelConfig)})
+    # A frozen run keeps the configuration it froze. Fields upstream added to ModelConfig after the run was frozen (they carry
+    # defaults) are optional here, so an upgrade of the vendored router never strands a run already in flight.
+    required={f.name for f in fields(ModelConfig) if f.default is MISSING and f.default_factory is MISSING}
+    value=mapping(row['config'],allowed={f.name for f in fields(ModelConfig)},required=required)
     cfg=ModelConfig(**value)
     if cfg.api_string!=row['model'] or cfg.data_collection not in {'allow','deny'}: raise FlowError('frozen API binding is inconsistent')
     return cfg
@@ -36,9 +39,14 @@ def council_config(path: Path,*,invocation: str,justification: str,authorized: b
     seats={'openai':'openai_top','anthropic':'anthropic_top','gemini':'google_top'}
     selected={seat:_selected(run,role) for seat,role in seats.items()}
     remaining=records.view(run)['remaining_seconds']
+    # The run's frozen model configurations seat the council, not the router file shipped today. When the shipped router moved
+    # since the freeze, the run keeps what it froze and the attempt records why, instead of refusing.
+    live=digest(CONFIG_PATH.read_bytes()); frozen=binding['base_registry_digest']
+    if live!=frozen:
+        justification=text(justification)+f' [frozen router {frozen[:12]} differs from shipped router {live[:12]}; seated from the configuration this run froze]'
     deadline=(run['flow']['started_epoch_ms']/1000+run['flow']['effective_policy']['budget_minutes']*60)
     config=AsyncCouncilConfig(openai_model=selected['openai'].name,anthropic_model=selected['anthropic'].name,
-          gemini_model=selected['gemini'].name,resolved_models=selected,expected_router_digest=binding['base_registry_digest'],
+          gemini_model=selected['gemini'].name,resolved_models=selected,expected_router_digest=frozen if live==frozen else None,
           overall_timeout_seconds=remaining,overall_deadline_epoch=deadline,timeout_seconds=min(600.0,remaining),
           max_tokens=min(32000,*(cfg.max_output_tokens for cfg in selected.values())),max_retries=1)
     records.attempt(path,kind='council',invocation=invocation,justification=justification)
